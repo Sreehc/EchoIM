@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImConversationMapper">
+
+    <select id="selectConversationPageByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
+        SELECT c.id AS conversationId,
+               c.conversation_type AS conversationType,
+               c.conversation_name AS conversationName,
+               c.avatar_url AS avatarUrl,
+               c.last_message_preview AS lastMessagePreview,
+               c.last_message_time AS lastMessageTime,
+               cu.unread_count AS unreadCount,
+               cu.is_top AS isTop
+        FROM im_conversation_user cu
+        JOIN im_conversation c ON c.id = cu.conversation_id
+        WHERE cu.user_id = #{userId}
+          AND cu.deleted = 0
+          AND c.status = 1
+        ORDER BY cu.is_top DESC, c.last_message_time DESC, c.id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countConversationByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM im_conversation_user cu
+        JOIN im_conversation c ON c.id = cu.conversation_id
+        WHERE cu.user_id = #{userId}
+          AND cu.deleted = 0
+          AND c.status = 1
+    </select>
+</mapper>

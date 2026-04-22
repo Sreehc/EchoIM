@@ -1,0 +1,21 @@
+package com.echoim.server.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.echoim.server.entity.ImMessageEntity;
+import com.echoim.server.vo.conversation.MessageItemVo;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+@Mapper
+public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
+
+    List<MessageItemVo> selectMessagePageByConversationIdAndUserId(@Param("conversationId") Long conversationId,
+                                                                   @Param("userId") Long userId,
+                                                                   @Param("offset") long offset,
+                                                                   @Param("pageSize") long pageSize);
+
+    long countMessageByConversationIdAndUserId(@Param("conversationId") Long conversationId,
+                                               @Param("userId") Long userId);
+}
