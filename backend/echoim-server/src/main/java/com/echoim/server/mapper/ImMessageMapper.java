@@ -18,4 +18,6 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
 
     long countMessageByConversationIdAndUserId(@Param("conversationId") Long conversationId,
                                                @Param("userId") Long userId);
+
+    Long selectMaxSeqNoByConversationId(@Param("conversationId") Long conversationId);
 }

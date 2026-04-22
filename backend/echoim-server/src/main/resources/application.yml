@@ -6,6 +6,11 @@ spring:
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -28,3 +33,7 @@ echoim:
   jwt:
     secret: ${ECHOIM_JWT_SECRET:echoim-server-jwt-secret-key-1234567890}
     expire-seconds: 7200
+  im:
+    port: ${ECHOIM_IM_PORT:8091}
+    ws-path: /ws
+    heartbeat-timeout-seconds: 60

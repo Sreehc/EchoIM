@@ -2,9 +2,12 @@ package com.echoim.server.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.echoim.server.entity.ImFriendRequestEntity;
+import com.echoim.server.vo.friend.FriendRequestItemVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 @Mapper
 public interface ImFriendRequestMapper extends BaseMapper<ImFriendRequestEntity> {
@@ -26,4 +29,6 @@ public interface ImFriendRequestMapper extends BaseMapper<ImFriendRequestEntity>
                 OR (user_id = #{userBId} AND friend_user_id = #{userAId}))
             """)
     long countExistingFriendRelation(@Param("userAId") Long userAId, @Param("userBId") Long userBId);
+
+    List<FriendRequestItemVo> selectRelatedRequests(@Param("userId") Long userId);
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImConversationUserMapper">
+
+    <select id="selectByConversationIdAndUserId" resultType="com.echoim.server.entity.ImConversationUserEntity">
+        SELECT id,
+               conversation_id AS conversationId,
+               user_id AS userId,
+               unread_count AS unreadCount,
+               last_read_seq AS lastReadSeq,
+               is_top AS isTop,
+               is_mute AS isMute,
+               deleted,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_conversation_user
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+        LIMIT 1
+    </select>
+</mapper>

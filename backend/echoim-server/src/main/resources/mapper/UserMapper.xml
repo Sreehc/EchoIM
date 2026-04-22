@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImUserMapper">
+
+    <select id="selectProfileByUserId" resultType="com.echoim.server.vo.user.UserProfileVo">
+        SELECT id AS userId,
+               user_no AS userNo,
+               username AS username,
+               nickname AS nickname,
+               avatar_url AS avatarUrl,
+               gender AS gender,
+               phone AS phone,
+               email AS email,
+               signature AS signature,
+               status AS status
+        FROM im_user
+        WHERE id = #{userId}
+        LIMIT 1
+    </select>
+</mapper>

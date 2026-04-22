@@ -30,4 +30,31 @@
           AND cu.deleted = 0
           AND c.status = 1
     </select>
+
+    <select id="selectSingleConversationByBizKey" resultType="com.echoim.server.entity.ImConversationEntity">
+        SELECT id,
+               conversation_type AS conversationType,
+               biz_key AS bizKey,
+               biz_id AS bizId,
+               conversation_name AS conversationName,
+               avatar_url AS avatarUrl,
+               last_message_id AS lastMessageId,
+               last_message_preview AS lastMessagePreview,
+               last_message_time AS lastMessageTime,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_conversation
+        WHERE conversation_type = 1
+          AND biz_key = #{bizKey}
+        LIMIT 1
+    </select>
+
+    <update id="updateLastMessage">
+        UPDATE im_conversation
+        SET last_message_id = #{lastMessageId},
+            last_message_preview = #{lastMessagePreview},
+            last_message_time = NOW()
+        WHERE id = #{conversationId}
+    </update>
 </mapper>

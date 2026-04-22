@@ -2,6 +2,7 @@ package com.echoim.server.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.echoim.server.entity.ImUserEntity;
+import com.echoim.server.vo.user.UserProfileVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -17,4 +18,6 @@ public interface ImUserMapper extends BaseMapper<ImUserEntity> {
             LIMIT 1
             """)
     ImUserEntity selectByUsername(@Param("username") String username);
+
+    UserProfileVo selectProfileByUserId(@Param("userId") Long userId);
 }

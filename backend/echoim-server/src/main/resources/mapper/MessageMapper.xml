@@ -42,4 +42,10 @@
           AND cu.deleted = 0
           AND c.status = 1
     </select>
+
+    <select id="selectMaxSeqNoByConversationId" resultType="java.lang.Long">
+        SELECT MAX(seq_no)
+        FROM im_message
+        WHERE conversation_id = #{conversationId}
+    </select>
 </mapper>

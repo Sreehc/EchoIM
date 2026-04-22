@@ -4,35 +4,32 @@ import com.echoim.server.common.ApiResponse;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.dto.friend.CreateFriendRequestDto;
+import com.echoim.server.service.friend.FriendService;
 import com.echoim.server.service.friend.FriendRequestService;
+import com.echoim.server.vo.friend.FriendItemVo;
 import com.echoim.server.vo.friend.FriendRequestCreateVo;
+import com.echoim.server.vo.friend.FriendRequestItemVo;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 public class FriendController {
 
+    private final FriendService friendService;
     private final FriendRequestService friendRequestService;
 
-    public FriendController(FriendRequestService friendRequestService) {
+    public FriendController(FriendService friendService, FriendRequestService friendRequestService) {
+        this.friendService = friendService;
         this.friendRequestService = friendRequestService;
     }
 
+    @RequireLogin
     @GetMapping("/friends")
-    public ApiResponse<List<Map<String, Object>>> friends() {
-        return ApiResponse.success(List.of(
-                Map.of(
-                        "friendUserId", 10002L,
-                        "nickname", "Echo用户02",
-                        "remark", "产品同学",
-                        "avatarUrl", ""
-                )
-        ));
+    public ApiResponse<List<FriendItemVo>> friends() {
+        return ApiResponse.success(friendService.listFriends(LoginUserContext.requireUserId()));
     }
 
     @RequireLogin
@@ -41,28 +38,24 @@ public class FriendController {
         return ApiResponse.success(friendRequestService.create(LoginUserContext.requireUserId(), requestDto));
     }
 
+    @RequireLogin
     @GetMapping("/friend-requests")
-    public ApiResponse<List<Map<String, Object>>> friendRequests() {
-        return ApiResponse.success(List.of(
-                Map.of(
-                        "requestId", 1L,
-                        "fromUserId", 10001L,
-                        "toUserId", 10002L,
-                        "applyMsg", "你好，想加你为好友",
-                        "status", 1,
-                        "createdAt", LocalDateTime.now().toString()
-                )
-        ));
+    public ApiResponse<List<FriendRequestItemVo>> friendRequests() {
+        return ApiResponse.success(friendService.listRelatedRequests(LoginUserContext.requireUserId()));
     }
 
+    @RequireLogin
     @PutMapping("/friend-requests/{id}/approve")
-    public ApiResponse<Map<String, Object>> approve(@PathVariable Long id) {
-        return ApiResponse.success(Map.of("requestId", id, "status", 1));
+    public ApiResponse<Void> approve(@PathVariable Long id) {
+        friendService.approveRequest(LoginUserContext.requireUserId(), id);
+        return ApiResponse.success();
     }
 
+    @RequireLogin
     @PutMapping("/friend-requests/{id}/reject")
-    public ApiResponse<Map<String, Object>> reject(@PathVariable Long id) {
-        return ApiResponse.success(Map.of("requestId", id, "status", 2));
+    public ApiResponse<Void> reject(@PathVariable Long id) {
+        friendService.rejectRequest(LoginUserContext.requireUserId(), id);
+        return ApiResponse.success();
     }
 
     @DeleteMapping("/friends/{friendId}")

@@ -2,13 +2,16 @@ package com.echoim.server.controller;
 
 import com.echoim.server.common.ApiResponse;
 import com.echoim.server.common.PageResponse;
+import com.echoim.server.common.annotation.RequireLogin;
+import com.echoim.server.common.auth.LoginUserContext;
+import com.echoim.server.dto.user.UpdateProfileRequestDto;
+import com.echoim.server.service.user.UserProfileService;
+import com.echoim.server.vo.user.UserProfileVo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,26 +20,22 @@ import java.util.Map;
 @RequestMapping("/api/users")
 public class UserController {
 
-    @GetMapping("/me")
-    public ApiResponse<Map<String, Object>> me() {
-        return ApiResponse.success(Map.of(
-                "userId", 10001L,
-                "userNo", "E10001",
-                "username", "echo_demo_01",
-                "nickname", "Echo用户01",
-                "avatarUrl", "",
-                "signature", "欢迎来到 EchoIM"
-        ));
+    private final UserProfileService userProfileService;
+
+    public UserController(UserProfileService userProfileService) {
+        this.userProfileService = userProfileService;
     }
 
+    @RequireLogin
+    @GetMapping("/me")
+    public ApiResponse<UserProfileVo> me() {
+        return ApiResponse.success(userProfileService.getCurrentProfile(LoginUserContext.requireUserId()));
+    }
+
+    @RequireLogin
     @PutMapping("/me")
-    public ApiResponse<Map<String, Object>> updateMe(@Valid @RequestBody UpdateProfileRequest request) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("nickname", request.nickname());
-        data.put("avatarUrl", request.avatarUrl());
-        data.put("gender", request.gender());
-        data.put("signature", request.signature());
-        return ApiResponse.success(data);
+    public ApiResponse<UserProfileVo> updateMe(@Valid @RequestBody UpdateProfileRequestDto requestDto) {
+        return ApiResponse.success(userProfileService.updateCurrentProfile(LoginUserContext.requireUserId(), requestDto));
     }
 
     @GetMapping("/search")
@@ -54,13 +53,5 @@ public class UserController {
                 "keyword", keyword
         ));
         return ApiResponse.success(new PageResponse<>(list, pageNo, pageSize, list.size()));
-    }
-
-    public record UpdateProfileRequest(
-            @NotBlank(message = "昵称不能为空") String nickname,
-            String avatarUrl,
-            Integer gender,
-            String signature
-    ) {
     }
 }
