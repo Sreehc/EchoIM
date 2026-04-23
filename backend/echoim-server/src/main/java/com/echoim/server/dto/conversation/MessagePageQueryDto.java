@@ -13,6 +13,9 @@ public class MessagePageQueryDto {
     @Min(value = 1, message = "maxSeqNo 最小为 1")
     private Long maxSeqNo;
 
+    @Min(value = 0, message = "afterSeq 最小为 0")
+    private Long afterSeq;
+
     public Long getPageNo() {
         return pageNo;
     }
@@ -35,5 +38,13 @@ public class MessagePageQueryDto {
 
     public void setMaxSeqNo(Long maxSeqNo) {
         this.maxSeqNo = maxSeqNo;
+    }
+
+    public Long getAfterSeq() {
+        return afterSeq;
+    }
+
+    public void setAfterSeq(Long afterSeq) {
+        this.afterSeq = afterSeq;
     }
 }

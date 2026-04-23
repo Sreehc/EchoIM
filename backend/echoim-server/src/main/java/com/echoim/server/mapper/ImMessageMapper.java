@@ -24,6 +24,15 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
                                                                      @Param("maxSeqNo") Long maxSeqNo,
                                                                      @Param("pageSize") long pageSize);
 
+    List<MessageItemVo> selectMessageAfterSeqByConversationIdAndUserId(@Param("conversationId") Long conversationId,
+                                                                       @Param("userId") Long userId,
+                                                                       @Param("afterSeq") Long afterSeq,
+                                                                       @Param("pageSize") long pageSize);
+
+    long countMessageAfterSeqByConversationIdAndUserId(@Param("conversationId") Long conversationId,
+                                                       @Param("userId") Long userId,
+                                                       @Param("afterSeq") Long afterSeq);
+
     Long selectMaxSeqNoByConversationId(@Param("conversationId") Long conversationId);
 
     ImMessageEntity selectByFromUserIdAndClientMsgId(@Param("fromUserId") Long fromUserId,

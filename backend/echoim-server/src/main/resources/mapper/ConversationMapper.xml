@@ -12,14 +12,55 @@
                c.last_message_preview AS lastMessagePreview,
                c.last_message_time AS lastMessageTime,
                cu.unread_count AS unreadCount,
-               cu.is_top AS isTop
+               cu.is_top AS isTop,
+               COALESCE(lm.seq_no, 0) AS latestSeq
         FROM im_conversation_user cu
         JOIN im_conversation c ON c.id = cu.conversation_id
+        LEFT JOIN im_message lm ON lm.id = c.last_message_id
         WHERE cu.user_id = #{userId}
           AND cu.deleted = 0
           AND c.status = 1
         ORDER BY cu.is_top DESC, c.last_message_time DESC, c.id DESC
         LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectAllConversationsByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
+        SELECT c.id AS conversationId,
+               c.conversation_type AS conversationType,
+               c.conversation_name AS conversationName,
+               c.avatar_url AS avatarUrl,
+               c.last_message_preview AS lastMessagePreview,
+               c.last_message_time AS lastMessageTime,
+               cu.unread_count AS unreadCount,
+               cu.is_top AS isTop,
+               COALESCE(lm.seq_no, 0) AS latestSeq
+        FROM im_conversation_user cu
+        JOIN im_conversation c ON c.id = cu.conversation_id
+        LEFT JOIN im_message lm ON lm.id = c.last_message_id
+        WHERE cu.user_id = #{userId}
+          AND cu.deleted = 0
+          AND c.status = 1
+        ORDER BY cu.is_top DESC, c.last_message_time DESC, c.id DESC
+    </select>
+
+    <select id="selectConversationItemByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
+        SELECT c.id AS conversationId,
+               c.conversation_type AS conversationType,
+               c.conversation_name AS conversationName,
+               c.avatar_url AS avatarUrl,
+               c.last_message_preview AS lastMessagePreview,
+               c.last_message_time AS lastMessageTime,
+               cu.unread_count AS unreadCount,
+               cu.is_top AS isTop,
+               COALESCE(lm.seq_no, 0) AS latestSeq
+        FROM im_conversation_user cu
+        JOIN im_conversation c ON c.id = cu.conversation_id
+        LEFT JOIN im_message lm ON lm.id = c.last_message_id
+        WHERE c.id = #{conversationId}
+          AND cu.user_id = #{userId}
+          AND cu.deleted = 0
+          AND c.status = 1
+        LIMIT 1
     </select>
 
     <select id="countConversationByUserId" resultType="long">

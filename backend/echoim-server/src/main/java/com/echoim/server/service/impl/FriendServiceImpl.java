@@ -8,6 +8,8 @@ import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImFriendEntity;
 import com.echoim.server.entity.ImFriendRequestEntity;
 import com.echoim.server.entity.ImMessageEntity;
+import com.echoim.server.im.model.WsMessageItem;
+import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImFriendMapper;
@@ -39,17 +41,20 @@ public class FriendServiceImpl implements FriendService {
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
     private final ImMessageMapper imMessageMapper;
+    private final ImWsPushService imWsPushService;
 
     public FriendServiceImpl(ImFriendMapper imFriendMapper,
                              ImFriendRequestMapper imFriendRequestMapper,
                              ImConversationMapper imConversationMapper,
                              ImConversationUserMapper imConversationUserMapper,
-                             ImMessageMapper imMessageMapper) {
+                             ImMessageMapper imMessageMapper,
+                             ImWsPushService imWsPushService) {
         this.imFriendMapper = imFriendMapper;
         this.imFriendRequestMapper = imFriendRequestMapper;
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imMessageMapper = imMessageMapper;
+        this.imWsPushService = imWsPushService;
     }
 
     @Override
@@ -96,6 +101,8 @@ public class FriendServiceImpl implements FriendService {
         imMessageMapper.insert(message);
 
         imConversationMapper.updateLastMessage(conversation.getId(), message.getId(), request.getApplyMsg());
+        pushConversationCreated(request.getFromUserId(), conversation.getId(), message);
+        pushConversationCreated(request.getToUserId(), conversation.getId(), message);
     }
 
     @Override
@@ -171,5 +178,29 @@ public class FriendServiceImpl implements FriendService {
     private long nextSeqNo(Long conversationId) {
         Long current = imMessageMapper.selectMaxSeqNoByConversationId(conversationId);
         return current == null ? 1L : current + 1;
+    }
+
+    private void pushConversationCreated(Long userId, Long conversationId, ImMessageEntity message) {
+        var conversation = imConversationMapper.selectConversationItemByUserId(conversationId, userId);
+        if (conversation == null) {
+            return;
+        }
+        imWsPushService.pushConversationChange(userId, "CONVERSATION_CREATED", conversation, toWsMessageItem(message));
+    }
+
+    private WsMessageItem toWsMessageItem(ImMessageEntity entity) {
+        WsMessageItem item = new WsMessageItem();
+        item.setMessageId(entity.getId());
+        item.setConversationId(entity.getConversationId());
+        item.setSeqNo(entity.getSeqNo());
+        item.setClientMsgId(entity.getClientMsgId());
+        item.setFromUserId(entity.getFromUserId());
+        item.setToUserId(entity.getToUserId());
+        item.setMsgType("SYSTEM");
+        item.setContent(entity.getContent());
+        item.setFileId(entity.getFileId());
+        item.setSendStatus(entity.getSendStatus());
+        item.setSentAt(entity.getSentAt());
+        return item;
     }
 }

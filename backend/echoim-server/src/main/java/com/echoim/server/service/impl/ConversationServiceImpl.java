@@ -54,17 +54,27 @@ public class ConversationServiceImpl implements ConversationService {
         long pageSize = normalizePageSize(queryDto.getPageSize());
         long offset = (pageNo - 1) * pageSize;
 
+        if (queryDto.getAfterSeq() != null && queryDto.getMaxSeqNo() != null) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "afterSeq 和 maxSeqNo 不能同时传");
+        }
         requireActiveConversation(userId, conversationId);
 
         List<MessageItemVo> list;
-        if (queryDto.getMaxSeqNo() != null) {
+        long total;
+        if (queryDto.getAfterSeq() != null) {
+            pageNo = 1L;
+            list = imMessageMapper.selectMessageAfterSeqByConversationIdAndUserId(conversationId, userId, queryDto.getAfterSeq(), pageSize);
+            total = imMessageMapper.countMessageAfterSeqByConversationIdAndUserId(conversationId, userId, queryDto.getAfterSeq());
+        } else if (queryDto.getMaxSeqNo() != null) {
             pageNo = 1L;
             list = imMessageMapper.selectMessageCursorByConversationIdAndUserId(conversationId, userId, queryDto.getMaxSeqNo(), pageSize);
+            Collections.reverse(list);
+            total = imMessageMapper.countMessageByConversationIdAndUserId(conversationId, userId);
         } else {
             list = imMessageMapper.selectMessagePageByConversationIdAndUserId(conversationId, userId, offset, pageSize);
+            Collections.reverse(list);
+            total = imMessageMapper.countMessageByConversationIdAndUserId(conversationId, userId);
         }
-        Collections.reverse(list);
-        long total = imMessageMapper.countMessageByConversationIdAndUserId(conversationId, userId);
         return new PageResponse<>(list, pageNo, pageSize, total);
     }
 

@@ -9,6 +9,7 @@ public enum WsMessageType {
     ACK,
     READ,
     NOTICE,
+    CONVERSATION_CHANGE,
     FORCE_OFFLINE,
     OFFLINE_SYNC
 }

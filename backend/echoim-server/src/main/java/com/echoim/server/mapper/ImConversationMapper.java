@@ -15,6 +15,11 @@ public interface ImConversationMapper extends BaseMapper<ImConversationEntity> {
                                                             @Param("offset") long offset,
                                                             @Param("pageSize") long pageSize);
 
+    List<ConversationItemVo> selectAllConversationsByUserId(@Param("userId") Long userId);
+
+    ConversationItemVo selectConversationItemByUserId(@Param("conversationId") Long conversationId,
+                                                      @Param("userId") Long userId);
+
     long countConversationByUserId(@Param("userId") Long userId);
 
     ImConversationEntity selectSingleConversationByBizKey(@Param("bizKey") String bizKey);

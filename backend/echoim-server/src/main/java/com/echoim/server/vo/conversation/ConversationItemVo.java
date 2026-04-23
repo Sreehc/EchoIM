@@ -12,6 +12,7 @@ public class ConversationItemVo {
     private LocalDateTime lastMessageTime;
     private Integer unreadCount;
     private Integer isTop;
+    private Long latestSeq;
 
     public Long getConversationId() {
         return conversationId;
@@ -75,5 +76,13 @@ public class ConversationItemVo {
 
     public void setIsTop(Integer isTop) {
         this.isTop = isTop;
+    }
+
+    public Long getLatestSeq() {
+        return latestSeq;
+    }
+
+    public void setLatestSeq(Long latestSeq) {
+        this.latestSeq = latestSeq;
     }
 }

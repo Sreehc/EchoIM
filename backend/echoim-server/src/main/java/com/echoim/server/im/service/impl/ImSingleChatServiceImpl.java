@@ -13,15 +13,13 @@ import com.echoim.server.im.model.WsMessageItem;
 import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.model.WsReadData;
 import com.echoim.server.im.service.ImSingleChatService;
-import com.echoim.server.im.session.ImSessionManager;
+import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.channel.Channel;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,25 +44,27 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private static final int RECEIPT_TYPE_READ = 2;
     private static final String ACK_TYPE_SEND = "SEND";
     private static final String ACK_TYPE_DELIVERED = "DELIVERED";
+    private static final String CHANGE_TYPE_MESSAGE_NEW = "MESSAGE_NEW";
+    private static final String CHANGE_TYPE_READ_UPDATE = "READ_UPDATE";
 
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
     private final ImMessageMapper imMessageMapper;
     private final ImMessageReceiptMapper imMessageReceiptMapper;
-    private final ImSessionManager imSessionManager;
+    private final ImWsPushService imWsPushService;
     private final ObjectMapper objectMapper;
 
     public ImSingleChatServiceImpl(ImConversationMapper imConversationMapper,
                                    ImConversationUserMapper imConversationUserMapper,
                                    ImMessageMapper imMessageMapper,
                                    ImMessageReceiptMapper imMessageReceiptMapper,
-                                   ImSessionManager imSessionManager,
+                                   ImWsPushService imWsPushService,
                                    ObjectMapper objectMapper) {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imMessageMapper = imMessageMapper;
         this.imMessageReceiptMapper = imMessageReceiptMapper;
-        this.imSessionManager = imSessionManager;
+        this.imWsPushService = imWsPushService;
         this.objectMapper = objectMapper;
     }
 
@@ -105,6 +105,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
         WsMessageItem item = toWsMessageItem(entity);
         pushSingleMessage(data.getToUserId(), message, item);
+        pushConversationChange(loginUser.getUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, item);
+        pushConversationChange(data.getToUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, item);
         return sendAckData(item, false);
     }
 
@@ -122,7 +124,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         imMessageReceiptMapper.insertIgnore(entity.getId(), entity.getConversationId(), loginUser.getUserId(), RECEIPT_TYPE_DELIVERED);
 
         Map<String, Object> ackData = deliveredAckData(entity, loginUser.getUserId());
-        pushToUser(entity.getFromUserId(), WsMessageType.ACK, message.getTraceId(), message.getClientMsgId(), ackData);
+        imWsPushService.pushToUser(entity.getFromUserId(), WsMessageType.ACK, message.getTraceId(), message.getClientMsgId(), ackData);
         return ackData;
     }
 
@@ -152,7 +154,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
         Map<String, Object> readData = readData(conversation.getId(), userId, effectiveLastReadSeq);
         otherMemberId(conversation.getId(), userId)
-                .ifPresent(targetUserId -> pushToUser(targetUserId, WsMessageType.READ, traceId, clientMsgId, readData));
+                .ifPresent(targetUserId -> imWsPushService.pushToUser(targetUserId, WsMessageType.READ, traceId, clientMsgId, readData));
+        pushConversationChange(userId, conversation.getId(), CHANGE_TYPE_READ_UPDATE, null);
         return readData;
     }
 
@@ -333,24 +336,13 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private void pushSingleMessage(Long toUserId, WsMessage request, WsMessageItem item) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("message", item);
-        pushToUser(toUserId, WsMessageType.CHAT_SINGLE, request.getTraceId(), request.getClientMsgId(), data);
+        imWsPushService.pushToUser(toUserId, WsMessageType.CHAT_SINGLE, request.getTraceId(), request.getClientMsgId(), data);
     }
 
-    private void pushToUser(Long userId, WsMessageType type, String traceId, String clientMsgId, Object data) {
-        Optional<Channel> channelOptional = imSessionManager.getChannel(userId);
-        if (channelOptional.isEmpty() || !channelOptional.get().isActive()) {
-            return;
-        }
-        WsMessage response = new WsMessage();
-        response.setType(type);
-        response.setTraceId(traceId);
-        response.setClientMsgId(clientMsgId);
-        response.setTimestamp(System.currentTimeMillis());
-        response.setData(data);
-        try {
-            channelOptional.get().writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
-        } catch (JsonProcessingException ex) {
-            throw new BizException(ErrorCode.SYSTEM_ERROR, "WebSocket 消息编码失败");
+    private void pushConversationChange(Long userId, Long conversationId, String changeType, Object message) {
+        var conversation = imConversationMapper.selectConversationItemByUserId(conversationId, userId);
+        if (conversation != null) {
+            imWsPushService.pushConversationChange(userId, changeType, conversation, message);
         }
     }
 }
