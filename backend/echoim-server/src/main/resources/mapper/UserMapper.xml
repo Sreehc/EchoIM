@@ -19,4 +19,97 @@
         WHERE id = #{userId}
         LIMIT 1
     </select>
+
+    <sql id="FriendStatusCase">
+        CASE
+            WHEN u.id = #{currentUserId} THEN 'SELF'
+            WHEN EXISTS (
+                SELECT 1
+                FROM im_friend f
+                WHERE f.user_id = #{currentUserId}
+                  AND f.friend_user_id = u.id
+                  AND f.status = 1
+            ) THEN 'FRIEND'
+            WHEN EXISTS (
+                SELECT 1
+                FROM im_friend_request r
+                WHERE r.from_user_id = u.id
+                  AND r.to_user_id = #{currentUserId}
+                  AND r.status = 0
+            ) THEN 'PENDING_IN'
+            WHEN EXISTS (
+                SELECT 1
+                FROM im_friend_request r
+                WHERE r.from_user_id = #{currentUserId}
+                  AND r.to_user_id = u.id
+                  AND r.status = 0
+            ) THEN 'PENDING_OUT'
+            ELSE 'NONE'
+        END
+    </sql>
+
+    <sql id="PendingRequestIdExpr">
+        (
+            SELECT r.id
+            FROM im_friend_request r
+            WHERE r.status = 0
+              AND ((r.from_user_id = #{currentUserId} AND r.to_user_id = u.id)
+                OR (r.from_user_id = u.id AND r.to_user_id = #{currentUserId}))
+            ORDER BY r.created_at DESC, r.id DESC
+            LIMIT 1
+        )
+    </sql>
+
+    <sql id="SearchKeywordFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (
+                u.user_no LIKE CONCAT('%', #{keyword}, '%')
+                OR u.username LIKE CONCAT('%', #{keyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <select id="selectSearchPage" resultType="com.echoim.server.vo.user.UserSearchItemVo">
+        SELECT u.id AS userId,
+               u.user_no AS userNo,
+               u.username AS username,
+               u.nickname AS nickname,
+               u.avatar_url AS avatarUrl,
+               u.gender AS gender,
+               u.signature AS signature,
+               <include refid="FriendStatusCase"/> AS friendStatus,
+               <include refid="PendingRequestIdExpr"/> AS pendingRequestId
+        FROM im_user u
+        WHERE u.status = 1
+          AND u.id != #{currentUserId}
+        <include refid="SearchKeywordFilter"/>
+        ORDER BY u.updated_at DESC, u.id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countSearchUsers" resultType="long">
+        SELECT COUNT(1)
+        FROM im_user u
+        WHERE u.status = 1
+          AND u.id != #{currentUserId}
+        <include refid="SearchKeywordFilter"/>
+    </select>
+
+    <select id="selectPublicProfileByUserId" resultType="com.echoim.server.vo.user.UserPublicProfileVo">
+        SELECT u.id AS userId,
+               u.user_no AS userNo,
+               u.username AS username,
+               u.nickname AS nickname,
+               u.avatar_url AS avatarUrl,
+               u.gender AS gender,
+               u.signature AS signature,
+               u.status AS status,
+               <include refid="FriendStatusCase"/> AS friendStatus,
+               <include refid="PendingRequestIdExpr"/> AS pendingRequestId
+        FROM im_user u
+        WHERE u.id = #{targetUserId}
+          AND u.status = 1
+        LIMIT 1
+    </select>
 </mapper>

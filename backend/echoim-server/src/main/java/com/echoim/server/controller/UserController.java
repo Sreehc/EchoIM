@@ -6,14 +6,13 @@ import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.dto.user.UpdateProfileRequestDto;
 import com.echoim.server.service.user.UserProfileService;
+import com.echoim.server.vo.user.UserPublicProfileVo;
 import com.echoim.server.vo.user.UserProfileVo;
+import com.echoim.server.vo.user.UserSearchItemVo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 @Validated
 @RestController
@@ -38,20 +37,19 @@ public class UserController {
         return ApiResponse.success(userProfileService.updateCurrentProfile(LoginUserContext.requireUserId(), requestDto));
     }
 
+    @RequireLogin
     @GetMapping("/search")
-    public ApiResponse<PageResponse<Map<String, Object>>> search(
+    public ApiResponse<PageResponse<UserSearchItemVo>> search(
             @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "pageNo 最小为 1") long pageNo,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "pageSize 最小为 1") long pageSize
     ) {
-        List<Map<String, Object>> list = List.of(Map.of(
-                "userId", 10002L,
-                "userNo", "E10002",
-                "nickname", "Echo用户02",
-                "avatarUrl", "",
-                "friendStatus", 0,
-                "keyword", keyword
-        ));
-        return ApiResponse.success(new PageResponse<>(list, pageNo, pageSize, list.size()));
+        return ApiResponse.success(userProfileService.searchUsers(LoginUserContext.requireUserId(), keyword, pageNo, pageSize));
+    }
+
+    @RequireLogin
+    @GetMapping("/{id}")
+    public ApiResponse<UserPublicProfileVo> profile(@PathVariable Long id) {
+        return ApiResponse.success(userProfileService.getPublicProfile(LoginUserContext.requireUserId(), id));
     }
 }
