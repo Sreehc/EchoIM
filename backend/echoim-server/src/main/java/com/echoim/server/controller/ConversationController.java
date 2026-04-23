@@ -50,9 +50,11 @@ public class ConversationController {
         return ApiResponse.success();
     }
 
+    @RequireLogin
     @PutMapping("/{id}/read")
     public ApiResponse<Map<String, Object>> read(@PathVariable Long id,
                                                  @Valid @RequestBody ConversationReadRequest request) {
+        conversationService.readConversation(LoginUserContext.requireUserId(), id, request.lastReadSeq());
         return ApiResponse.success(Map.of("conversationId", id, "lastReadSeq", request.lastReadSeq()));
     }
 

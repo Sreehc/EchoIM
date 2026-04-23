@@ -1,10 +1,13 @@
 package com.echoim.server.im.netty;
 
 import com.echoim.server.common.auth.LoginUser;
+import com.echoim.server.common.constant.ErrorCode;
+import com.echoim.server.common.exception.BizException;
 import com.echoim.server.im.model.WsAuthData;
 import com.echoim.server.im.model.WsMessage;
 import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.service.ImOnlineService;
+import com.echoim.server.im.service.ImSingleChatService;
 import com.echoim.server.service.token.TokenService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,15 +29,18 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
     private final ObjectMapper objectMapper;
     private final TokenService tokenService;
     private final ImOnlineService imOnlineService;
+    private final ImSingleChatService imSingleChatService;
     private final com.echoim.server.config.ImProperties imProperties;
 
     public ImTextFrameHandler(ObjectMapper objectMapper,
                               TokenService tokenService,
                               ImOnlineService imOnlineService,
+                              ImSingleChatService imSingleChatService,
                               com.echoim.server.config.ImProperties imProperties) {
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.imOnlineService = imOnlineService;
+        this.imSingleChatService = imSingleChatService;
         this.imProperties = imProperties;
     }
 
@@ -52,10 +58,19 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
             return;
         }
 
-        switch (message.getType()) {
-            case AUTH -> handleAuth(ctx, message);
-            case PING -> handlePing(ctx, loginUser);
-            default -> ctx.close();
+        try {
+            switch (message.getType()) {
+                case AUTH -> handleAuth(ctx, message);
+                case PING -> handlePing(ctx, loginUser);
+                case CHAT_SINGLE -> writeWsMessage(ctx, WsMessageType.ACK, message, imSingleChatService.sendSingle(loginUser, message));
+                case ACK -> writeWsMessage(ctx, WsMessageType.ACK, message, imSingleChatService.deliveredAck(loginUser, message));
+                case READ -> writeWsMessage(ctx, WsMessageType.READ, message, imSingleChatService.read(loginUser, message));
+                default -> writeNotice(ctx, message, ErrorCode.PARAM_ERROR, "不支持的消息类型");
+            }
+        } catch (BizException ex) {
+            writeNotice(ctx, message, ex.getCode(), ex.getMessage());
+        } catch (Exception ex) {
+            writeNotice(ctx, message, ErrorCode.SYSTEM_ERROR, ex.getMessage());
         }
     }
 
@@ -90,19 +105,30 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "SUCCESS");
         data.put("userId", loginUser.getUserId());
-        writeWsMessage(ctx, WsMessageType.AUTH, data);
+        writeWsMessage(ctx, WsMessageType.AUTH, message, data);
     }
 
     private void handlePing(ChannelHandlerContext ctx, LoginUser loginUser) throws JsonProcessingException {
         imOnlineService.refreshHeartbeat(loginUser.getUserId(), currentNodeId(), imProperties.getHeartbeatTimeoutSeconds());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "ALIVE");
-        writeWsMessage(ctx, WsMessageType.PONG, data);
+        writeWsMessage(ctx, WsMessageType.PONG, null, data);
     }
 
-    private void writeWsMessage(ChannelHandlerContext ctx, WsMessageType type, Object data) throws JsonProcessingException {
+    private void writeNotice(ChannelHandlerContext ctx, WsMessage request, int code, String message) throws JsonProcessingException {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("code", code);
+        data.put("message", message == null ? "系统异常" : message);
+        writeWsMessage(ctx, WsMessageType.NOTICE, request, data);
+    }
+
+    private void writeWsMessage(ChannelHandlerContext ctx, WsMessageType type, WsMessage request, Object data) throws JsonProcessingException {
         WsMessage response = new WsMessage();
         response.setType(type);
+        if (request != null) {
+            response.setTraceId(request.getTraceId());
+            response.setClientMsgId(request.getClientMsgId());
+        }
         response.setTimestamp(System.currentTimeMillis());
         response.setData(data);
         ctx.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));

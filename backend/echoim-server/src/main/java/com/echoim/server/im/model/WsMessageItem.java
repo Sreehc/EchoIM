@@ -1,8 +1,8 @@
-package com.echoim.server.vo.conversation;
+package com.echoim.server.im.model;
 
 import java.time.LocalDateTime;
 
-public class MessageItemVo {
+public class WsMessageItem {
 
     private Long messageId;
     private Long conversationId;

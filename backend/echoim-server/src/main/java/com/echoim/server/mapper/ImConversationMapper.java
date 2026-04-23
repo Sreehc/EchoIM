@@ -19,6 +19,8 @@ public interface ImConversationMapper extends BaseMapper<ImConversationEntity> {
 
     ImConversationEntity selectSingleConversationByBizKey(@Param("bizKey") String bizKey);
 
+    ImConversationEntity selectByIdForUpdate(@Param("conversationId") Long conversationId);
+
     void updateLastMessage(@Param("conversationId") Long conversationId,
                            @Param("lastMessageId") Long lastMessageId,
                            @Param("lastMessagePreview") String lastMessagePreview);

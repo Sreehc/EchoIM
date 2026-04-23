@@ -8,7 +8,9 @@
         SELECT m.id AS messageId,
                m.conversation_id AS conversationId,
                m.seq_no AS seqNo,
+               m.client_msg_id AS clientMsgId,
                m.from_user_id AS fromUserId,
+               m.to_user_id AS toUserId,
                CASE m.msg_type
                    WHEN 1 THEN 'TEXT'
                    WHEN 2 THEN 'EMOJI'
@@ -20,6 +22,7 @@
                END AS msgType,
                m.content AS content,
                m.file_id AS fileId,
+               m.send_status AS sendStatus,
                m.sent_at AS sentAt
         FROM im_message m
         JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
@@ -30,6 +33,38 @@
           AND c.status = 1
         ORDER BY m.seq_no DESC
         LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectMessageCursorByConversationIdAndUserId" resultType="com.echoim.server.vo.conversation.MessageItemVo">
+        SELECT m.id AS messageId,
+               m.conversation_id AS conversationId,
+               m.seq_no AS seqNo,
+               m.client_msg_id AS clientMsgId,
+               m.from_user_id AS fromUserId,
+               m.to_user_id AS toUserId,
+               CASE m.msg_type
+                   WHEN 1 THEN 'TEXT'
+                   WHEN 2 THEN 'EMOJI'
+                   WHEN 3 THEN 'IMAGE'
+                   WHEN 4 THEN 'VIDEO'
+                   WHEN 5 THEN 'FILE'
+                   WHEN 6 THEN 'SYSTEM'
+                   ELSE 'UNKNOWN'
+               END AS msgType,
+               m.content AS content,
+               m.file_id AS fileId,
+               m.send_status AS sendStatus,
+               m.sent_at AS sentAt
+        FROM im_message m
+        JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
+        JOIN im_conversation c ON c.id = m.conversation_id
+        WHERE m.conversation_id = #{conversationId}
+          AND cu.user_id = #{userId}
+          AND cu.deleted = 0
+          AND c.status = 1
+          AND m.seq_no &lt; #{maxSeqNo}
+        ORDER BY m.seq_no DESC
+        LIMIT #{pageSize}
     </select>
 
     <select id="countMessageByConversationIdAndUserId" resultType="long">
@@ -47,5 +82,28 @@
         SELECT MAX(seq_no)
         FROM im_message
         WHERE conversation_id = #{conversationId}
+    </select>
+
+    <select id="selectByFromUserIdAndClientMsgId" resultType="com.echoim.server.entity.ImMessageEntity">
+        SELECT id,
+               conversation_id AS conversationId,
+               conversation_type AS conversationType,
+               seq_no AS seqNo,
+               client_msg_id AS clientMsgId,
+               from_user_id AS fromUserId,
+               to_user_id AS toUserId,
+               group_id AS groupId,
+               msg_type AS msgType,
+               content,
+               extra_json AS extraJson,
+               file_id AS fileId,
+               send_status AS sendStatus,
+               sent_at AS sentAt,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_message
+        WHERE from_user_id = #{fromUserId}
+          AND client_msg_id = #{clientMsgId}
+        LIMIT 1
     </select>
 </mapper>

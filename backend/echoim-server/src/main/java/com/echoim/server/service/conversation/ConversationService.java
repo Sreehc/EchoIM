@@ -11,4 +11,6 @@ public interface ConversationService {
     PageResponse<ConversationItemVo> pageCurrentUserConversations(Long userId, ConversationPageQueryDto queryDto);
 
     PageResponse<MessageItemVo> pageConversationMessages(Long userId, Long conversationId, MessagePageQueryDto queryDto);
+
+    void readConversation(Long userId, Long conversationId, Long lastReadSeq);
 }

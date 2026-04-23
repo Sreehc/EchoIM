@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImMessageReceiptMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO im_message_receipt (message_id, conversation_id, user_id, receipt_type, receipt_at)
+        VALUES (#{messageId}, #{conversationId}, #{userId}, #{receiptType}, NOW())
+    </insert>
+
+    <insert id="insertReadReceiptsUpToSeq">
+        INSERT IGNORE INTO im_message_receipt (message_id, conversation_id, user_id, receipt_type, receipt_at)
+        SELECT id, conversation_id, #{userId}, #{receiptType}, NOW()
+        FROM im_message
+        WHERE conversation_id = #{conversationId}
+          AND seq_no &lt;= #{lastReadSeq}
+          AND from_user_id != #{userId}
+    </insert>
+</mapper>

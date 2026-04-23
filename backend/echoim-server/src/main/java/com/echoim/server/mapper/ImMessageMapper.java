@@ -19,5 +19,13 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
     long countMessageByConversationIdAndUserId(@Param("conversationId") Long conversationId,
                                                @Param("userId") Long userId);
 
+    List<MessageItemVo> selectMessageCursorByConversationIdAndUserId(@Param("conversationId") Long conversationId,
+                                                                     @Param("userId") Long userId,
+                                                                     @Param("maxSeqNo") Long maxSeqNo,
+                                                                     @Param("pageSize") long pageSize);
+
     Long selectMaxSeqNoByConversationId(@Param("conversationId") Long conversationId);
+
+    ImMessageEntity selectByFromUserIdAndClientMsgId(@Param("fromUserId") Long fromUserId,
+                                                     @Param("clientMsgId") String clientMsgId);
 }

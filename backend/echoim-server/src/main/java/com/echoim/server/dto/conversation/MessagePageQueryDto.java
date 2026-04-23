@@ -10,6 +10,9 @@ public class MessagePageQueryDto {
     @Min(value = 1, message = "pageSize 最小为 1")
     private Long pageSize = 20L;
 
+    @Min(value = 1, message = "maxSeqNo 最小为 1")
+    private Long maxSeqNo;
+
     public Long getPageNo() {
         return pageNo;
     }
@@ -24,5 +27,13 @@ public class MessagePageQueryDto {
 
     public void setPageSize(Long pageSize) {
         this.pageSize = pageSize;
+    }
+
+    public Long getMaxSeqNo() {
+        return maxSeqNo;
+    }
+
+    public void setMaxSeqNo(Long maxSeqNo) {
+        this.maxSeqNo = maxSeqNo;
     }
 }

@@ -20,4 +20,48 @@
           AND user_id = #{userId}
         LIMIT 1
     </select>
+
+    <select id="selectByConversationId" resultType="com.echoim.server.entity.ImConversationUserEntity">
+        SELECT id,
+               conversation_id AS conversationId,
+               user_id AS userId,
+               unread_count AS unreadCount,
+               last_read_seq AS lastReadSeq,
+               is_top AS isTop,
+               is_mute AS isMute,
+               deleted,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_conversation_user
+        WHERE conversation_id = #{conversationId}
+    </select>
+
+    <update id="resetDeleted">
+        UPDATE im_conversation_user
+        SET deleted = 0
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="incrementUnread">
+        UPDATE im_conversation_user
+        SET unread_count = unread_count + 1,
+            deleted = 0
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="updateReadState">
+        UPDATE im_conversation_user cu
+        SET cu.last_read_seq = GREATEST(cu.last_read_seq, #{lastReadSeq}),
+            cu.unread_count = (
+                SELECT COUNT(1)
+                FROM im_message m
+                WHERE m.conversation_id = #{conversationId}
+                  AND m.seq_no &gt; GREATEST(cu.last_read_seq, #{lastReadSeq})
+                  AND m.from_user_id != #{userId}
+            )
+        WHERE cu.conversation_id = #{conversationId}
+          AND cu.user_id = #{userId}
+    </update>
 </mapper>
