@@ -4,19 +4,84 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.echoim.server.mapper.ImConversationMapper">
 
-    <select id="selectConversationPageByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
+    <sql id="ConversationItemColumns">
         SELECT c.id AS conversationId,
                c.conversation_type AS conversationType,
-               c.conversation_name AS conversationName,
-               c.avatar_url AS avatarUrl,
-               c.last_message_preview AS lastMessagePreview,
-               c.last_message_time AS lastMessageTime,
+               CASE
+                   WHEN c.conversation_type = 1 THEN COALESCE(NULLIF(f.remark, ''), other_u.nickname, c.conversation_name)
+                   WHEN c.conversation_type = 2 THEN COALESCE(g.group_name, c.conversation_name)
+                   ELSE c.conversation_name
+               END AS conversationName,
+               CASE
+                   WHEN c.conversation_type = 1 THEN COALESCE(other_u.avatar_url, c.avatar_url)
+                   WHEN c.conversation_type = 2 THEN COALESCE(g.avatar_url, c.avatar_url)
+                   ELSE c.avatar_url
+               END AS avatarUrl,
+               CASE
+                   WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN (
+                       SELECT CASE m.msg_type
+                                  WHEN 3 THEN '[图片]'
+                                  WHEN 5 THEN '[文件]'
+                                  ELSE m.content
+                              END
+                       FROM im_message m
+                       WHERE m.conversation_id = c.id
+                         AND m.seq_no &lt;= cu.last_read_seq
+                       ORDER BY m.seq_no DESC
+                       LIMIT 1
+                   )
+                   ELSE c.last_message_preview
+               END AS lastMessagePreview,
+               CASE
+                   WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN (
+                       SELECT m.sent_at
+                       FROM im_message m
+                       WHERE m.conversation_id = c.id
+                         AND m.seq_no &lt;= cu.last_read_seq
+                       ORDER BY m.seq_no DESC
+                       LIMIT 1
+                   )
+                   ELSE c.last_message_time
+               END AS lastMessageTime,
                cu.unread_count AS unreadCount,
                cu.is_top AS isTop,
-               COALESCE(lm.seq_no, 0) AS latestSeq
+               CASE
+                   WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN COALESCE((
+                       SELECT m.seq_no
+                       FROM im_message m
+                       WHERE m.conversation_id = c.id
+                         AND m.seq_no &lt;= cu.last_read_seq
+                       ORDER BY m.seq_no DESC
+                       LIMIT 1
+                   ), 0)
+                   ELSE COALESCE(lm.seq_no, 0)
+               END AS latestSeq
+    </sql>
+
+    <sql id="ConversationItemJoins">
         FROM im_conversation_user cu
         JOIN im_conversation c ON c.id = cu.conversation_id
         LEFT JOIN im_message lm ON lm.id = c.last_message_id
+        LEFT JOIN im_conversation_user other_cu
+               ON c.conversation_type = 1
+              AND other_cu.conversation_id = c.id
+              AND other_cu.user_id != #{userId}
+        LEFT JOIN im_user other_u ON other_u.id = other_cu.user_id
+        LEFT JOIN im_friend f
+               ON f.user_id = #{userId}
+              AND f.friend_user_id = other_u.id
+        LEFT JOIN im_group g
+               ON c.conversation_type = 2
+              AND g.id = c.biz_id
+        LEFT JOIN im_group_member current_gm
+               ON c.conversation_type = 2
+              AND current_gm.group_id = c.biz_id
+              AND current_gm.user_id = #{userId}
+    </sql>
+
+    <select id="selectConversationPageByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
+        <include refid="ConversationItemColumns"/>
+        <include refid="ConversationItemJoins"/>
         WHERE cu.user_id = #{userId}
           AND cu.deleted = 0
           AND c.status = 1
@@ -25,37 +90,22 @@
     </select>
 
     <select id="selectAllConversationsByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
-        SELECT c.id AS conversationId,
-               c.conversation_type AS conversationType,
-               c.conversation_name AS conversationName,
-               c.avatar_url AS avatarUrl,
-               c.last_message_preview AS lastMessagePreview,
-               c.last_message_time AS lastMessageTime,
-               cu.unread_count AS unreadCount,
-               cu.is_top AS isTop,
-               COALESCE(lm.seq_no, 0) AS latestSeq
-        FROM im_conversation_user cu
-        JOIN im_conversation c ON c.id = cu.conversation_id
-        LEFT JOIN im_message lm ON lm.id = c.last_message_id
+        <include refid="ConversationItemColumns"/>
+        <include refid="ConversationItemJoins"/>
+        LEFT JOIN im_group_member gm
+               ON c.conversation_type = 2
+              AND gm.group_id = c.biz_id
+              AND gm.user_id = #{userId}
         WHERE cu.user_id = #{userId}
           AND cu.deleted = 0
           AND c.status = 1
+          AND (c.conversation_type != 2 OR gm.status = 1)
         ORDER BY cu.is_top DESC, c.last_message_time DESC, c.id DESC
     </select>
 
     <select id="selectConversationItemByUserId" resultType="com.echoim.server.vo.conversation.ConversationItemVo">
-        SELECT c.id AS conversationId,
-               c.conversation_type AS conversationType,
-               c.conversation_name AS conversationName,
-               c.avatar_url AS avatarUrl,
-               c.last_message_preview AS lastMessagePreview,
-               c.last_message_time AS lastMessageTime,
-               cu.unread_count AS unreadCount,
-               cu.is_top AS isTop,
-               COALESCE(lm.seq_no, 0) AS latestSeq
-        FROM im_conversation_user cu
-        JOIN im_conversation c ON c.id = cu.conversation_id
-        LEFT JOIN im_message lm ON lm.id = c.last_message_id
+        <include refid="ConversationItemColumns"/>
+        <include refid="ConversationItemJoins"/>
         WHERE c.id = #{conversationId}
           AND cu.user_id = #{userId}
           AND cu.deleted = 0
@@ -88,6 +138,25 @@
         FROM im_conversation
         WHERE conversation_type = 1
           AND biz_key = #{bizKey}
+        LIMIT 1
+    </select>
+
+    <select id="selectGroupConversationByGroupId" resultType="com.echoim.server.entity.ImConversationEntity">
+        SELECT id,
+               conversation_type AS conversationType,
+               biz_key AS bizKey,
+               biz_id AS bizId,
+               conversation_name AS conversationName,
+               avatar_url AS avatarUrl,
+               last_message_id AS lastMessageId,
+               last_message_preview AS lastMessagePreview,
+               last_message_time AS lastMessageTime,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_conversation
+        WHERE conversation_type = 2
+          AND biz_id = #{groupId}
         LIMIT 1
     </select>
 

@@ -6,6 +6,7 @@ import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.dto.conversation.ConversationPageQueryDto;
 import com.echoim.server.dto.conversation.MessagePageQueryDto;
+import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
@@ -88,6 +89,26 @@ public class ConversationServiceImpl implements ConversationService {
         imSingleChatService.read(userId, conversationId, lastReadSeq, null, null);
     }
 
+    @Override
+    public void updateTop(Long userId, Long conversationId, Integer isTop) {
+        validateSwitchValue(isTop, "置顶状态错误");
+        requireConversationUser(userId, conversationId);
+        imConversationUserMapper.updateTop(conversationId, userId, isTop);
+    }
+
+    @Override
+    public void updateMute(Long userId, Long conversationId, Integer isMute) {
+        validateSwitchValue(isMute, "免打扰状态错误");
+        requireConversationUser(userId, conversationId);
+        imConversationUserMapper.updateMute(conversationId, userId, isMute);
+    }
+
+    @Override
+    public void deleteConversation(Long userId, Long conversationId) {
+        requireConversationUser(userId, conversationId);
+        imConversationUserMapper.hideConversation(conversationId, userId);
+    }
+
     private void requireActiveConversation(Long userId, Long conversationId) {
         Long ownedCount = imConversationUserMapper.selectCount(new LambdaQueryWrapper<ImConversationUserEntity>()
                 .eq(ImConversationUserEntity::getConversationId, conversationId)
@@ -95,6 +116,20 @@ public class ConversationServiceImpl implements ConversationService {
                 .eq(ImConversationUserEntity::getDeleted, 0));
         if (ownedCount == null || ownedCount == 0L) {
             throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
+        }
+    }
+
+    private void requireConversationUser(Long userId, Long conversationId) {
+        ImConversationEntity conversation = imConversationMapper.selectById(conversationId);
+        ImConversationUserEntity conversationUser = imConversationUserMapper.selectByConversationIdAndUserId(conversationId, userId);
+        if (conversation == null || conversationUser == null || !Integer.valueOf(1).equals(conversation.getStatus())) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
+        }
+    }
+
+    private void validateSwitchValue(Integer value, String message) {
+        if (value == null || (value != 0 && value != 1)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, message);
         }
     }
 

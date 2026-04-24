@@ -1,0 +1,307 @@
+package com.echoim.server.service.impl;
+
+import com.echoim.server.common.constant.ErrorCode;
+import com.echoim.server.common.exception.BizException;
+import com.echoim.server.dto.group.AddGroupMembersRequestDto;
+import com.echoim.server.dto.group.CreateGroupRequestDto;
+import com.echoim.server.entity.ImConversationEntity;
+import com.echoim.server.entity.ImConversationUserEntity;
+import com.echoim.server.entity.ImGroupEntity;
+import com.echoim.server.entity.ImGroupMemberEntity;
+import com.echoim.server.im.service.ImWsPushService;
+import com.echoim.server.mapper.ImConversationMapper;
+import com.echoim.server.mapper.ImConversationUserMapper;
+import com.echoim.server.mapper.ImGroupMapper;
+import com.echoim.server.mapper.ImGroupMemberMapper;
+import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.mapper.ImUserMapper;
+import com.echoim.server.service.group.GroupService;
+import com.echoim.server.vo.group.GroupCreateVo;
+import com.echoim.server.vo.group.GroupDetailVo;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+@Service
+public class GroupServiceImpl implements GroupService {
+
+    private static final int GROUP_STATUS_NORMAL = 1;
+    private static final int GROUP_STATUS_DISSOLVED = 2;
+    private static final int MEMBER_ROLE_OWNER = 1;
+    private static final int MEMBER_ROLE_MEMBER = 2;
+    private static final int MEMBER_ROLE_ADMIN = 3;
+    private static final int MEMBER_STATUS_NORMAL = 1;
+    private static final int MEMBER_STATUS_LEFT = 2;
+    private static final int MEMBER_STATUS_REMOVED = 3;
+    private static final int JOIN_SOURCE_CREATE = 1;
+    private static final int JOIN_SOURCE_INVITE = 2;
+    private static final int CONVERSATION_TYPE_GROUP = 2;
+    private static final int CONVERSATION_STATUS_NORMAL = 1;
+
+    private final ImGroupMapper imGroupMapper;
+    private final ImGroupMemberMapper imGroupMemberMapper;
+    private final ImConversationMapper imConversationMapper;
+    private final ImConversationUserMapper imConversationUserMapper;
+    private final ImMessageMapper imMessageMapper;
+    private final ImUserMapper imUserMapper;
+    private final ImWsPushService imWsPushService;
+
+    public GroupServiceImpl(ImGroupMapper imGroupMapper,
+                            ImGroupMemberMapper imGroupMemberMapper,
+                            ImConversationMapper imConversationMapper,
+                            ImConversationUserMapper imConversationUserMapper,
+                            ImMessageMapper imMessageMapper,
+                            ImUserMapper imUserMapper,
+                            ImWsPushService imWsPushService) {
+        this.imGroupMapper = imGroupMapper;
+        this.imGroupMemberMapper = imGroupMemberMapper;
+        this.imConversationMapper = imConversationMapper;
+        this.imConversationUserMapper = imConversationUserMapper;
+        this.imMessageMapper = imMessageMapper;
+        this.imUserMapper = imUserMapper;
+        this.imWsPushService = imWsPushService;
+    }
+
+    @Override
+    @Transactional
+    public GroupCreateVo createGroup(Long currentUserId, CreateGroupRequestDto requestDto) {
+        Set<Long> memberIds = normalizeMemberIds(currentUserId, requestDto.getMemberIds());
+        validateUsersExist(memberIds);
+
+        ImGroupEntity group = new ImGroupEntity();
+        group.setGroupNo(generateGroupNo());
+        group.setGroupName(requestDto.getGroupName().trim());
+        group.setOwnerUserId(currentUserId);
+        group.setStatus(GROUP_STATUS_NORMAL);
+        imGroupMapper.insert(group);
+
+        for (Long memberId : memberIds) {
+            int role = currentUserId.equals(memberId) ? MEMBER_ROLE_OWNER : MEMBER_ROLE_MEMBER;
+            ensureGroupMember(group.getId(), memberId, role, currentUserId.equals(memberId) ? JOIN_SOURCE_CREATE : JOIN_SOURCE_INVITE);
+        }
+
+        ImConversationEntity conversation = ensureGroupConversation(group);
+        for (Long memberId : memberIds) {
+            ensureConversationUser(conversation.getId(), memberId, false);
+        }
+        pushConversationCreated(conversation.getId(), memberIds);
+
+        GroupCreateVo vo = new GroupCreateVo();
+        vo.setGroupId(group.getId());
+        vo.setGroupNo(group.getGroupNo());
+        vo.setGroupName(group.getGroupName());
+        vo.setConversationId(conversation.getId());
+        vo.setMemberCount(memberIds.size());
+        return vo;
+    }
+
+    @Override
+    public GroupDetailVo getGroupDetail(Long currentUserId, Long groupId) {
+        GroupDetailVo detail = imGroupMapper.selectGroupDetail(groupId, currentUserId);
+        if (detail == null) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "群组不存在");
+        }
+        return detail;
+    }
+
+    @Override
+    @Transactional
+    public GroupDetailVo addMembers(Long currentUserId, Long groupId, AddGroupMembersRequestDto requestDto) {
+        requireNormalGroup(groupId);
+        requireActiveMember(groupId, currentUserId);
+        Set<Long> memberIds = normalizeMemberIds(null, requestDto.getMemberIds());
+        validateUsersExist(memberIds);
+        for (Long memberId : memberIds) {
+            ensureGroupMember(groupId, memberId, MEMBER_ROLE_MEMBER, JOIN_SOURCE_INVITE);
+        }
+        ImConversationEntity conversation = ensureGroupConversation(requireNormalGroup(groupId));
+        for (Long memberId : memberIds) {
+            ensureConversationUser(conversation.getId(), memberId, false);
+        }
+        pushConversationCreated(conversation.getId(), memberIds);
+        return getGroupDetail(currentUserId, groupId);
+    }
+
+    @Override
+    @Transactional
+    public void removeMember(Long currentUserId, Long groupId, Long userId) {
+        ImGroupEntity group = requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        ImGroupMemberEntity target = requireActiveMember(groupId, userId);
+        if (group.getOwnerUserId().equals(userId)) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "不能移除群主");
+        }
+        if (!canRemove(operator, target)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权移除该成员");
+        }
+        target.setStatus(MEMBER_STATUS_REMOVED);
+        target.setUpdatedAt(LocalDateTime.now());
+        imGroupMemberMapper.updateById(target);
+        freezeConversationAtCurrentSeq(groupId, userId, true);
+    }
+
+    @Override
+    @Transactional
+    public void leaveGroup(Long currentUserId, Long groupId, boolean keepConversation) {
+        ImGroupEntity group = requireNormalGroup(groupId);
+        if (group.getOwnerUserId().equals(currentUserId)) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "群主不能直接退群");
+        }
+        ImGroupMemberEntity member = requireActiveMember(groupId, currentUserId);
+        member.setStatus(MEMBER_STATUS_LEFT);
+        member.setUpdatedAt(LocalDateTime.now());
+        imGroupMemberMapper.updateById(member);
+        freezeConversationAtCurrentSeq(groupId, currentUserId, keepConversation);
+    }
+
+    @Override
+    @Transactional
+    public void dissolveGroup(Long currentUserId, Long groupId) {
+        ImGroupEntity group = requireNormalGroup(groupId);
+        if (!group.getOwnerUserId().equals(currentUserId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有群主可以解散群");
+        }
+        group.setStatus(GROUP_STATUS_DISSOLVED);
+        imGroupMapper.updateById(group);
+    }
+
+    private ImGroupEntity requireNormalGroup(Long groupId) {
+        ImGroupEntity group = imGroupMapper.selectById(groupId);
+        if (group == null || !Integer.valueOf(GROUP_STATUS_NORMAL).equals(group.getStatus())) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "群组不存在");
+        }
+        return group;
+    }
+
+    private ImGroupMemberEntity requireActiveMember(Long groupId, Long userId) {
+        ImGroupMemberEntity member = imGroupMemberMapper.selectActiveByGroupIdAndUserId(groupId, userId);
+        if (member == null) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "群成员不存在");
+        }
+        return member;
+    }
+
+    private boolean canRemove(ImGroupMemberEntity operator, ImGroupMemberEntity target) {
+        if (Integer.valueOf(MEMBER_ROLE_OWNER).equals(operator.getRole())) {
+            return true;
+        }
+        return Integer.valueOf(MEMBER_ROLE_ADMIN).equals(operator.getRole())
+                && Integer.valueOf(MEMBER_ROLE_MEMBER).equals(target.getRole());
+    }
+
+    private void ensureGroupMember(Long groupId, Long userId, int role, int joinSource) {
+        ImGroupMemberEntity existing = imGroupMemberMapper.selectByGroupIdAndUserId(groupId, userId);
+        if (existing != null) {
+            existing.setRole(role);
+            existing.setJoinSource(joinSource);
+            existing.setStatus(MEMBER_STATUS_NORMAL);
+            existing.setUpdatedAt(LocalDateTime.now());
+            imGroupMemberMapper.updateById(existing);
+            return;
+        }
+        ImGroupMemberEntity member = new ImGroupMemberEntity();
+        member.setGroupId(groupId);
+        member.setUserId(userId);
+        member.setRole(role);
+        member.setJoinSource(joinSource);
+        member.setJoinAt(LocalDateTime.now());
+        member.setStatus(MEMBER_STATUS_NORMAL);
+        imGroupMemberMapper.insert(member);
+    }
+
+    private ImConversationEntity ensureGroupConversation(ImGroupEntity group) {
+        ImConversationEntity existing = imConversationMapper.selectGroupConversationByGroupId(group.getId());
+        if (existing != null) {
+            existing.setStatus(CONVERSATION_STATUS_NORMAL);
+            existing.setConversationName(group.getGroupName());
+            existing.setAvatarUrl(group.getAvatarUrl());
+            imConversationMapper.updateById(existing);
+            return existing;
+        }
+        ImConversationEntity conversation = new ImConversationEntity();
+        conversation.setConversationType(CONVERSATION_TYPE_GROUP);
+        conversation.setBizKey("group_" + group.getId());
+        conversation.setBizId(group.getId());
+        conversation.setConversationName(group.getGroupName());
+        conversation.setAvatarUrl(group.getAvatarUrl());
+        conversation.setStatus(CONVERSATION_STATUS_NORMAL);
+        imConversationMapper.insert(conversation);
+        return conversation;
+    }
+
+    private void ensureConversationUser(Long conversationId, Long userId, boolean deleted) {
+        ImConversationUserEntity existing = imConversationUserMapper.selectByConversationIdAndUserId(conversationId, userId);
+        if (existing != null) {
+            existing.setDeleted(deleted ? 1 : 0);
+            imConversationUserMapper.updateById(existing);
+            return;
+        }
+        ImConversationUserEntity entity = new ImConversationUserEntity();
+        entity.setConversationId(conversationId);
+        entity.setUserId(userId);
+        entity.setUnreadCount(0);
+        entity.setLastReadSeq(0L);
+        entity.setIsTop(0);
+        entity.setIsMute(0);
+        entity.setDeleted(deleted ? 1 : 0);
+        imConversationUserMapper.insert(entity);
+    }
+
+    private void freezeConversationAtCurrentSeq(Long groupId, Long userId, boolean keepConversation) {
+        ImConversationEntity conversation = imConversationMapper.selectGroupConversationByGroupId(groupId);
+        if (conversation == null) {
+            return;
+        }
+        ImConversationUserEntity conversationUser = imConversationUserMapper.selectByConversationIdAndUserId(conversation.getId(), userId);
+        if (conversationUser == null) {
+            return;
+        }
+        Long maxSeqNo = imMessageMapper.selectMaxSeqNoByConversationId(conversation.getId());
+        conversationUser.setLastReadSeq(maxSeqNo == null ? 0L : maxSeqNo);
+        conversationUser.setUnreadCount(0);
+        conversationUser.setDeleted(keepConversation ? 0 : 1);
+        imConversationUserMapper.updateById(conversationUser);
+    }
+
+    private void pushConversationCreated(Long conversationId, Set<Long> memberIds) {
+        for (Long memberId : memberIds) {
+            var conversation = imConversationMapper.selectConversationItemByUserId(conversationId, memberId);
+            if (conversation != null) {
+                imWsPushService.pushConversationChange(memberId, "CONVERSATION_CREATED", conversation, null);
+            }
+        }
+    }
+
+    private Set<Long> normalizeMemberIds(Long currentUserId, List<Long> requestMemberIds) {
+        Set<Long> memberIds = new LinkedHashSet<>();
+        if (currentUserId != null) {
+            memberIds.add(currentUserId);
+        }
+        if (requestMemberIds != null) {
+            memberIds.addAll(requestMemberIds);
+        }
+        memberIds.remove(null);
+        if (memberIds.isEmpty()) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "群成员不能为空");
+        }
+        return memberIds;
+    }
+
+    private void validateUsersExist(Set<Long> memberIds) {
+        if (memberIds.isEmpty()) {
+            return;
+        }
+        if (imUserMapper.selectBatchIds(memberIds).size() != memberIds.size()) {
+            throw new BizException(ErrorCode.USER_NOT_FOUND, "群成员不存在");
+        }
+    }
+
+    private String generateGroupNo() {
+        return "G" + System.currentTimeMillis() + UUID.randomUUID().toString().replace("-", "").substring(0, 6);
+    }
+}

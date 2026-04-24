@@ -38,6 +38,7 @@ import java.util.Optional;
 public class ImSingleChatServiceImpl implements ImSingleChatService {
 
     private static final int CONVERSATION_TYPE_SINGLE = 1;
+    private static final int CONVERSATION_TYPE_GROUP = 2;
     private static final int CONVERSATION_STATUS_NORMAL = 1;
     private static final int MESSAGE_TYPE_TEXT = 1;
     private static final int MESSAGE_TYPE_IMAGE = 3;
@@ -165,16 +166,18 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
             throw new BizException(ErrorCode.PARAM_ERROR, "READ 参数错误");
         }
         ImConversationEntity conversation = imConversationMapper.selectByIdForUpdate(conversationId);
-        validateSingleConversation(conversation);
+        validateConversationForRead(conversation);
         ImConversationUserEntity member = requireMember(conversation.getId(), userId);
         long effectiveLastReadSeq = Math.max(member.getLastReadSeq() == null ? 0L : member.getLastReadSeq(), lastReadSeq);
 
         imConversationUserMapper.updateReadState(conversation.getId(), userId, effectiveLastReadSeq);
-        imMessageReceiptMapper.insertReadReceiptsUpToSeq(conversation.getId(), userId, effectiveLastReadSeq, RECEIPT_TYPE_READ);
 
         Map<String, Object> readData = readData(conversation.getId(), userId, effectiveLastReadSeq);
-        otherMemberId(conversation.getId(), userId)
-                .ifPresent(targetUserId -> imWsPushService.pushToUser(targetUserId, WsMessageType.READ, traceId, clientMsgId, readData));
+        if (Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(conversation.getConversationType())) {
+            imMessageReceiptMapper.insertReadReceiptsUpToSeq(conversation.getId(), userId, effectiveLastReadSeq, RECEIPT_TYPE_READ);
+            otherMemberId(conversation.getId(), userId)
+                    .ifPresent(targetUserId -> imWsPushService.pushToUser(targetUserId, WsMessageType.READ, traceId, clientMsgId, readData));
+        }
         pushConversationChange(userId, conversation.getId(), CHANGE_TYPE_READ_UPDATE, null);
         return readData;
     }
@@ -198,6 +201,16 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private void validateSingleConversation(ImConversationEntity conversation) {
         if (conversation == null || !Integer.valueOf(CONVERSATION_STATUS_NORMAL).equals(conversation.getStatus())
                 || !Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(conversation.getConversationType())) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
+        }
+    }
+
+    private void validateConversationForRead(ImConversationEntity conversation) {
+        if (conversation == null || !Integer.valueOf(CONVERSATION_STATUS_NORMAL).equals(conversation.getStatus())) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
+        }
+        if (!Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(conversation.getConversationType())
+                && !Integer.valueOf(CONVERSATION_TYPE_GROUP).equals(conversation.getConversationType())) {
             throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
         }
     }
@@ -301,6 +314,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (entity == null || !data.getConversationId().equals(entity.getConversationId())) {
             throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "消息不存在");
         }
+        if (!Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(entity.getConversationType())) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "群聊暂不支持送达 ACK");
+        }
         if (data.getSeqNo() != null && !data.getSeqNo().equals(entity.getSeqNo())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "ACK 消息序号错误");
         }
@@ -359,6 +375,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         item.setClientMsgId(entity.getClientMsgId());
         item.setFromUserId(entity.getFromUserId());
         item.setToUserId(entity.getToUserId());
+        item.setGroupId(entity.getGroupId());
         item.setMsgType(toExternalMsgType(entity.getMsgType()));
         item.setContent(entity.getContent());
         item.setFileId(entity.getFileId());

@@ -39,14 +39,26 @@ public class ConversationController {
         return ApiResponse.success(conversationService.pageConversationMessages(LoginUserContext.requireUserId(), id, queryDto));
     }
 
+    @RequireLogin
     @PutMapping("/{id}/top")
     public ApiResponse<Map<String, Object>> top(@PathVariable Long id,
                                                 @Valid @RequestBody ConversationTopRequest request) {
+        conversationService.updateTop(LoginUserContext.requireUserId(), id, request.isTop());
         return ApiResponse.success(Map.of("conversationId", id, "isTop", request.isTop()));
     }
 
+    @RequireLogin
+    @PutMapping("/{id}/mute")
+    public ApiResponse<Map<String, Object>> mute(@PathVariable Long id,
+                                                 @Valid @RequestBody ConversationMuteRequest request) {
+        conversationService.updateMute(LoginUserContext.requireUserId(), id, request.isMute());
+        return ApiResponse.success(Map.of("conversationId", id, "isMute", request.isMute()));
+    }
+
+    @RequireLogin
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
+        conversationService.deleteConversation(LoginUserContext.requireUserId(), id);
         return ApiResponse.success();
     }
 
@@ -60,6 +72,11 @@ public class ConversationController {
 
     public record ConversationTopRequest(
             @NotNull(message = "置顶状态不能为空") Integer isTop
+    ) {
+    }
+
+    public record ConversationMuteRequest(
+            @NotNull(message = "免打扰状态不能为空") Integer isMute
     ) {
     }
 

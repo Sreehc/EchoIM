@@ -13,4 +13,10 @@ public interface ConversationService {
     PageResponse<MessageItemVo> pageConversationMessages(Long userId, Long conversationId, MessagePageQueryDto queryDto);
 
     void readConversation(Long userId, Long conversationId, Long lastReadSeq);
+
+    void updateTop(Long userId, Long conversationId, Integer isTop);
+
+    void updateMute(Long userId, Long conversationId, Integer isMute);
+
+    void deleteConversation(Long userId, Long conversationId);
 }

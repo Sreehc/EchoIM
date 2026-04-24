@@ -12,6 +12,7 @@ public class WsMessageItem {
     private String clientMsgId;
     private Long fromUserId;
     private Long toUserId;
+    private Long groupId;
     private String msgType;
     private String content;
     private Long fileId;
@@ -65,6 +66,14 @@ public class WsMessageItem {
 
     public void setToUserId(Long toUserId) {
         this.toUserId = toUserId;
+    }
+
+    public Long getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(Long groupId) {
+        this.groupId = groupId;
     }
 
     public String getMsgType() {

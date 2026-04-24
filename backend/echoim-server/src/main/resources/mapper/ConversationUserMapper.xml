@@ -43,12 +43,33 @@
           AND user_id = #{userId}
     </update>
 
+    <update id="resetDeletedBatch">
+        UPDATE im_conversation_user
+        SET deleted = 0
+        WHERE conversation_id = #{conversationId}
+          AND user_id IN
+          <foreach collection="userIds" item="userId" open="(" close=")" separator=",">
+              #{userId}
+          </foreach>
+    </update>
+
     <update id="incrementUnread">
         UPDATE im_conversation_user
         SET unread_count = unread_count + 1,
             deleted = 0
         WHERE conversation_id = #{conversationId}
           AND user_id = #{userId}
+    </update>
+
+    <update id="incrementUnreadBatch">
+        UPDATE im_conversation_user
+        SET unread_count = unread_count + 1,
+            deleted = 0
+        WHERE conversation_id = #{conversationId}
+          AND user_id IN
+          <foreach collection="userIds" item="userId" open="(" close=")" separator=",">
+              #{userId}
+          </foreach>
     </update>
 
     <update id="updateReadState">
@@ -63,5 +84,27 @@
             )
         WHERE cu.conversation_id = #{conversationId}
           AND cu.user_id = #{userId}
+    </update>
+
+    <update id="updateTop">
+        UPDATE im_conversation_user
+        SET is_top = #{isTop}
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="updateMute">
+        UPDATE im_conversation_user
+        SET is_mute = #{isMute}
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="hideConversation">
+        UPDATE im_conversation_user
+        SET deleted = 1,
+            unread_count = 0
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
     </update>
 </mapper>

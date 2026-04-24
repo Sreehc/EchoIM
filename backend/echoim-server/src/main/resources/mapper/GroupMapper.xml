@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImGroupMapper">
+
+    <select id="selectGroupDetail" resultType="com.echoim.server.vo.group.GroupDetailVo">
+        SELECT g.id AS groupId,
+               g.group_no AS groupNo,
+               g.group_name AS groupName,
+               g.owner_user_id AS ownerUserId,
+               g.avatar_url AS avatarUrl,
+               g.notice AS notice,
+               g.status AS status,
+               gm.role AS myRole,
+               (
+                   SELECT COUNT(1)
+                   FROM im_group_member active_gm
+                   WHERE active_gm.group_id = g.id
+                     AND active_gm.status = 1
+               ) AS memberCount
+        FROM im_group g
+        JOIN im_group_member gm ON gm.group_id = g.id
+        WHERE g.id = #{groupId}
+          AND gm.user_id = #{userId}
+          AND gm.status = 1
+          AND g.status = 1
+        LIMIT 1
+    </select>
+</mapper>

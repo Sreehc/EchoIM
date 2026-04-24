@@ -4,13 +4,14 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.echoim.server.mapper.ImMessageMapper">
 
-    <select id="selectMessagePageByConversationIdAndUserId" resultType="com.echoim.server.vo.conversation.MessageItemVo">
+    <sql id="MessageColumns">
         SELECT m.id AS messageId,
                m.conversation_id AS conversationId,
                m.seq_no AS seqNo,
                m.client_msg_id AS clientMsgId,
                m.from_user_id AS fromUserId,
                m.to_user_id AS toUserId,
+               m.group_id AS groupId,
                CASE m.msg_type
                    WHEN 1 THEN 'TEXT'
                    WHEN 2 THEN 'EMOJI'
@@ -24,76 +25,53 @@
                m.file_id AS fileId,
                m.send_status AS sendStatus,
                m.sent_at AS sentAt
+    </sql>
+
+    <sql id="MessageAccessJoins">
         FROM im_message m
         JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
         JOIN im_conversation c ON c.id = m.conversation_id
+        LEFT JOIN im_group_member gm
+               ON c.conversation_type = 2
+              AND gm.group_id = c.biz_id
+              AND gm.user_id = #{userId}
+    </sql>
+
+    <sql id="MessageAccessWhere">
         WHERE m.conversation_id = #{conversationId}
           AND cu.user_id = #{userId}
           AND cu.deleted = 0
           AND c.status = 1
+          AND (
+              c.conversation_type != 2
+                  OR (
+                      gm.id IS NOT NULL
+                  AND (gm.status = 1 OR m.seq_no &lt;= cu.last_read_seq)
+                  )
+          )
+    </sql>
+
+    <select id="selectMessagePageByConversationIdAndUserId" resultType="com.echoim.server.vo.conversation.MessageItemVo">
+        <include refid="MessageColumns"/>
+        <include refid="MessageAccessJoins"/>
+        <include refid="MessageAccessWhere"/>
         ORDER BY m.seq_no DESC
         LIMIT #{offset}, #{pageSize}
     </select>
 
     <select id="selectMessageCursorByConversationIdAndUserId" resultType="com.echoim.server.vo.conversation.MessageItemVo">
-        SELECT m.id AS messageId,
-               m.conversation_id AS conversationId,
-               m.seq_no AS seqNo,
-               m.client_msg_id AS clientMsgId,
-               m.from_user_id AS fromUserId,
-               m.to_user_id AS toUserId,
-               CASE m.msg_type
-                   WHEN 1 THEN 'TEXT'
-                   WHEN 2 THEN 'EMOJI'
-                   WHEN 3 THEN 'IMAGE'
-                   WHEN 4 THEN 'VIDEO'
-                   WHEN 5 THEN 'FILE'
-                   WHEN 6 THEN 'SYSTEM'
-                   ELSE 'UNKNOWN'
-               END AS msgType,
-               m.content AS content,
-               m.file_id AS fileId,
-               m.send_status AS sendStatus,
-               m.sent_at AS sentAt
-        FROM im_message m
-        JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
-        JOIN im_conversation c ON c.id = m.conversation_id
-        WHERE m.conversation_id = #{conversationId}
-          AND cu.user_id = #{userId}
-          AND cu.deleted = 0
-          AND c.status = 1
+        <include refid="MessageColumns"/>
+        <include refid="MessageAccessJoins"/>
+        <include refid="MessageAccessWhere"/>
           AND m.seq_no &lt; #{maxSeqNo}
         ORDER BY m.seq_no DESC
         LIMIT #{pageSize}
     </select>
 
     <select id="selectMessageAfterSeqByConversationIdAndUserId" resultType="com.echoim.server.vo.conversation.MessageItemVo">
-        SELECT m.id AS messageId,
-               m.conversation_id AS conversationId,
-               m.seq_no AS seqNo,
-               m.client_msg_id AS clientMsgId,
-               m.from_user_id AS fromUserId,
-               m.to_user_id AS toUserId,
-               CASE m.msg_type
-                   WHEN 1 THEN 'TEXT'
-                   WHEN 2 THEN 'EMOJI'
-                   WHEN 3 THEN 'IMAGE'
-                   WHEN 4 THEN 'VIDEO'
-                   WHEN 5 THEN 'FILE'
-                   WHEN 6 THEN 'SYSTEM'
-                   ELSE 'UNKNOWN'
-               END AS msgType,
-               m.content AS content,
-               m.file_id AS fileId,
-               m.send_status AS sendStatus,
-               m.sent_at AS sentAt
-        FROM im_message m
-        JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
-        JOIN im_conversation c ON c.id = m.conversation_id
-        WHERE m.conversation_id = #{conversationId}
-          AND cu.user_id = #{userId}
-          AND cu.deleted = 0
-          AND c.status = 1
+        <include refid="MessageColumns"/>
+        <include refid="MessageAccessJoins"/>
+        <include refid="MessageAccessWhere"/>
           AND m.seq_no &gt; #{afterSeq}
         ORDER BY m.seq_no ASC
         LIMIT #{pageSize}
@@ -104,10 +82,11 @@
         FROM im_message m
         JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
         JOIN im_conversation c ON c.id = m.conversation_id
-        WHERE m.conversation_id = #{conversationId}
-          AND cu.user_id = #{userId}
-          AND cu.deleted = 0
-          AND c.status = 1
+        LEFT JOIN im_group_member gm
+               ON c.conversation_type = 2
+              AND gm.group_id = c.biz_id
+              AND gm.user_id = #{userId}
+        <include refid="MessageAccessWhere"/>
           AND m.seq_no &gt; #{afterSeq}
     </select>
 
@@ -116,10 +95,11 @@
         FROM im_message m
         JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
         JOIN im_conversation c ON c.id = m.conversation_id
-        WHERE m.conversation_id = #{conversationId}
-          AND cu.user_id = #{userId}
-          AND cu.deleted = 0
-          AND c.status = 1
+        LEFT JOIN im_group_member gm
+               ON c.conversation_type = 2
+              AND gm.group_id = c.biz_id
+              AND gm.user_id = #{userId}
+        <include refid="MessageAccessWhere"/>
     </select>
 
     <select id="selectMaxSeqNoByConversationId" resultType="java.lang.Long">
