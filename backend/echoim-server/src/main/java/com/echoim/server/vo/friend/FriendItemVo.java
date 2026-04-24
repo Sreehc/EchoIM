@@ -7,6 +7,7 @@ public class FriendItemVo {
     private String nickname;
     private String avatarUrl;
     private String remark;
+    private String displayName;
 
     public Long getFriendUserId() {
         return friendUserId;
@@ -46,5 +47,13 @@ public class FriendItemVo {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
     }
 }

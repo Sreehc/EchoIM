@@ -28,6 +28,20 @@
                 FROM im_friend f
                 WHERE f.user_id = #{currentUserId}
                   AND f.friend_user_id = u.id
+                  AND f.status = 2
+            ) THEN 'BLOCKED_OUT'
+            WHEN EXISTS (
+                SELECT 1
+                FROM im_friend f
+                WHERE f.user_id = u.id
+                  AND f.friend_user_id = #{currentUserId}
+                  AND f.status = 2
+            ) THEN 'BLOCKED_IN'
+            WHEN EXISTS (
+                SELECT 1
+                FROM im_friend f
+                WHERE f.user_id = #{currentUserId}
+                  AND f.friend_user_id = u.id
                   AND f.status = 1
             ) THEN 'FRIEND'
             WHEN EXISTS (

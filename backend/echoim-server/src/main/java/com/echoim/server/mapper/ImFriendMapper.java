@@ -12,4 +12,9 @@ import java.util.List;
 public interface ImFriendMapper extends BaseMapper<ImFriendEntity> {
 
     List<FriendItemVo> selectFriendListByUserId(@Param("userId") Long userId);
+
+    List<FriendItemVo> selectBlockedListByUserId(@Param("userId") Long userId);
+
+    ImFriendEntity selectRelationByUserIdAndFriendUserId(@Param("userId") Long userId,
+                                                         @Param("friendUserId") Long friendUserId);
 }

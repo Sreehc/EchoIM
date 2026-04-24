@@ -9,11 +9,40 @@
                u.user_no AS userNo,
                u.nickname AS nickname,
                u.avatar_url AS avatarUrl,
-               f.remark AS remark
+               f.remark AS remark,
+               COALESCE(NULLIF(f.remark, ''), u.nickname) AS displayName
         FROM im_friend f
         JOIN im_user u ON u.id = f.friend_user_id
         WHERE f.user_id = #{userId}
           AND f.status = 1
         ORDER BY f.updated_at DESC, f.id DESC
+    </select>
+
+    <select id="selectBlockedListByUserId" resultType="com.echoim.server.vo.friend.FriendItemVo">
+        SELECT f.friend_user_id AS friendUserId,
+               u.user_no AS userNo,
+               u.nickname AS nickname,
+               u.avatar_url AS avatarUrl,
+               f.remark AS remark,
+               COALESCE(NULLIF(f.remark, ''), u.nickname) AS displayName
+        FROM im_friend f
+        JOIN im_user u ON u.id = f.friend_user_id
+        WHERE f.user_id = #{userId}
+          AND f.status = 2
+        ORDER BY f.updated_at DESC, f.id DESC
+    </select>
+
+    <select id="selectRelationByUserIdAndFriendUserId" resultType="com.echoim.server.entity.ImFriendEntity">
+        SELECT id,
+               user_id AS userId,
+               friend_user_id AS friendUserId,
+               remark,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_friend
+        WHERE user_id = #{userId}
+          AND friend_user_id = #{friendUserId}
+        LIMIT 1
     </select>
 </mapper>

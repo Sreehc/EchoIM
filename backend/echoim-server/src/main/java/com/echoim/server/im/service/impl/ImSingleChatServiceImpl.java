@@ -5,6 +5,7 @@ import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
+import com.echoim.server.entity.ImFileEntity;
 import com.echoim.server.entity.ImMessageEntity;
 import com.echoim.server.im.model.WsAckData;
 import com.echoim.server.im.model.WsChatSingleData;
@@ -18,6 +19,8 @@ import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
+import com.echoim.server.service.file.FileService;
+import com.echoim.server.service.friend.FriendService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -39,6 +42,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private static final int MESSAGE_TYPE_TEXT = 1;
     private static final int MESSAGE_TYPE_IMAGE = 3;
     private static final int MESSAGE_TYPE_FILE = 5;
+    private static final int FILE_BIZ_TYPE_IMAGE = 2;
+    private static final int FILE_BIZ_TYPE_FILE = 4;
     private static final int MESSAGE_STATUS_SENT = 1;
     private static final int RECEIPT_TYPE_DELIVERED = 1;
     private static final int RECEIPT_TYPE_READ = 2;
@@ -52,6 +57,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private final ImMessageMapper imMessageMapper;
     private final ImMessageReceiptMapper imMessageReceiptMapper;
     private final ImWsPushService imWsPushService;
+    private final FriendService friendService;
+    private final FileService fileService;
     private final ObjectMapper objectMapper;
 
     public ImSingleChatServiceImpl(ImConversationMapper imConversationMapper,
@@ -59,12 +66,16 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
                                    ImMessageMapper imMessageMapper,
                                    ImMessageReceiptMapper imMessageReceiptMapper,
                                    ImWsPushService imWsPushService,
+                                   FriendService friendService,
+                                   FileService fileService,
                                    ObjectMapper objectMapper) {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imMessageMapper = imMessageMapper;
         this.imMessageReceiptMapper = imMessageReceiptMapper;
         this.imWsPushService = imWsPushService;
+        this.friendService = friendService;
+        this.fileService = fileService;
         this.objectMapper = objectMapper;
     }
 
@@ -76,7 +87,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
         ImMessageEntity duplicate = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
         if (duplicate != null) {
-            return sendAckData(duplicate, true);
+            WsMessageItem duplicateItem = toWsMessageItem(duplicate);
+            fileService.enrichWsMessage(loginUser.getUserId(), duplicateItem);
+            return sendAckData(duplicateItem, true);
         }
 
         ImConversationEntity conversation = imConversationMapper.selectByIdForUpdate(data.getConversationId());
@@ -86,6 +99,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (senderMember.getUserId().equals(receiverMember.getUserId())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "不能给自己发送单聊消息");
         }
+        friendService.validateSingleChatAllowed(loginUser.getUserId(), data.getToUserId());
+        ImFileEntity messageFile = validateAndLoadMessageFile(loginUser.getUserId(), data);
 
         ImMessageEntity entity = buildMessage(loginUser.getUserId(), data, message.getClientMsgId());
         entity.setSeqNo(nextSeqNo(conversation.getId()));
@@ -94,20 +109,25 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         } catch (DuplicateKeyException ex) {
             ImMessageEntity existing = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
             if (existing != null) {
-                return sendAckData(existing, true);
+                WsMessageItem existingItem = toWsMessageItem(existing);
+                fileService.enrichWsMessage(loginUser.getUserId(), existingItem);
+                return sendAckData(existingItem, true);
             }
             throw ex;
         }
 
         imConversationUserMapper.resetDeleted(conversation.getId(), loginUser.getUserId());
         imConversationUserMapper.incrementUnread(conversation.getId(), data.getToUserId());
-        imConversationMapper.updateLastMessage(conversation.getId(), entity.getId(), preview(entity));
+        imConversationMapper.updateLastMessage(conversation.getId(), entity.getId(), preview(entity, messageFile));
 
-        WsMessageItem item = toWsMessageItem(entity);
-        pushSingleMessage(data.getToUserId(), message, item);
-        pushConversationChange(loginUser.getUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, item);
-        pushConversationChange(data.getToUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, item);
-        return sendAckData(item, false);
+        WsMessageItem senderItem = toWsMessageItem(entity);
+        fileService.enrichWsMessage(loginUser.getUserId(), senderItem);
+        WsMessageItem receiverItem = toWsMessageItem(entity);
+        fileService.enrichWsMessage(data.getToUserId(), receiverItem);
+        pushSingleMessage(data.getToUserId(), message, receiverItem);
+        pushConversationChange(loginUser.getUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, senderItem);
+        pushConversationChange(data.getToUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, receiverItem);
+        return sendAckData(senderItem, false);
     }
 
     @Override
@@ -169,6 +189,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         int msgType = toMessageType(data.getMsgType());
         if (msgType == MESSAGE_TYPE_TEXT && !StringUtils.hasText(data.getContent())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文本消息内容不能为空");
+        }
+        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "文件消息必须传 fileId");
         }
     }
 
@@ -248,12 +271,23 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         return current == null ? 1L : current + 1L;
     }
 
-    private String preview(ImMessageEntity entity) {
+    private ImFileEntity validateAndLoadMessageFile(Long userId, WsChatSingleData data) {
+        int msgType = toMessageType(data.getMsgType());
+        if (msgType == MESSAGE_TYPE_IMAGE) {
+            return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_IMAGE);
+        }
+        if (msgType == MESSAGE_TYPE_FILE) {
+            return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_FILE);
+        }
+        return null;
+    }
+
+    private String preview(ImMessageEntity entity, ImFileEntity messageFile) {
         String preview;
         if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(entity.getMsgType())) {
-            preview = "[image]";
+            preview = "[图片]";
         } else if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(entity.getMsgType())) {
-            preview = "[file]";
+            preview = "[文件] " + (messageFile == null ? "" : messageFile.getFileName());
         } else {
             preview = entity.getContent();
         }

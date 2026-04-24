@@ -1,0 +1,11 @@
+echoim:
+  file:
+    storage-type: oss
+    max-size: 104857600
+    signed-url-expire-seconds: 600
+    oss:
+      endpoint: https://oss-cn-beijing.aliyuncs.com
+      bucket-name: ${ALIYUN_OSS_BUCKET:your-bucket-name}
+      access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:your-access-key-id}
+      access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:your-access-key-secret}
+      object-prefix: echoim

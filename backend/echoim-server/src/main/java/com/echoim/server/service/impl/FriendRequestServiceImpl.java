@@ -3,8 +3,10 @@ package com.echoim.server.service.impl;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.dto.friend.CreateFriendRequestDto;
+import com.echoim.server.entity.ImFriendEntity;
 import com.echoim.server.entity.ImFriendRequestEntity;
 import com.echoim.server.entity.ImUserEntity;
+import com.echoim.server.mapper.ImFriendMapper;
 import com.echoim.server.mapper.ImFriendRequestMapper;
 import com.echoim.server.mapper.ImUserMapper;
 import com.echoim.server.service.friend.FriendRequestService;
@@ -16,11 +18,16 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
     private static final int USER_STATUS_NORMAL = 1;
     private static final int FRIEND_REQUEST_PENDING = 0;
+    private static final int FRIEND_STATUS_BLOCKED = 2;
 
+    private final ImFriendMapper imFriendMapper;
     private final ImFriendRequestMapper imFriendRequestMapper;
     private final ImUserMapper imUserMapper;
 
-    public FriendRequestServiceImpl(ImFriendRequestMapper imFriendRequestMapper, ImUserMapper imUserMapper) {
+    public FriendRequestServiceImpl(ImFriendMapper imFriendMapper,
+                                    ImFriendRequestMapper imFriendRequestMapper,
+                                    ImUserMapper imUserMapper) {
+        this.imFriendMapper = imFriendMapper;
         this.imFriendRequestMapper = imFriendRequestMapper;
         this.imUserMapper = imUserMapper;
     }
@@ -39,6 +46,13 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
         if (imFriendRequestMapper.countExistingFriendRelation(fromUserId, toUserId) > 0) {
             throw new BizException(ErrorCode.ALREADY_FRIEND, "已是好友");
+        }
+
+        ImFriendEntity currentRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(fromUserId, toUserId);
+        ImFriendEntity reverseRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(toUserId, fromUserId);
+        if ((currentRelation != null && Integer.valueOf(FRIEND_STATUS_BLOCKED).equals(currentRelation.getStatus()))
+                || (reverseRelation != null && Integer.valueOf(FRIEND_STATUS_BLOCKED).equals(reverseRelation.getStatus()))) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "存在拉黑关系，无法发起好友申请");
         }
 
         if (imFriendRequestMapper.countPendingRequest(fromUserId, toUserId) > 0) {

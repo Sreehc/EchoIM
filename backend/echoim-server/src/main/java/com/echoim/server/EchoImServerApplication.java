@@ -1,5 +1,6 @@
 package com.echoim.server;
 
+import com.echoim.server.config.FileProperties;
 import com.echoim.server.config.ImProperties;
 import com.echoim.server.config.JwtProperties;
 import org.mybatis.spring.annotation.MapperScan;
@@ -8,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @MapperScan("com.echoim.server.mapper")
-@EnableConfigurationProperties({JwtProperties.class, ImProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, ImProperties.class, FileProperties.class})
 @SpringBootApplication
 public class EchoImServerApplication {
 

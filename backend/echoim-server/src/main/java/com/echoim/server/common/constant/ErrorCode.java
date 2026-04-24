@@ -11,6 +11,8 @@ public final class ErrorCode {
     public static final int USER_NOT_FOUND = 40401;
     public static final int CONVERSATION_NOT_FOUND = 40402;
     public static final int FRIEND_REQUEST_NOT_FOUND = 40403;
+    public static final int FILE_NOT_FOUND = 40404;
+    public static final int FORBIDDEN = 40300;
     public static final int USERNAME_EXISTS = 40901;
     public static final int FRIEND_REQUEST_DUPLICATE = 40902;
     public static final int ALREADY_FRIEND = 40903;

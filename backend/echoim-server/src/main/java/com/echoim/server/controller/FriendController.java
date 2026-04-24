@@ -4,6 +4,7 @@ import com.echoim.server.common.ApiResponse;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.dto.friend.CreateFriendRequestDto;
+import com.echoim.server.dto.friend.UpdateFriendRemarkRequestDto;
 import com.echoim.server.service.friend.FriendService;
 import com.echoim.server.service.friend.FriendRequestService;
 import com.echoim.server.vo.friend.FriendItemVo;
@@ -33,6 +34,12 @@ public class FriendController {
     }
 
     @RequireLogin
+    @GetMapping("/friends/blocked")
+    public ApiResponse<List<FriendItemVo>> blockedFriends() {
+        return ApiResponse.success(friendService.listBlockedFriends(LoginUserContext.requireUserId()));
+    }
+
+    @RequireLogin
     @PostMapping("/friend-requests")
     public ApiResponse<FriendRequestCreateVo> createRequest(@Valid @RequestBody CreateFriendRequestDto requestDto) {
         return ApiResponse.success(friendRequestService.create(LoginUserContext.requireUserId(), requestDto));
@@ -58,8 +65,32 @@ public class FriendController {
         return ApiResponse.success();
     }
 
+    @RequireLogin
+    @PutMapping("/friends/{friendId}/remark")
+    public ApiResponse<Void> updateRemark(@PathVariable Long friendId,
+                                          @Valid @RequestBody UpdateFriendRemarkRequestDto requestDto) {
+        friendService.updateRemark(LoginUserContext.requireUserId(), friendId, requestDto.getRemark());
+        return ApiResponse.success();
+    }
+
+    @RequireLogin
+    @PutMapping("/friends/{friendId}/block")
+    public ApiResponse<Void> block(@PathVariable Long friendId) {
+        friendService.blockFriend(LoginUserContext.requireUserId(), friendId);
+        return ApiResponse.success();
+    }
+
+    @RequireLogin
+    @PutMapping("/friends/{friendId}/unblock")
+    public ApiResponse<Void> unblock(@PathVariable Long friendId) {
+        friendService.unblockFriend(LoginUserContext.requireUserId(), friendId);
+        return ApiResponse.success();
+    }
+
+    @RequireLogin
     @DeleteMapping("/friends/{friendId}")
     public ApiResponse<Void> delete(@PathVariable Long friendId) {
+        friendService.deleteFriend(LoginUserContext.requireUserId(), friendId);
         return ApiResponse.success();
     }
 }

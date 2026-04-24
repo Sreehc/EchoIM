@@ -1,43 +1,41 @@
 package com.echoim.server.controller;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireLogin;
+import com.echoim.server.common.auth.LoginUserContext;
+import com.echoim.server.service.file.FileService;
+import com.echoim.server.vo.file.FileDownloadVo;
+import com.echoim.server.vo.file.FileInfoVo;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
 
+    private final FileService fileService;
+
+    public FileController(FileService fileService) {
+        this.fileService = fileService;
+    }
+
+    @RequireLogin
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<Map<String, Object>> upload(@RequestPart("file") MultipartFile file) {
-        return ApiResponse.success(Map.of(
-                "fileId", 50001L,
-                "fileName", file.getOriginalFilename() == null ? "unknown" : file.getOriginalFilename(),
-                "contentType", file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
-                "fileSize", file.getSize(),
-                "url", "/upload/demo/" + (file.getOriginalFilename() == null ? "unknown" : file.getOriginalFilename())
-        ));
+    public ApiResponse<FileInfoVo> upload(@RequestPart("file") MultipartFile file,
+                                          @RequestParam(value = "bizType", required = false) Integer bizType) {
+        return ApiResponse.success(fileService.upload(LoginUserContext.requireUserId(), file, bizType));
     }
 
+    @RequireLogin
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> info(@PathVariable Long id) {
-        return ApiResponse.success(Map.of(
-                "fileId", id,
-                "fileName", "welcome.png",
-                "contentType", "image/png",
-                "fileSize", 102400L,
-                "url", "/upload/demo/welcome.png"
-        ));
+    public ApiResponse<FileInfoVo> info(@PathVariable Long id) {
+        return ApiResponse.success(fileService.getFileInfo(LoginUserContext.requireUserId(), id));
     }
 
+    @RequireLogin
     @GetMapping("/{id}/download")
-    public ApiResponse<Map<String, Object>> download(@PathVariable Long id) {
-        return ApiResponse.success(Map.of(
-                "fileId", id,
-                "downloadUrl", "/upload/demo/welcome.png"
-        ));
+    public ApiResponse<FileDownloadVo> download(@PathVariable Long id) {
+        return ApiResponse.success(fileService.getDownloadInfo(LoginUserContext.requireUserId(), id));
     }
 }

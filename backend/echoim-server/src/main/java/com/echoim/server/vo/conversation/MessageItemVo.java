@@ -2,6 +2,8 @@ package com.echoim.server.vo.conversation;
 
 import java.time.LocalDateTime;
 
+import com.echoim.server.vo.file.FileInfoVo;
+
 public class MessageItemVo {
 
     private Long messageId;
@@ -13,6 +15,7 @@ public class MessageItemVo {
     private String msgType;
     private String content;
     private Long fileId;
+    private FileInfoVo file;
     private Integer sendStatus;
     private LocalDateTime sentAt;
 
@@ -86,6 +89,14 @@ public class MessageItemVo {
 
     public void setFileId(Long fileId) {
         this.fileId = fileId;
+    }
+
+    public FileInfoVo getFile() {
+        return file;
+    }
+
+    public void setFile(FileInfoVo file) {
+        this.file = file;
     }
 
     public Integer getSendStatus() {

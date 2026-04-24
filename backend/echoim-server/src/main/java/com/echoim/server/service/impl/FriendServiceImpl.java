@@ -2,12 +2,12 @@ package com.echoim.server.service.impl;
 
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImFriendEntity;
 import com.echoim.server.entity.ImFriendRequestEntity;
 import com.echoim.server.entity.ImMessageEntity;
+import com.echoim.server.entity.ImUserEntity;
 import com.echoim.server.im.model.WsMessageItem;
 import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
@@ -15,6 +15,7 @@ import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImFriendMapper;
 import com.echoim.server.mapper.ImFriendRequestMapper;
 import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.mapper.ImUserMapper;
 import com.echoim.server.service.friend.FriendService;
 import com.echoim.server.vo.friend.FriendItemVo;
 import com.echoim.server.vo.friend.FriendRequestItemVo;
@@ -28,6 +29,8 @@ import java.util.List;
 public class FriendServiceImpl implements FriendService {
 
     private static final int FRIEND_STATUS_NORMAL = 1;
+    private static final int FRIEND_STATUS_BLOCKED = 2;
+    private static final int FRIEND_STATUS_DELETED = 3;
     private static final int REQUEST_PENDING = 0;
     private static final int REQUEST_APPROVED = 1;
     private static final int REQUEST_REJECTED = 2;
@@ -41,6 +44,7 @@ public class FriendServiceImpl implements FriendService {
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
     private final ImMessageMapper imMessageMapper;
+    private final ImUserMapper imUserMapper;
     private final ImWsPushService imWsPushService;
 
     public FriendServiceImpl(ImFriendMapper imFriendMapper,
@@ -48,18 +52,25 @@ public class FriendServiceImpl implements FriendService {
                              ImConversationMapper imConversationMapper,
                              ImConversationUserMapper imConversationUserMapper,
                              ImMessageMapper imMessageMapper,
+                             ImUserMapper imUserMapper,
                              ImWsPushService imWsPushService) {
         this.imFriendMapper = imFriendMapper;
         this.imFriendRequestMapper = imFriendRequestMapper;
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imMessageMapper = imMessageMapper;
+        this.imUserMapper = imUserMapper;
         this.imWsPushService = imWsPushService;
     }
 
     @Override
     public List<FriendItemVo> listFriends(Long userId) {
         return imFriendMapper.selectFriendListByUserId(userId);
+    }
+
+    @Override
+    public List<FriendItemVo> listBlockedFriends(Long userId) {
+        return imFriendMapper.selectBlockedListByUserId(userId);
     }
 
     @Override
@@ -115,6 +126,68 @@ public class FriendServiceImpl implements FriendService {
         imFriendRequestMapper.updateById(request);
     }
 
+    @Override
+    @Transactional
+    public void deleteFriend(Long currentUserId, Long friendUserId) {
+        requireTargetUser(friendUserId);
+        ImFriendEntity currentRelation = requireExistingRelation(currentUserId, friendUserId);
+        ImFriendEntity reverseRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(friendUserId, currentUserId);
+        currentRelation.setStatus(FRIEND_STATUS_DELETED);
+        imFriendMapper.updateById(currentRelation);
+        if (reverseRelation != null && !Integer.valueOf(FRIEND_STATUS_DELETED).equals(reverseRelation.getStatus())) {
+            reverseRelation.setStatus(FRIEND_STATUS_DELETED);
+            imFriendMapper.updateById(reverseRelation);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateRemark(Long currentUserId, Long friendUserId, String remark) {
+        requireTargetUser(friendUserId);
+        ImFriendEntity relation = requireRelationWithStatus(currentUserId, friendUserId, FRIEND_STATUS_NORMAL);
+        relation.setRemark(normalizeRemark(remark));
+        imFriendMapper.updateById(relation);
+    }
+
+    @Override
+    @Transactional
+    public void blockFriend(Long currentUserId, Long friendUserId) {
+        requireTargetUser(friendUserId);
+        ImFriendEntity relation = requireExistingRelation(currentUserId, friendUserId);
+        if (Integer.valueOf(FRIEND_STATUS_DELETED).equals(relation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不存在");
+        }
+        relation.setStatus(FRIEND_STATUS_BLOCKED);
+        imFriendMapper.updateById(relation);
+    }
+
+    @Override
+    @Transactional
+    public void unblockFriend(Long currentUserId, Long friendUserId) {
+        requireTargetUser(friendUserId);
+        ImFriendEntity relation = requireRelationWithStatus(currentUserId, friendUserId, FRIEND_STATUS_BLOCKED);
+        relation.setStatus(FRIEND_STATUS_NORMAL);
+        imFriendMapper.updateById(relation);
+    }
+
+    @Override
+    public void validateSingleChatAllowed(Long fromUserId, Long toUserId) {
+        ImFriendEntity senderRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(fromUserId, toUserId);
+        ImFriendEntity receiverRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(toUserId, fromUserId);
+        if (senderRelation == null || !Integer.valueOf(FRIEND_STATUS_NORMAL).equals(senderRelation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不可用");
+        }
+        if (receiverRelation == null || Integer.valueOf(FRIEND_STATUS_DELETED).equals(receiverRelation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不可用");
+        }
+        if (Integer.valueOf(FRIEND_STATUS_BLOCKED).equals(receiverRelation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "对方已拉黑你");
+        }
+        if (!Integer.valueOf(FRIEND_STATUS_NORMAL).equals(receiverRelation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不可用");
+        }
+    }
+
     private ImFriendRequestEntity validateRequestForAction(Long currentUserId, Long requestId) {
         ImFriendRequestEntity request = imFriendRequestMapper.selectById(requestId);
         if (request == null || !currentUserId.equals(request.getToUserId())) {
@@ -127,11 +200,10 @@ public class FriendServiceImpl implements FriendService {
     }
 
     private void insertFriendIfAbsent(Long userId, Long friendUserId) {
-        Long count = imFriendMapper.selectCount(new LambdaQueryWrapper<ImFriendEntity>()
-                .eq(ImFriendEntity::getUserId, userId)
-                .eq(ImFriendEntity::getFriendUserId, friendUserId)
-                .eq(ImFriendEntity::getStatus, FRIEND_STATUS_NORMAL));
-        if (count != null && count > 0) {
+        ImFriendEntity existing = imFriendMapper.selectRelationByUserIdAndFriendUserId(userId, friendUserId);
+        if (existing != null) {
+            existing.setStatus(FRIEND_STATUS_NORMAL);
+            imFriendMapper.updateById(existing);
             return;
         }
         ImFriendEntity entity = new ImFriendEntity();
@@ -202,5 +274,37 @@ public class FriendServiceImpl implements FriendService {
         item.setSendStatus(entity.getSendStatus());
         item.setSentAt(entity.getSentAt());
         return item;
+    }
+
+    private ImUserEntity requireTargetUser(Long friendUserId) {
+        ImUserEntity entity = imUserMapper.selectById(friendUserId);
+        if (entity == null) {
+            throw new BizException(ErrorCode.USER_NOT_FOUND, "用户不存在");
+        }
+        return entity;
+    }
+
+    private ImFriendEntity requireExistingRelation(Long currentUserId, Long friendUserId) {
+        ImFriendEntity relation = imFriendMapper.selectRelationByUserIdAndFriendUserId(currentUserId, friendUserId);
+        if (relation == null) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不存在");
+        }
+        return relation;
+    }
+
+    private ImFriendEntity requireRelationWithStatus(Long currentUserId, Long friendUserId, int status) {
+        ImFriendEntity relation = requireExistingRelation(currentUserId, friendUserId);
+        if (!Integer.valueOf(status).equals(relation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系状态不正确");
+        }
+        return relation;
+    }
+
+    private String normalizeRemark(String remark) {
+        if (remark == null) {
+            return null;
+        }
+        String normalized = remark.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 }

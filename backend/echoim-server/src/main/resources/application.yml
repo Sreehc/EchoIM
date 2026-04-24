@@ -11,6 +11,10 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: ${ECHOIM_MULTIPART_MAX_FILE_SIZE:100MB}
+      max-request-size: ${ECHOIM_MULTIPART_MAX_FILE_SIZE:100MB}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -33,6 +37,10 @@ echoim:
   jwt:
     secret: ${ECHOIM_JWT_SECRET:echoim-server-jwt-secret-key-1234567890}
     expire-seconds: 7200
+  file:
+    storage-type: ${ECHOIM_FILE_STORAGE_TYPE:oss}
+    max-size: ${ECHOIM_FILE_MAX_SIZE:104857600}
+    signed-url-expire-seconds: ${ECHOIM_FILE_SIGNED_URL_EXPIRE_SECONDS:600}
   im:
     port: ${ECHOIM_IM_PORT:8091}
     ws-path: /ws
