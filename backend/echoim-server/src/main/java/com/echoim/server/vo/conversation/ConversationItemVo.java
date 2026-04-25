@@ -12,6 +12,9 @@ public class ConversationItemVo {
     private LocalDateTime lastMessageTime;
     private Integer unreadCount;
     private Integer isTop;
+    private Integer isMute;
+    private Long peerUserId;
+    private Long groupId;
     private Long latestSeq;
 
     public Long getConversationId() {
@@ -76,6 +79,30 @@ public class ConversationItemVo {
 
     public void setIsTop(Integer isTop) {
         this.isTop = isTop;
+    }
+
+    public Integer getIsMute() {
+        return isMute;
+    }
+
+    public void setIsMute(Integer isMute) {
+        this.isMute = isMute;
+    }
+
+    public Long getPeerUserId() {
+        return peerUserId;
+    }
+
+    public void setPeerUserId(Long peerUserId) {
+        this.peerUserId = peerUserId;
+    }
+
+    public Long getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(Long groupId) {
+        this.groupId = groupId;
     }
 
     public Long getLatestSeq() {

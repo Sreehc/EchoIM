@@ -1,0 +1,137 @@
+import type {
+  ApiConversationItem,
+  ApiMessageItem,
+  ApiOfflineSyncConversation,
+} from '@/types/api'
+import type { ChatFile, ChatMessage, ConversationSummary } from '@/types/chat'
+
+function normalizeTime(value: string | null | undefined): string {
+  if (!value) return new Date(0).toISOString()
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? new Date(0).toISOString() : date.toISOString()
+}
+
+function adaptFile(file: ChatFile | null | undefined): ChatFile | null {
+  if (!file) return null
+
+  return {
+    fileId: Number(file.fileId),
+    fileName: file.fileName ?? '未命名文件',
+    fileExt: file.fileExt ?? null,
+    contentType: file.contentType ?? null,
+    fileSize: file.fileSize ?? null,
+    bizType: file.bizType ?? null,
+    objectKey: file.objectKey ?? null,
+    downloadUrl: file.downloadUrl ?? null,
+    expiresIn: file.expiresIn ?? null,
+    expireAt: file.expireAt ? normalizeTime(file.expireAt) : null,
+  }
+}
+
+export function adaptConversationSummary(
+  item: ApiConversationItem,
+): ConversationSummary {
+  return {
+    conversationId: Number(item.conversationId),
+    conversationType: item.conversationType,
+    conversationName: item.conversationName ?? `会话 ${item.conversationId}`,
+    avatarUrl: item.avatarUrl ?? null,
+    lastMessagePreview: item.lastMessagePreview ?? '',
+    lastMessageTime: normalizeTime(item.lastMessageTime),
+    unreadCount: Number(item.unreadCount ?? 0),
+    isTop: Number(item.isTop ?? 0),
+    isMute: Number(item.isMute ?? 0),
+    peerUserId: item.peerUserId == null ? null : Number(item.peerUserId),
+    groupId: item.groupId == null ? null : Number(item.groupId),
+    latestSeq: Number(item.latestSeq ?? 0),
+  }
+}
+
+export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
+  return {
+    messageId: Number(item.messageId),
+    conversationId: Number(item.conversationId),
+    seqNo: Number(item.seqNo ?? 0),
+    clientMsgId: item.clientMsgId ?? `server-${item.messageId}`,
+    fromUserId: Number(item.fromUserId),
+    toUserId: item.toUserId == null ? null : Number(item.toUserId),
+    groupId: item.groupId == null ? null : Number(item.groupId),
+    msgType: item.msgType,
+    content: item.content ?? null,
+    fileId: item.fileId == null ? null : Number(item.fileId),
+    file: adaptFile(item.file),
+    sentAt: normalizeTime(item.sentAt),
+    sendStatus: Number(item.sendStatus ?? 1),
+    recalled: Boolean(item.recalled),
+    edited: Boolean(item.edited),
+    delivered: Boolean(item.delivered),
+    read: Boolean(item.read),
+    errorMessage: null,
+  }
+}
+
+export function messagePreviewFromMessage(message: ChatMessage): string {
+  if (message.msgType === 'IMAGE') {
+    return message.file?.fileName ? `[图片] ${message.file.fileName}` : '[图片]'
+  }
+
+  if (message.msgType === 'FILE') {
+    return message.file?.fileName ? `[文件] ${message.file.fileName}` : '[文件]'
+  }
+
+  if (message.msgType === 'SYSTEM') {
+    return message.content ?? '系统消息'
+  }
+
+  return message.content?.trim() || '新消息'
+}
+
+export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+  const merged = new Map<string, ChatMessage>()
+
+  for (const message of existing) {
+    merged.set(buildMessageKey(message), message)
+  }
+
+  for (const message of incoming) {
+    const key = buildMessageKey(message)
+    const previous = merged.get(key)
+
+    if (!previous) {
+      merged.set(key, message)
+      continue
+    }
+
+    merged.set(key, {
+      ...previous,
+      ...message,
+      sendStatus: message.sendStatus,
+      delivered: Boolean(previous.delivered || message.delivered),
+      read: Boolean(previous.read || message.read),
+      errorMessage: message.errorMessage ?? previous.errorMessage ?? null,
+    })
+  }
+
+  return Array.from(merged.values()).sort((left, right) => {
+    if (left.seqNo !== right.seqNo) return left.seqNo - right.seqNo
+    return new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime()
+  })
+}
+
+export function buildMessageKey(message: Pick<ChatMessage, 'messageId' | 'clientMsgId' | 'seqNo'>): string {
+  if (message.messageId > 0) return `id:${message.messageId}`
+  if (message.clientMsgId) return `client:${message.clientMsgId}`
+  return `seq:${message.seqNo}`
+}
+
+export function mapOfflineConversation(
+  item: ApiOfflineSyncConversation,
+) {
+  return {
+    conversation: adaptConversationSummary(item.conversation),
+    messages: item.messages.map(adaptChatMessage),
+    fromSeq: Number(item.fromSeq ?? 0),
+    toSeq: Number(item.toSeq ?? 0),
+    hasMore: Boolean(item.hasMore),
+  }
+}

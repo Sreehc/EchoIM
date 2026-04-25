@@ -45,6 +45,15 @@
                END AS lastMessageTime,
                cu.unread_count AS unreadCount,
                cu.is_top AS isTop,
+               cu.is_mute AS isMute,
+               CASE
+                   WHEN c.conversation_type = 1 THEN other_cu.user_id
+                   ELSE NULL
+               END AS peerUserId,
+               CASE
+                   WHEN c.conversation_type = 2 THEN c.biz_id
+                   ELSE NULL
+               END AS groupId,
                CASE
                    WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN COALESCE((
                        SELECT m.seq_no
@@ -183,6 +192,14 @@
         SET last_message_id = #{lastMessageId},
             last_message_preview = #{lastMessagePreview},
             last_message_time = NOW()
+        WHERE id = #{conversationId}
+    </update>
+
+    <update id="updateLastMessageState">
+        UPDATE im_conversation
+        SET last_message_id = #{lastMessageId},
+            last_message_preview = #{lastMessagePreview},
+            last_message_time = #{lastMessageTime}
         WHERE id = #{conversationId}
     </update>
 </mapper>

@@ -1,0 +1,67 @@
+:root {
+  --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: color-mix(in srgb, var(--color-primary) 70%, white);
+  --el-color-primary-light-5: color-mix(in srgb, var(--color-primary) 55%, white);
+  --el-color-primary-light-7: color-mix(in srgb, var(--color-primary) 35%, white);
+  --el-border-radius-base: var(--radius-sm);
+  --el-border-radius-round: 999px;
+  --el-border-color: var(--color-line);
+  --el-fill-color-blank: var(--color-bg-surface);
+  --el-bg-color: var(--color-bg-surface);
+  --el-bg-color-page: var(--color-bg-app);
+  --el-text-color-primary: var(--color-text-1);
+  --el-text-color-regular: var(--color-text-2);
+  --el-text-color-secondary: var(--color-text-3);
+  --el-fill-color-light: color-mix(in srgb, var(--color-bg-panel) 72%, transparent);
+  --el-mask-color: rgba(11, 17, 32, 0.48);
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-button {
+  box-shadow: none !important;
+}
+
+.el-input__wrapper,
+.el-textarea__inner {
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 2px var(--color-focus-ring) !important;
+}
+
+.el-button {
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.el-button--primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.el-input__wrapper {
+  padding-inline: 10px;
+  border: 1px solid transparent;
+}
+
+.el-input__wrapper:hover {
+  background: var(--color-bg-elevated);
+}
+
+.el-form-item__label {
+  color: var(--color-text-2);
+  font-weight: 600;
+}
+
+.el-drawer {
+  background: var(--color-bg-surface);
+}
+
+.el-drawer__body {
+  padding: 0;
+}
