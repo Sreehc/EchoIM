@@ -1,27 +1,32 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ChatTopbar from '@/components/chat/ChatTopbar.vue'
 import MessagePane from '@/components/chat/MessagePane.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
 import ConversationProfileDrawer from '@/components/chat/ConversationProfileDrawer.vue'
-import ChatStatePanel from '@/components/chat/ChatStatePanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
+import type { ChangePasswordPayload, ChatMessage, LeftPanelMode, UpdateCurrentUserProfilePayload } from '@/types/chat'
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const uiStore = useUiStore()
 const route = useRoute()
 const router = useRouter()
+const editingMessageId = ref<number | null>(null)
+const editingMessageDraft = ref('')
+const messageActionPendingId = ref<number | null>(null)
 
 const shouldShowConversationList = computed(() => !uiStore.isMobile || uiStore.mobileView === 'list')
-const showDesktopProfile = computed(() => uiStore.isDesktop && uiStore.profileOpen)
 const shouldShowMainPanel = computed(() => !uiStore.isMobile || uiStore.mobileView === 'chat')
-const shouldShowWelcomeState = computed(() => !chatStore.activeConversation && !uiStore.isMobile)
-const sidebarErrorMessage = computed(() => (chatStore.conversations.length ? null : chatStore.errors.bootstrapError))
+const sidebarErrorMessage = computed(() =>
+  uiStore.leftPanelMode === 'conversations' && !chatStore.conversations.length ? chatStore.errors.bootstrapError : null,
+)
+const currentSidebarScrollTop = computed(() => uiStore.panelScrollTop[uiStore.leftPanelMode])
 const connectionStatusLabel = computed(() => {
   if (uiStore.connectionStatus === 'ready') return '实时连接已就绪'
   if (uiStore.connectionStatus === 'reconnecting') return '正在重连'
@@ -79,7 +84,8 @@ watch(
   async (value) => {
     try {
       await chatStore.bootstrap()
-    } catch (error) {
+      await authStore.ensureCurrentProfile().catch(() => null)
+    } catch {
       return
     }
 
@@ -99,18 +105,44 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => chatStore.activeConversationId,
+  () => {
+    cancelMessageEditing()
+  },
+)
+
+watch(
+  () => chatStore.activeMessages.map((message) => `${message.messageId}:${message.recalled}:${message.content}`).join('|'),
+  () => {
+    if (!editingMessageId.value) return
+    const targetMessage = chatStore.activeMessages.find((message) => message.messageId === editingMessageId.value)
+    if (!targetMessage || targetMessage.recalled) {
+      cancelMessageEditing()
+    }
+  },
+)
+
 async function selectConversation(conversationId: number) {
+  uiStore.setGlobalMenuOpen(false)
   uiStore.setTopbarMenuOpen(false)
+
   try {
     await chatStore.openConversation(conversationId)
   } catch {
     return
   }
+
   uiStore.setMobileView('chat')
   router.push(`/chat/${conversationId}`)
 }
 
 function handleBack() {
+  if (uiStore.globalMenuOpen) {
+    uiStore.setGlobalMenuOpen(false)
+    return
+  }
+
   if (uiStore.profileOpen) {
     uiStore.setProfileOpen(false)
     return
@@ -123,11 +155,38 @@ function handleBack() {
 }
 
 function openProfile() {
+  uiStore.setGlobalMenuOpen(false)
   uiStore.setTopbarMenuOpen(false)
   uiStore.setProfileOpen(true)
 }
 
-async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 'mark-read') {
+function openLeftPanel(mode: LeftPanelMode) {
+  uiStore.setGlobalMenuOpen(false)
+  uiStore.setTopbarMenuOpen(false)
+  uiStore.openLeftPanel(mode)
+
+  if (mode === 'conversations' && uiStore.isMobile && !chatStore.activeConversationId) {
+    uiStore.setMobileView('list')
+  }
+}
+
+async function saveProfile(payload: UpdateCurrentUserProfilePayload) {
+  try {
+    await authStore.saveCurrentProfile(payload)
+  } catch {
+    return
+  }
+}
+
+async function changePassword(payload: ChangePasswordPayload) {
+  try {
+    await authStore.changePassword(payload)
+  } catch {
+    return
+  }
+}
+
+async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 'mark-read' | 'delete') {
   const conversationId = chatStore.activeConversationId
   if (!conversationId) return
 
@@ -136,6 +195,16 @@ async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 
       await chatStore.toggleConversationTop(conversationId)
     } else if (command === 'toggle-mute') {
       await chatStore.toggleConversationMute(conversationId)
+    } else if (command === 'delete') {
+      await ElMessageBox.confirm('删除后会从当前列表隐藏该会话，后续有新消息时会再次恢复。', '删除会话', {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      })
+      await chatStore.deleteConversation(conversationId)
+      uiStore.setProfileOpen(false)
+      uiStore.setMobileView('list')
+      await router.push('/chat')
     } else {
       await chatStore.markConversationRead(conversationId)
     }
@@ -147,7 +216,9 @@ async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 
 }
 
 function handleFocusSearch() {
+  uiStore.setGlobalMenuOpen(false)
   uiStore.setTopbarMenuOpen(false)
+  uiStore.returnToConversationList()
 
   if (uiStore.isMobile && chatStore.activeConversationId) {
     chatStore.clearActiveConversation()
@@ -163,8 +234,82 @@ function handleFocusSearch() {
 async function handleRetry() {
   try {
     await chatStore.bootstrap(true)
+    await authStore.ensureCurrentProfile(true).catch(() => null)
   } catch {
     return
+  }
+}
+
+async function handleLogout() {
+  try {
+    await authStore.logout()
+  } finally {
+    cancelMessageEditing()
+    chatStore.resetState()
+    uiStore.setGlobalMenuOpen(false)
+    uiStore.setTopbarMenuOpen(false)
+    uiStore.setProfileOpen(false)
+    uiStore.setMobileView('list')
+    await router.replace('/login')
+  }
+}
+
+async function handleLoadOlderMessages() {
+  const conversationId = chatStore.activeConversationId
+  if (!conversationId) return
+
+  try {
+    await chatStore.loadOlderMessages(conversationId)
+  } catch {
+    return
+  }
+}
+
+function startEditingMessage(message: ChatMessage) {
+  editingMessageId.value = message.messageId
+  editingMessageDraft.value = message.content ?? ''
+}
+
+function cancelMessageEditing() {
+  editingMessageId.value = null
+  editingMessageDraft.value = ''
+}
+
+async function saveEditingMessage(payload: { messageId: number; content: string }) {
+  messageActionPendingId.value = payload.messageId
+
+  try {
+    await chatStore.editMessage(payload.messageId, payload.content)
+    cancelMessageEditing()
+  } catch {
+    return
+  } finally {
+    messageActionPendingId.value = null
+  }
+}
+
+async function handleRecallMessage(messageId: number) {
+  try {
+    await ElMessageBox.confirm('撤回后会同步更新当前会话和对方消息列表。', '撤回消息', {
+      confirmButtonText: '撤回',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  messageActionPendingId.value = messageId
+
+  try {
+    await chatStore.recallMessage(messageId)
+    if (editingMessageId.value === messageId) {
+      cancelMessageEditing()
+    }
+  } catch {
+    return
+  } finally {
+    messageActionPendingId.value = null
   }
 }
 
@@ -187,6 +332,7 @@ function registerDebugHooks() {
   window.__ECHOIM_E2E__ = {
     getConnectionStatus: () => uiStore.connectionStatus,
     getActiveConversationId: () => chatStore.activeConversationId,
+    getLeftPanelMode: () => uiStore.leftPanelMode,
     listConversations: () =>
       chatStore.conversations.map((item) => ({
         conversationId: item.conversationId,
@@ -198,6 +344,9 @@ function registerDebugHooks() {
       })),
     openConversation: async (conversationId: number) => {
       await selectConversation(conversationId)
+    },
+    openLeftPanel: (mode: LeftPanelMode) => {
+      openLeftPanel(mode)
     },
     dropRealtimeConnection: (pauseReconnect?: boolean) => {
       chatStore.simulateRealtimeDrop(Boolean(pauseReconnect))
@@ -212,30 +361,50 @@ function registerDebugHooks() {
 </script>
 
 <template>
-  <main class="chat-page" :class="{ 'chat-page--with-profile': showDesktopProfile }">
+  <main class="chat-page">
     <h1 class="chat-page__sr-only">EchoIM 聊天工作台</h1>
     <p class="chat-page__sr-only" role="status" aria-live="polite">{{ liveStatusMessage }}</p>
+
     <ConversationSidebar
       v-if="shouldShowConversationList"
       class="chat-page__sidebar"
       :current-user="authStore.currentUser"
+      :current-profile="authStore.profile"
       :conversations="chatStore.filteredConversations"
-      :selected-conversation-id="chatStore.activeConversationId ?? chatStore.lastOpenedConversationId"
+      :selected-conversation-id="chatStore.activeConversationId"
       :search-query="chatStore.searchQuery"
       :theme="uiStore.theme"
+      :left-panel-mode="uiStore.leftPanelMode"
+      :settings-section="uiStore.settingsSection"
+      :global-menu-open="uiStore.globalMenuOpen"
+      :chat-preferences="uiStore.chatPreferences"
       :loading="chatStore.loading"
       :error-message="sidebarErrorMessage"
       :focus-search-token="uiStore.sidebarSearchFocusToken"
-      :sidebar-scroll-top="uiStore.sidebarScrollTop"
+      :panel-scroll-top="currentSidebarScrollTop"
+      :profile-loading="authStore.profileLoading"
+      :profile-saving="authStore.profileSaving"
+      :password-saving="authStore.passwordSaving"
+      :profile-error="authStore.profileError"
+      :profile-notice="authStore.profileNotice"
       @update:search-query="chatStore.setSearchQuery"
-      @update:sidebar-scroll-top="uiStore.setSidebarScrollTop"
+      @update:panel-scroll-top="uiStore.setPanelScrollTop(uiStore.leftPanelMode, $event)"
+      @update:settings-section="uiStore.setSettingsSection"
+      @update:global-menu-open="uiStore.setGlobalMenuOpen"
+      @update:chat-preferences="uiStore.setChatPreferences"
       @clear-search="chatStore.clearSearchQuery"
       @retry="handleRetry"
       @select="selectConversation"
       @toggle-theme="uiStore.toggleTheme"
+      @open-panel="openLeftPanel"
+      @save-profile="saveProfile"
+      @change-password="changePassword"
+      @clear-profile-error="authStore.clearProfileError"
+      @clear-profile-notice="authStore.clearProfileNotice"
+      @logout="handleLogout"
     />
 
-    <section v-if="shouldShowMainPanel" class="chat-page__main">
+    <section v-if="shouldShowMainPanel" id="chat-main" tabindex="-1" class="chat-page__main">
       <template v-if="chatStore.activeConversation">
         <ChatTopbar
           :conversation="chatStore.activeConversation"
@@ -259,54 +428,50 @@ function registerDebugHooks() {
           <span>{{ transientBanner.message }}</span>
           <button type="button" aria-label="关闭状态提示" @click="dismissTransientBanner">关闭</button>
         </div>
-        <MessagePane
-          :conversation-id="chatStore.activeConversation.conversationId"
-          :messages="chatStore.activeMessages"
-          :current-user-id="authStore.currentUser?.userId ?? 0"
-          :current-user-name="authStore.currentUser?.nickname ?? '我'"
-          :conversation-name="chatStore.activeConversation.conversationName"
-          :conversation-type="chatStore.activeConversation.conversationType"
-          :loading="chatStore.messagesLoading"
-          :error-message="chatStore.errors.messageLoadError"
-          @retry="chatStore.loadConversationMessages(chatStore.activeConversation.conversationId, true)"
-          @retry-message="chatStore.retryMessage"
-        />
-        <MessageComposer
-          @send="chatStore.sendMessage({ currentUserId: authStore.currentUser?.userId ?? 0, content: $event })"
-        />
+        <div class="chat-page__stage">
+          <MessagePane
+            :conversation-id="chatStore.activeConversation.conversationId"
+            :messages="chatStore.activeMessages"
+            :current-user-id="authStore.currentUser?.userId ?? 0"
+            :current-user-name="authStore.currentUser?.nickname ?? '我'"
+            :conversation-name="chatStore.activeConversation.conversationName"
+            :conversation-type="chatStore.activeConversation.conversationType"
+            :compact="uiStore.chatPreferences.compactBubbles"
+            :loading="chatStore.messagesLoading"
+            :error-message="chatStore.errors.messageLoadError"
+            :has-older-messages="chatStore.activeHasOlderMessages"
+            :older-messages-loading="chatStore.activeOlderMessagesLoading"
+            :older-messages-error="chatStore.activeOlderMessagesError"
+            :editing-message-id="editingMessageId"
+            :editing-draft="editingMessageDraft"
+            :message-action-pending-id="messageActionPendingId"
+            @retry="chatStore.loadConversationMessages(chatStore.activeConversation.conversationId, true)"
+            @load-older="handleLoadOlderMessages"
+            @retry-message="chatStore.retryMessage"
+            @start-edit-message="startEditingMessage"
+            @update:editing-draft="editingMessageDraft = $event"
+            @cancel-edit-message="cancelMessageEditing"
+            @save-edit-message="saveEditingMessage"
+            @recall-message="handleRecallMessage"
+          />
+          <MessageComposer
+            :enter-to-send="uiStore.chatPreferences.enterToSend"
+            @send="chatStore.sendMessage({ currentUserId: authStore.currentUser?.userId ?? 0, content: $event })"
+          />
+        </div>
       </template>
 
-      <div v-else-if="shouldShowWelcomeState" class="chat-page__welcome">
-        <div class="chat-page__welcome-card">
-          <ChatStatePanel
-            eyebrow="EchoIM"
-            title="选择一个会话开始"
-            description="从左侧列表打开最近会话。置顶会话会始终保持在最上方，便于快速进入。"
-            action-label="聚焦搜索"
-            role="status"
-            aria-live="polite"
-            @action="handleFocusSearch"
-          />
-          <dl class="chat-page__welcome-meta">
-            <div>
-              <dt>当前账号</dt>
-              <dd>{{ authStore.currentUser?.nickname ?? authStore.currentUser?.username ?? '未登录' }}</dd>
-            </div>
-            <div>
-              <dt>同步状态</dt>
-              <dd>{{ connectionStatusLabel }}</dd>
-            </div>
-          </dl>
-        </div>
-      </div>
+      <div v-else class="chat-page__empty" data-testid="chat-empty-state"></div>
     </section>
 
     <ConversationProfileDrawer
-      v-if="chatStore.activeConversation && (uiStore.useOverlayProfile || showDesktopProfile)"
+      v-if="chatStore.activeConversation && uiStore.profileOpen"
       class="chat-page__profile"
       :conversation="chatStore.activeConversation"
       :profile="chatStore.activeProfile"
-      :overlay="uiStore.useOverlayProfile"
+      :loading="chatStore.activeProfileLoading"
+      :error-message="chatStore.activeProfileError"
+      :overlay="true"
       :visible="uiStore.profileOpen"
       @action="handleConversationAction"
       @update:visible="uiStore.setProfileOpen"
@@ -317,40 +482,74 @@ function registerDebugHooks() {
 <style scoped>
 .chat-page {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 14px;
-  min-height: calc(100dvh - 24px);
-}
-
-.chat-page--with-profile {
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: 404px minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-page__sidebar,
 .chat-page__main,
 .chat-page__profile {
   min-height: 0;
-}
-
-.chat-page__main {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  border: 1px solid var(--color-line);
-  border-radius: 16px;
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
+.chat-page__main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.chat-page__stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-chat-stage-base);
+}
+
+.chat-page__stage::before,
+.chat-page__stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.chat-page__stage::before {
+  background-image: var(--chat-wallpaper-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: var(--chat-wallpaper-opacity);
+}
+
+.chat-page__stage::after {
+  background:
+    linear-gradient(180deg, var(--color-chat-stage-top), transparent 18%),
+    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 24%),
+    radial-gradient(circle at top right, var(--color-chat-stage-glow), transparent 38%);
+}
+
 .chat-page__banner {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 14px;
+  padding: 8px 18px;
   border-bottom: 1px solid var(--color-line);
   color: var(--color-text-2);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  background: rgba(33, 33, 33, 0.92);
 }
 
 .chat-page__banner.is-warning {
@@ -358,19 +557,49 @@ function registerDebugHooks() {
 }
 
 .chat-page__banner.is-error {
-  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg-surface));
+  background: color-mix(in srgb, var(--color-danger) 9%, var(--color-bg-surface));
 }
 
 .chat-page__banner.is-muted {
-  background: var(--color-bg-elevated);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg-surface));
 }
 
 .chat-page__banner button {
-  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 0.76rem;
+  font: inherit;
+}
+
+.chat-page__empty {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(10, 10, 16, 0.28), transparent 16%),
+    var(--color-chat-stage-base);
+}
+
+.chat-page__empty::before,
+.chat-page__empty::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.chat-page__empty::before {
+  background-image: var(--chat-wallpaper-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: var(--chat-wallpaper-opacity);
+}
+
+.chat-page__empty::after {
+  background:
+    linear-gradient(180deg, var(--color-chat-stage-top), transparent 18%),
+    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 24%);
 }
 
 .chat-page__sr-only {
@@ -385,84 +614,22 @@ function registerDebugHooks() {
   border: 0;
 }
 
-.chat-page__profile {
-  width: 320px;
-}
-
-.chat-page__welcome {
-  min-height: 0;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 30%),
-    var(--color-bg-surface);
-}
-
-.chat-page__welcome-card {
-  width: min(100%, 420px);
-  padding: 28px 28px 24px;
-  border: 1px solid var(--color-line);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--color-bg-elevated) 92%, var(--color-bg-surface));
-  box-shadow: var(--shadow-soft);
-}
-
-.chat-page__welcome-eyebrow {
-  display: inline-block;
-  margin-bottom: 14px;
-  color: var(--color-text-soft);
-  font: 600 0.72rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.chat-page__welcome-card h1 {
-  margin: 0 0 10px;
-  font: 700 1.4rem/1.08 var(--font-display);
-  letter-spacing: -0.03em;
-}
-
-.chat-page__welcome-card p {
-  color: var(--color-text-2);
-  font-size: 0.92rem;
-}
-
-.chat-page__welcome-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-line);
-}
-
-.chat-page__welcome-meta dt {
-  margin-bottom: 4px;
-  color: var(--color-text-soft);
-  font: 500 0.68rem/1 var(--font-mono);
-  text-transform: uppercase;
-}
-
-.chat-page__welcome-meta dd {
-  margin: 0;
-  color: var(--color-text-1);
-  font-size: 0.9rem;
-  font-weight: 600;
+@media (max-width: 1279px) {
+  .chat-page {
+    grid-template-columns: 356px minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 767px) {
   .chat-page {
     grid-template-columns: 1fr;
     gap: 0;
-    min-height: 100dvh;
   }
 
+  .chat-page__sidebar,
   .chat-page__main {
-    min-height: 100dvh;
-    border-radius: 0;
     border-inline: 0;
-    box-shadow: none;
   }
+
 }
 </style>

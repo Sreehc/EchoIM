@@ -6,7 +6,7 @@ import type {
   OfflineSyncRequest,
   PageResponse,
 } from '@/types/api'
-import { getJson, postJson, putJson } from './http'
+import { deleteJson, getJson, postJson, putJson } from './http'
 
 export function fetchConversations(pageNo = 1, pageSize = 100) {
   return getJson<PageResponse<ApiConversationItem>>(
@@ -45,6 +45,10 @@ export function updateConversationTop(conversationId: number, isTop: number) {
 
 export function updateConversationMute(conversationId: number, isMute: number) {
   return putJson(`/api/conversations/${conversationId}/mute`, { isMute })
+}
+
+export function deleteConversation(conversationId: number) {
+  return deleteJson<void>(`/api/conversations/${conversationId}`)
 }
 
 export function markConversationReadRequest(conversationId: number, lastReadSeq: number) {

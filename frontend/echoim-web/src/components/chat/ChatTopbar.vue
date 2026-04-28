@@ -14,7 +14,7 @@ const emit = defineEmits<{
   back: []
   openProfile: []
   focusSearch: []
-  action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read']
+  action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read' | 'delete']
   'update:menuOpen': [value: boolean]
 }>()
 </script>
@@ -33,8 +33,10 @@ const emit = defineEmits<{
           :type="conversation?.conversationType === 2 ? 'group' : 'user'"
           size="md"
         />
-        <div>
-          <strong>{{ conversation?.conversationName ?? '请选择会话' }}</strong>
+        <div class="chat-topbar__copy">
+          <div class="chat-topbar__title-row">
+            <strong>{{ conversation?.conversationName ?? '请选择会话' }}</strong>
+          </div>
           <p>{{ profile?.subtitle ?? '消息将保持同步' }}</p>
         </div>
       </div>
@@ -44,7 +46,7 @@ const emit = defineEmits<{
       <button class="chat-topbar__icon" type="button" aria-label="搜索会话" @click="emit('focusSearch')">
         <Search />
       </button>
-      <button class="chat-topbar__icon" type="button" aria-label="打开详情" @click="emit('openProfile')">
+      <button class="chat-topbar__icon" type="button" aria-label="打开会话详情" @click="emit('openProfile')">
         <Setting />
       </button>
       <el-dropdown
@@ -69,6 +71,9 @@ const emit = defineEmits<{
             <el-dropdown-item command="mark-read" :disabled="!props.conversation?.unreadCount">
               标记已读
             </el-dropdown-item>
+            <el-dropdown-item command="delete" divided>
+              删除会话
+            </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -81,10 +86,11 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: 56px;
-  padding: 8px 14px;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 18px;
   border-bottom: 1px solid var(--color-line);
+  background: #212121;
 }
 
 .chat-topbar__main,
@@ -92,7 +98,7 @@ const emit = defineEmits<{
 .chat-topbar__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .chat-topbar__avatar {
@@ -100,42 +106,56 @@ const emit = defineEmits<{
 }
 
 .chat-topbar__icon {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+}
+
+.chat-topbar__identity {
+  min-width: 0;
+}
+
+.chat-topbar__copy {
+  min-width: 0;
+}
+
+.chat-topbar__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .chat-topbar__identity strong {
   display: block;
-  font-size: 0.88rem;
+  font-size: 0.98rem;
   line-height: 1.15;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .chat-topbar__identity p {
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--color-text-soft);
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   line-height: 1.1;
 }
 
 .chat-topbar__icon {
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 50%;
+  border: 0;
   background: transparent;
   color: var(--color-text-2);
   transition:
     background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
 .chat-topbar__icon:hover,
 .chat-topbar__icon:focus-visible {
-  border-color: var(--color-line);
   background: var(--color-hover);
   color: var(--color-text-1);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 767px) {

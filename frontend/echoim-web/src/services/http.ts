@@ -49,13 +49,17 @@ export async function putJson<T>(path: string, body?: unknown, init?: RequestIni
   })
 }
 
+export async function deleteJson<T>(path: string, init?: RequestInit) {
+  return requestJson<T>(path, { ...init, method: 'DELETE' })
+}
+
 function resolveUrl(path: string) {
   if (!API_BASE_URL) return path
   if (path.startsWith('http://') || path.startsWith('https://')) return path
   return `${API_BASE_URL}${path}`
 }
 
-async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+export async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
   const headers = new Headers(init.headers ?? {})
   const token = getToken()
 

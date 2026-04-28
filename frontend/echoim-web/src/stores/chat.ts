@@ -7,8 +7,8 @@ import {
   mergeMessages,
   messagePreviewFromMessage,
 } from '@/adapters/chat'
-import { mockProfiles } from '@/mock/profiles'
 import {
+  deleteConversation as deleteConversationRequest,
   fetchConversationMessages,
   fetchConversations,
   fetchImInfo,
@@ -17,14 +17,21 @@ import {
   updateConversationMute,
   updateConversationTop,
 } from '@/services/conversations'
+import { fetchGroupDetail } from '@/services/groups'
 import { HttpError } from '@/services/http'
+import { editMessage as editMessageRequest, recallMessage as recallMessageRequest } from '@/services/messages'
 import { EchoWsClient } from '@/services/ws'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { fetchUserPublicProfile } from '@/services/user'
+import { showIncomingMessageNotification } from '@/utils/browserNotifications'
+import { normalizeDisplayText } from '@/utils/text'
 import type {
   ApiConversationItem,
+  ApiGroupDetail,
   ApiMessageItem,
   OfflineSyncRequest,
+  ApiUserPublicProfile,
   WsAckPayload,
   WsConversationChangePayload,
   WsEnvelope,
@@ -36,6 +43,12 @@ import type { ChatErrorState, ChatMessage, ConversationProfile, ConversationSumm
 interface ConversationRuntimeMeta {
   loaded: boolean
   lastReadSeq: number
+  hasOlder: boolean
+  loadingOlder: boolean
+  olderError: string | null
+  profileLoaded: boolean
+  profileLoading: boolean
+  profileError: string | null
 }
 
 const DEFAULT_PAGE_SIZE = 50
@@ -46,7 +59,7 @@ export const useChatStore = defineStore('chat', () => {
 
   const conversations = ref<ConversationSummary[]>([])
   const messagesByConversation = ref<Record<number, ChatMessage[]>>({})
-  const profiles = ref<Record<number, ConversationProfile>>(structuredClone(mockProfiles))
+  const profiles = ref<Record<number, ConversationProfile>>({})
   const runtimeMeta = ref<Record<number, ConversationRuntimeMeta>>({})
   const activeConversationId = ref<number | null>(null)
   const lastOpenedConversationId = ref<number | null>(null)
@@ -93,6 +106,21 @@ export const useChatStore = defineStore('chat', () => {
 
   const activeProfile = computed(() =>
     activeConversationId.value ? profiles.value[activeConversationId.value] ?? null : null,
+  )
+  const activeProfileLoading = computed(() =>
+    activeConversationId.value ? ensureConversationMeta(activeConversationId.value).profileLoading : false,
+  )
+  const activeProfileError = computed(() =>
+    activeConversationId.value ? ensureConversationMeta(activeConversationId.value).profileError : null,
+  )
+  const activeHasOlderMessages = computed(() =>
+    activeConversationId.value ? ensureConversationMeta(activeConversationId.value).hasOlder : false,
+  )
+  const activeOlderMessagesLoading = computed(() =>
+    activeConversationId.value ? ensureConversationMeta(activeConversationId.value).loadingOlder : false,
+  )
+  const activeOlderMessagesError = computed(() =>
+    activeConversationId.value ? ensureConversationMeta(activeConversationId.value).olderError : null,
   )
 
   const errorMessage = computed(
@@ -151,14 +179,17 @@ export const useChatStore = defineStore('chat', () => {
       await loadConversationMessages(conversationId)
     }
 
+    void fetchConversationProfile(conversationId).catch(() => undefined)
     await markConversationRead(conversationId)
   }
 
   async function loadConversationMessages(conversationId: number, force = false) {
-    if (!force && runtimeMeta.value[conversationId]?.loaded) return
+    const meta = ensureConversationMeta(conversationId)
+    if (!force && meta.loaded) return
 
     messagesLoading.value = true
     errors.value.messageLoadError = null
+    meta.olderError = null
 
     try {
       const page = await fetchConversationMessages(conversationId, {
@@ -170,12 +201,82 @@ export const useChatStore = defineStore('chat', () => {
         ...messagesByConversation.value,
         [conversationId]: nextMessages,
       }
-      ensureConversationMeta(conversationId).loaded = true
+      meta.loaded = true
+      meta.hasOlder = nextMessages.length >= DEFAULT_PAGE_SIZE
     } catch (error) {
       errors.value.messageLoadError = toErrorMessage(error, '消息加载失败')
       throw error
     } finally {
       messagesLoading.value = false
+    }
+  }
+
+  async function loadOlderMessages(conversationId: number) {
+    const meta = ensureConversationMeta(conversationId)
+    const existingMessages = messagesByConversation.value[conversationId] ?? []
+
+    if (!existingMessages.length) {
+      await loadConversationMessages(conversationId, true)
+      return
+    }
+
+    if (meta.loadingOlder || !meta.hasOlder) return
+
+    meta.loadingOlder = true
+    meta.olderError = null
+
+    try {
+      const oldestSeqNo = existingMessages[0]?.seqNo ?? 0
+      const page = await fetchConversationMessages(conversationId, {
+        maxSeqNo: Math.max(oldestSeqNo - 1, 0),
+        pageSize: DEFAULT_PAGE_SIZE,
+      })
+      const olderMessages = page.list.map(adaptChatMessage)
+      messagesByConversation.value = {
+        ...messagesByConversation.value,
+        [conversationId]: mergeMessages(existingMessages, olderMessages),
+      }
+      meta.hasOlder = olderMessages.length >= DEFAULT_PAGE_SIZE
+    } catch (error) {
+      meta.olderError = toErrorMessage(error, '更早消息加载失败')
+      throw error
+    } finally {
+      meta.loadingOlder = false
+    }
+  }
+
+  async function fetchConversationProfile(conversationId: number, force = false) {
+    const conversation = conversations.value.find((item) => item.conversationId === conversationId)
+    if (!conversation) return null
+
+    const meta = ensureConversationMeta(conversationId)
+    if (meta.profileLoaded && !force) {
+      return profiles.value[conversationId] ?? null
+    }
+    if (meta.profileLoading) {
+      return profiles.value[conversationId] ?? null
+    }
+
+    meta.profileLoading = true
+    meta.profileError = null
+
+    try {
+      const nextProfile =
+        conversation.conversationType === 2
+          ? await buildGroupConversationProfile(conversation)
+          : await buildSingleConversationProfile(conversation)
+
+      profiles.value = {
+        ...profiles.value,
+        [conversationId]: nextProfile,
+      }
+      meta.profileLoaded = true
+      return nextProfile
+    } catch (error) {
+      meta.profileError = toErrorMessage(error, '会话详情加载失败')
+      throw error
+    } finally {
+      meta.profileLoading = false
     }
   }
 
@@ -255,6 +356,23 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function deleteConversation(conversationId: number) {
+    await deleteConversationRequest(conversationId)
+
+    conversations.value = conversations.value.filter((item) => item.conversationId !== conversationId)
+    messagesByConversation.value = omitRecordKey(messagesByConversation.value, conversationId)
+    profiles.value = omitRecordKey(profiles.value, conversationId)
+    runtimeMeta.value = omitRecordKey(runtimeMeta.value, conversationId)
+
+    if (activeConversationId.value === conversationId) {
+      clearActiveConversation()
+    }
+    if (lastOpenedConversationId.value === conversationId) {
+      lastOpenedConversationId.value = null
+    }
+    errors.value.noticeMessage = '会话已删除'
+  }
+
   async function sendMessage(payload: { currentUserId: number; content: string }) {
     const conversation = activeConversation.value
     if (!conversation || !payload.content.trim()) return
@@ -332,6 +450,52 @@ export const useChatStore = defineStore('chat', () => {
     } catch (error) {
       markMessageFailed(target.conversationId, clientMsgId, toErrorMessage(error, '消息发送失败'))
       errors.value.sendError = toErrorMessage(error, '消息发送失败')
+    }
+  }
+
+  async function recallMessage(messageId: number) {
+    const target = findMessageById(messageId)
+    if (!target) return
+
+    errors.value.noticeMessage = null
+
+    try {
+      await recallMessageRequest(messageId)
+      applyMessageMutation(target.conversationId, {
+        ...target.message,
+        recalled: true,
+        recalledAt: new Date().toISOString(),
+        content: '撤回了一条消息',
+        edited: false,
+      })
+    } catch (error) {
+      errors.value.noticeMessage = toErrorMessage(error, '撤回消息失败')
+      throw error
+    }
+  }
+
+  async function editMessage(messageId: number, content: string) {
+    const nextContent = content.trim()
+    if (!nextContent) {
+      throw new Error('消息内容不能为空')
+    }
+
+    const target = findMessageById(messageId)
+    if (!target) return
+
+    errors.value.noticeMessage = null
+
+    try {
+      await editMessageRequest(messageId, nextContent)
+      applyMessageMutation(target.conversationId, {
+        ...target.message,
+        content: nextContent,
+        edited: true,
+        editedAt: new Date().toISOString(),
+      })
+    } catch (error) {
+      errors.value.noticeMessage = toErrorMessage(error, '编辑消息失败')
+      throw error
     }
   }
 
@@ -455,6 +619,13 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
+    if (envelope.type === 'MESSAGE_RECALL' || envelope.type === 'MESSAGE_EDIT') {
+      const payload = envelope.data as { message: ApiMessageItem }
+      if (!payload?.message) return
+      applyMessageMutation(Number(payload.message.conversationId), adaptChatMessage(payload.message))
+      return
+    }
+
     if (envelope.type === 'ACK') {
       handleWsAck(envelope.data as WsAckPayload, envelope.clientMsgId ?? null)
       return
@@ -510,15 +681,34 @@ export const useChatStore = defineStore('chat', () => {
   function handleConversationChange(payload: WsConversationChangePayload) {
     upsertConversation(adaptConversationSummary(payload.conversation))
 
-    if (payload.message) {
-      const message = adaptChatMessage(payload.message)
-      mergeIncomingMessage(message)
+    if (!payload.message) {
+      return
     }
+
+    const message = adaptChatMessage(payload.message)
+
+    if (payload.changeType === 'MESSAGE_RECALL' || payload.changeType === 'MESSAGE_EDIT') {
+      applyMessageMutation(message.conversationId, message)
+      return
+    }
+
+    if (payload.changeType === 'READ_UPDATE') {
+      applyMessageMutation(message.conversationId, message)
+      return
+    }
+
+    if (payload.changeType === 'MESSAGE_NEW' || payload.changeType === 'CONVERSATION_CREATED') {
+      mergeIncomingMessage(message)
+      return
+    }
+
+    applyMessageMutation(message.conversationId, message)
   }
 
   function mergeIncomingMessage(message: ChatMessage) {
     const conversationId = message.conversationId
     const collection = messagesByConversation.value[conversationId] ?? []
+    const isIncomingMessage = message.fromUserId !== authStore.currentUser?.userId
 
     messagesByConversation.value = {
       ...messagesByConversation.value,
@@ -528,8 +718,37 @@ export const useChatStore = defineStore('chat', () => {
     applyLatestMessageToConversation(
       conversationId,
       message,
-      message.fromUserId !== authStore.currentUser?.userId && activeConversationId.value !== conversationId,
+      isIncomingMessage && activeConversationId.value !== conversationId,
     )
+
+    maybeShowIncomingNotification(message, isIncomingMessage)
+  }
+
+  function applyMessageMutation(conversationId: number, message: ChatMessage) {
+    const collection = messagesByConversation.value[conversationId] ?? []
+    messagesByConversation.value = {
+      ...messagesByConversation.value,
+      [conversationId]: mergeMessages(collection, [message]),
+    }
+
+    const conversation = conversations.value.find((item) => item.conversationId === conversationId)
+    if (conversation && message.seqNo >= conversation.latestSeq) {
+      conversation.lastMessagePreview = messagePreviewFromMessage(message)
+      conversation.lastMessageTime = message.sentAt
+      conversation.latestSeq = Math.max(conversation.latestSeq, message.seqNo)
+    }
+  }
+
+  function maybeShowIncomingNotification(message: ChatMessage, isIncomingMessage: boolean) {
+    if (!isIncomingMessage || message.msgType === 'SYSTEM') return
+    if (activeConversationId.value === message.conversationId && document.visibilityState === 'visible') return
+
+    const conversation = conversations.value.find((item) => item.conversationId === message.conversationId)
+    showIncomingMessageNotification({
+      title: conversation?.conversationName ?? '新消息',
+      body: messagePreviewFromMessage(message),
+      tag: `conversation-${message.conversationId}`,
+    })
   }
 
   function replacePendingMessage(conversationId: number, clientMsgId: string, nextMessage: ChatMessage) {
@@ -662,6 +881,20 @@ export const useChatStore = defineStore('chat', () => {
     return null
   }
 
+  function findMessageById(messageId: number) {
+    for (const [key, collection] of Object.entries(messagesByConversation.value)) {
+      const message = collection.find((item) => item.messageId === messageId)
+      if (message) {
+        return {
+          conversationId: Number(key),
+          message,
+        }
+      }
+    }
+
+    return null
+  }
+
   function findConversationIdByClientMsgId(clientMsgId: string) {
     return findMessageByClientMsgId(clientMsgId)?.conversationId ?? null
   }
@@ -689,8 +922,10 @@ export const useChatStore = defineStore('chat', () => {
     const conversation = conversations.value.find((item) => item.conversationId === conversationId)
     if (!conversation) return
 
-    conversation.lastMessagePreview = messagePreviewFromMessage(message)
-    conversation.lastMessageTime = message.sentAt
+    if (message.seqNo >= conversation.latestSeq || conversation.latestSeq === 0) {
+      conversation.lastMessagePreview = messagePreviewFromMessage(message)
+      conversation.lastMessageTime = message.sentAt
+    }
     conversation.latestSeq = Math.max(conversation.latestSeq, message.seqNo)
     if (incrementUnread && message.msgType !== 'SYSTEM') {
       conversation.unreadCount += 1
@@ -702,6 +937,12 @@ export const useChatStore = defineStore('chat', () => {
       runtimeMeta.value[conversationId] = {
         loaded: false,
         lastReadSeq: 0,
+        hasOlder: true,
+        loadingOlder: false,
+        olderError: null,
+        profileLoaded: false,
+        profileLoading: false,
+        profileError: null,
       }
     }
 
@@ -730,13 +971,101 @@ export const useChatStore = defineStore('chat', () => {
 
       return action
     })
+  }
 
-    if (!profile.actions.some((action) => action.key === 'top')) {
-      profile.actions = [
-        ...profile.actions,
-        { key: 'top', label: '会话置顶', value: conversation.isTop ? '开启' : '关闭' },
-      ]
+  async function buildSingleConversationProfile(conversation: ConversationSummary): Promise<ConversationProfile> {
+    if (!conversation.peerUserId) {
+      throw new Error('当前单聊会话缺少对端用户标识')
     }
+
+    const profile = await fetchUserPublicProfile(conversation.peerUserId)
+
+    return {
+      conversationId: conversation.conversationId,
+      conversationType: conversation.conversationType,
+      subtitle: [profile.userNo, `@${profile.username}`].filter(Boolean).join(' · '),
+      signature: profile.signature ? normalizeDisplayText(profile.signature) : null,
+      notice: null,
+      fields: compactProfileFields([
+        { key: 'user-no', label: '账号编号', value: profile.userNo },
+        { key: 'username', label: '用户名', value: `@${profile.username}` },
+        { key: 'friend-status', label: '关系状态', value: formatFriendStatus(profile.friendStatus) },
+      ]),
+      actions: buildProfileActions(conversation),
+    }
+  }
+
+  async function buildGroupConversationProfile(conversation: ConversationSummary): Promise<ConversationProfile> {
+    if (!conversation.groupId) {
+      throw new Error('当前群聊会话缺少群组标识')
+    }
+
+    const group = await fetchGroupDetail(conversation.groupId)
+
+    return {
+      conversationId: conversation.conversationId,
+      conversationType: conversation.conversationType,
+      subtitle: group.memberCount ? `${group.memberCount} 位成员` : '群聊会话',
+      signature: null,
+      notice: group.notice ? normalizeDisplayText(group.notice) : null,
+      fields: compactProfileFields([
+        { key: 'group-no', label: '群号', value: group.groupNo },
+        { key: 'member-count', label: '成员数', value: group.memberCount ? `${group.memberCount}` : '' },
+        { key: 'my-role', label: '我的角色', value: formatGroupRole(group.myRole) },
+        { key: 'owner-user-id', label: '群主 ID', value: group.ownerUserId ? `${group.ownerUserId}` : '' },
+      ]),
+      actions: buildProfileActions(conversation),
+    }
+  }
+
+  function buildProfileActions(conversation: ConversationSummary) {
+    return [
+      { key: 'mute', label: '消息免打扰', value: conversation.isMute ? '已开启' : '关闭' },
+      { key: 'top', label: '会话置顶', value: conversation.isTop ? '开启' : '关闭' },
+    ]
+  }
+
+  function compactProfileFields(fields: ConversationProfile['fields']) {
+    return fields.filter((field) => field.value)
+  }
+
+  function formatFriendStatus(value: ApiUserPublicProfile['friendStatus']) {
+    switch (value) {
+      case 'FRIEND':
+        return '已是好友'
+      case 'PENDING_OUT':
+        return '申请已发送'
+      case 'PENDING_IN':
+        return '等待你处理'
+      case 'BLOCKED_OUT':
+        return '已拉黑对方'
+      case 'BLOCKED_IN':
+        return '被对方拉黑'
+      case 'SELF':
+        return '当前登录用户'
+      case 'NONE':
+      default:
+        return ''
+    }
+  }
+
+  function formatGroupRole(value: ApiGroupDetail['myRole']) {
+    switch (value) {
+      case 1:
+        return '群主'
+      case 3:
+        return '管理员'
+      case 2:
+        return '普通成员'
+      default:
+        return ''
+    }
+  }
+
+  function omitRecordKey<T>(record: Record<number, T>, keyToRemove: number): Record<number, T> {
+    const nextRecord = { ...record }
+    delete nextRecord[keyToRemove]
+    return nextRecord
   }
 
   function resetState() {
@@ -744,7 +1073,7 @@ export const useChatStore = defineStore('chat', () => {
     uiStore.setConnectionStatus('disconnected')
     conversations.value = []
     messagesByConversation.value = {}
-    profiles.value = structuredClone(mockProfiles)
+    profiles.value = {}
     runtimeMeta.value = {}
     activeConversationId.value = null
     lastOpenedConversationId.value = null
@@ -808,18 +1137,28 @@ export const useChatStore = defineStore('chat', () => {
     activeConversation,
     activeMessages,
     activeProfile,
+    activeProfileLoading,
+    activeProfileError,
+    activeHasOlderMessages,
+    activeOlderMessagesLoading,
+    activeOlderMessagesError,
     bootstrap,
     fetchConversationList,
     openConversation,
     loadConversationMessages,
+    loadOlderMessages,
+    fetchConversationProfile,
     clearActiveConversation,
     setSearchQuery,
     clearSearchQuery,
     markConversationRead,
     toggleConversationTop,
     toggleConversationMute,
+    deleteConversation,
     sendMessage,
     retryMessage,
+    recallMessage,
+    editMessage,
     connectRealtime,
     disconnectRealtime,
     simulateRealtimeDrop,

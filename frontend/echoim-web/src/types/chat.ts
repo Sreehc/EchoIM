@@ -1,10 +1,39 @@
 export type ThemeMode = 'light' | 'dark'
+export type LeftPanelMode = 'conversations' | 'me' | 'settings'
+export type SettingsSection = 'appearance' | 'chat' | 'security'
 
 export interface UserInfo {
   userId: number
   username: string
   nickname: string
   avatarUrl: string | null
+}
+
+export interface CurrentUserProfile extends UserInfo {
+  userNo: string
+  gender: number | null
+  phone: string | null
+  email: string | null
+  signature: string | null
+  status: number | null
+}
+
+export interface UpdateCurrentUserProfilePayload {
+  nickname: string
+  avatarUrl: string | null
+  gender: number | null
+  signature: string | null
+}
+
+export interface ChangePasswordPayload {
+  oldPassword: string
+  newPassword: string
+}
+
+export interface ChatPreferences {
+  enterToSend: boolean
+  compactList: boolean
+  compactBubbles: boolean
 }
 
 export interface AuthSession {
@@ -69,10 +98,23 @@ export interface ChatMessage {
   sentAt: string
   sendStatus: number
   recalled?: boolean
+  recalledAt?: string | null
   edited?: boolean
+  editedAt?: string | null
   delivered?: boolean
+  deliveredAt?: string | null
   read?: boolean
+  readAt?: string | null
+  forwardSource?: MessageForwardSource | null
   errorMessage?: string | null
+}
+
+export interface MessageForwardSource {
+  sourceMessageId: number
+  sourceConversationId: number
+  sourceSenderId: number
+  sourceMsgType: MessageType
+  sourcePreview: string | null
 }
 
 export interface ProfileAction {
@@ -81,20 +123,18 @@ export interface ProfileAction {
   value?: string
 }
 
-export interface ProfileMember {
-  id: number
-  name: string
-  role?: string
+export interface ProfileField {
+  key: string
+  label: string
+  value: string
 }
 
 export interface ConversationProfile {
   conversationId: number
   conversationType: ConversationType
   subtitle: string
-  signature: string
-  notice?: string
-  sharedFilesCount: number
-  sharedMediaCount: number
-  members?: ProfileMember[]
+  signature?: string | null
+  notice?: string | null
+  fields: ProfileField[]
   actions: ProfileAction[]
 }

@@ -3,7 +3,8 @@ import type {
   ApiMessageItem,
   ApiOfflineSyncConversation,
 } from '@/types/api'
-import type { ChatFile, ChatMessage, ConversationSummary } from '@/types/chat'
+import type { ChatFile, ChatMessage, ConversationSummary, MessageForwardSource } from '@/types/chat'
+import { normalizeDisplayText } from '@/utils/text'
 
 function normalizeTime(value: string | null | undefined): string {
   if (!value) return new Date(0).toISOString()
@@ -16,7 +17,7 @@ function adaptFile(file: ChatFile | null | undefined): ChatFile | null {
 
   return {
     fileId: Number(file.fileId),
-    fileName: file.fileName ?? '未命名文件',
+    fileName: normalizeDisplayText(file.fileName) || '未命名文件',
     fileExt: file.fileExt ?? null,
     contentType: file.contentType ?? null,
     fileSize: file.fileSize ?? null,
@@ -28,15 +29,27 @@ function adaptFile(file: ChatFile | null | undefined): ChatFile | null {
   }
 }
 
+function adaptForwardSource(source: MessageForwardSource | null | undefined): MessageForwardSource | null {
+  if (!source) return null
+
+  return {
+    sourceMessageId: Number(source.sourceMessageId),
+    sourceConversationId: Number(source.sourceConversationId),
+    sourceSenderId: Number(source.sourceSenderId),
+    sourceMsgType: source.sourceMsgType,
+    sourcePreview: source.sourcePreview == null ? null : normalizeDisplayText(source.sourcePreview),
+  }
+}
+
 export function adaptConversationSummary(
   item: ApiConversationItem,
 ): ConversationSummary {
   return {
     conversationId: Number(item.conversationId),
     conversationType: item.conversationType,
-    conversationName: item.conversationName ?? `会话 ${item.conversationId}`,
+    conversationName: normalizeDisplayText(item.conversationName) || `会话 ${item.conversationId}`,
     avatarUrl: item.avatarUrl ?? null,
-    lastMessagePreview: item.lastMessagePreview ?? '',
+    lastMessagePreview: normalizeDisplayText(item.lastMessagePreview) ?? '',
     lastMessageTime: normalizeTime(item.lastMessageTime),
     unreadCount: Number(item.unreadCount ?? 0),
     isTop: Number(item.isTop ?? 0),
@@ -57,20 +70,29 @@ export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
     toUserId: item.toUserId == null ? null : Number(item.toUserId),
     groupId: item.groupId == null ? null : Number(item.groupId),
     msgType: item.msgType,
-    content: item.content ?? null,
+    content: item.content == null ? null : normalizeDisplayText(item.content),
     fileId: item.fileId == null ? null : Number(item.fileId),
     file: adaptFile(item.file),
     sentAt: normalizeTime(item.sentAt),
     sendStatus: Number(item.sendStatus ?? 1),
     recalled: Boolean(item.recalled),
+    recalledAt: item.recalledAt ? normalizeTime(item.recalledAt) : null,
     edited: Boolean(item.edited),
+    editedAt: item.editedAt ? normalizeTime(item.editedAt) : null,
     delivered: Boolean(item.delivered),
+    deliveredAt: item.deliveredAt ? normalizeTime(item.deliveredAt) : null,
     read: Boolean(item.read),
+    readAt: item.readAt ? normalizeTime(item.readAt) : null,
+    forwardSource: adaptForwardSource(item.forwardSource),
     errorMessage: null,
   }
 }
 
 export function messagePreviewFromMessage(message: ChatMessage): string {
+  if (message.recalled) {
+    return '撤回了一条消息'
+  }
+
   if (message.msgType === 'IMAGE') {
     return message.file?.fileName ? `[图片] ${message.file.fileName}` : '[图片]'
   }

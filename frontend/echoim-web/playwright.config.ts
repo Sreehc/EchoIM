@@ -25,7 +25,7 @@ export default defineConfig({
     {
       command: 'mvn spring-boot:run',
       cwd: backendRoot,
-      url: `http://127.0.0.1:${apiPort}/actuator/health`,
+      url: `http://127.0.0.1:${apiPort}/api/health`,
       reuseExistingServer: true,
       timeout: 240_000,
       env: {

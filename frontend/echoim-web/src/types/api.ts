@@ -1,4 +1,13 @@
-import type { ChatFile, ConversationType, MessageType, UserInfo } from './chat'
+import type {
+  ChangePasswordPayload,
+  ChatFile,
+  ConversationType,
+  CurrentUserProfile,
+  MessageForwardSource,
+  MessageType,
+  UpdateCurrentUserProfilePayload,
+  UserInfo,
+} from './chat'
 
 export interface ApiResponse<T> {
   code: number
@@ -19,6 +28,35 @@ export interface ApiLoginResponse {
   tokenType: string
   expiresIn: number
   userInfo: UserInfo
+}
+
+export type ApiCurrentUserProfile = CurrentUserProfile
+export type ApiUpdateCurrentUserProfilePayload = UpdateCurrentUserProfilePayload
+export type ApiChangePasswordPayload = ChangePasswordPayload
+
+export interface ApiUserPublicProfile {
+  userId: number
+  userNo: string
+  username: string
+  nickname: string
+  avatarUrl: string | null
+  gender: number | null
+  signature: string | null
+  status: number | null
+  friendStatus: string | null
+  pendingRequestId: number | null
+}
+
+export interface ApiGroupDetail {
+  groupId: number
+  groupNo: string
+  groupName: string
+  ownerUserId: number
+  avatarUrl: string | null
+  notice: string | null
+  status: number | null
+  memberCount: number | null
+  myRole: number | null
 }
 
 export interface ApiConversationItem {
@@ -51,9 +89,14 @@ export interface ApiMessageItem {
   sentAt: string | null
   sendStatus: number | null
   recalled?: boolean | null
+  recalledAt?: string | null
   edited?: boolean | null
+  editedAt?: string | null
   delivered?: boolean | null
+  deliveredAt?: string | null
   read?: boolean | null
+  readAt?: string | null
+  forwardSource?: MessageForwardSource | null
 }
 
 export interface ApiOfflineSyncConversation {
