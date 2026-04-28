@@ -13,6 +13,11 @@
                g.notice AS notice,
                g.status AS status,
                gm.role AS myRole,
+               c.conversation_type AS conversationType,
+               CASE
+                   WHEN c.conversation_type = 3 THEN COALESCE(gm.role = 1, FALSE)
+                   ELSE TRUE
+               END AS canSend,
                (
                    SELECT COUNT(1)
                    FROM im_group_member active_gm
@@ -21,6 +26,10 @@
                ) AS memberCount
         FROM im_group g
         JOIN im_group_member gm ON gm.group_id = g.id
+        LEFT JOIN im_conversation c
+               ON c.biz_id = g.id
+              AND c.conversation_type IN (2, 3)
+              AND c.status = 1
         WHERE g.id = #{groupId}
           AND gm.user_id = #{userId}
           AND gm.status = 1

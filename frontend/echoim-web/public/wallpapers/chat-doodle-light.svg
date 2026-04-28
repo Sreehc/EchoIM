@@ -1,0 +1,31 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="1200" fill="#DCE7F2"/>
+  <rect width="1600" height="1200" fill="url(#bg)"/>
+  <g opacity="0.34">
+    <rect width="1600" height="1200" fill="url(#pattern)"/>
+  </g>
+  <defs>
+    <linearGradient id="bg" x1="800" y1="0" x2="800" y2="1200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8EEF7"/>
+      <stop offset="1" stop-color="#D8E1ED"/>
+    </linearGradient>
+    <pattern id="pattern" x="0" y="0" width="320" height="320" patternUnits="userSpaceOnUse">
+      <g stroke-linecap="round" stroke-linejoin="round">
+        <path d="M60 42L74 38L66 52L80 58L50 61L60 42Z" stroke="#A79AE8" stroke-width="2.2"/>
+        <path d="M182 50C198 38 220 39 234 52" stroke="#94A5D7" stroke-width="2"/>
+        <path d="M186 66C199 58 216 59 228 70" stroke="#94A5D7" stroke-width="2"/>
+        <path d="M47 132C64 116 94 116 111 132C124 145 120 165 102 174C81 185 49 178 38 156" stroke="#A79AE8" stroke-width="2"/>
+        <path d="M155 132C172 118 197 119 212 134C223 145 221 163 208 171C189 183 160 178 150 159" stroke="#94A5D7" stroke-width="2"/>
+        <path d="M148 172L212 120" stroke="#A79AE8" stroke-width="2"/>
+        <path d="M269 127C283 114 303 115 316 128C326 138 324 155 313 162C297 173 272 168 263 152" stroke="#94A5D7" stroke-width="2"/>
+        <path d="M68 236L84 214L101 236" stroke="#94A5D7" stroke-width="2.1"/>
+        <path d="M58 245H108" stroke="#A79AE8" stroke-width="2"/>
+        <path d="M178 232C188 215 205 207 224 208C242 209 255 218 262 233" stroke="#A79AE8" stroke-width="2"/>
+        <path d="M194 249C202 241 211 238 221 238C232 238 241 242 247 249" stroke="#94A5D7" stroke-width="2"/>
+        <circle cx="125" cy="32" r="5" stroke="#94A5D7" stroke-width="2"/>
+        <circle cx="24" cy="82" r="4" stroke="#A79AE8" stroke-width="2"/>
+        <path d="M278 272L282 263L287 272L296 273L289 279L291 289L282 284L272 289L274 279L267 273L278 272Z" stroke="#94A5D7" stroke-width="2"/>
+      </g>
+    </pattern>
+  </defs>
+</svg>

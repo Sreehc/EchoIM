@@ -32,17 +32,28 @@ export function highlightText(value: string, keyword: string) {
 
   const source = value.toLowerCase()
   const target = query.toLowerCase()
-  const index = source.indexOf(target)
+  const segments: Array<{ text: string; matched: boolean }> = []
+  let start = 0
+  let index = source.indexOf(target, start)
 
-  if (index === -1) {
+  if (index < 0) {
     return [{ text: value, matched: false }]
   }
 
-  const end = index + query.length
+  while (index >= 0) {
+    if (index > start) {
+      segments.push({ text: value.slice(start, index), matched: false })
+    }
 
-  return [
-    ...(index > 0 ? [{ text: value.slice(0, index), matched: false }] : []),
-    { text: value.slice(index, end), matched: true },
-    ...(end < value.length ? [{ text: value.slice(end), matched: false }] : []),
-  ]
+    const end = index + query.length
+    segments.push({ text: value.slice(index, end), matched: true })
+    start = end
+    index = source.indexOf(target, start)
+  }
+
+  if (start < value.length) {
+    segments.push({ text: value.slice(start), matched: false })
+  }
+
+  return segments
 }

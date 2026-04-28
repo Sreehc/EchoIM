@@ -21,6 +21,8 @@ const props = defineProps<{
   editingMessageId?: number | null
   editingDraft?: string
   messageActionPendingId?: number | null
+  searchQuery?: string
+  activeMatchIndex?: number
 }>()
 
 const emit = defineEmits<{
@@ -32,6 +34,7 @@ const emit = defineEmits<{
   'cancel-edit-message': []
   'save-edit-message': [payload: { messageId: number; content: string }]
   'recall-message': [messageId: number]
+  'update:search-match-count': [value: number]
 }>()
 
 const scroller = ref()
@@ -112,7 +115,7 @@ const decoratedMessages = computed(() =>
       isGroupedWithNext,
       showAvatar: !currentIsSystem && !isGroupedWithNext && message.fromUserId !== props.currentUserId,
       showSenderLabel:
-        props.conversationType === 2 &&
+        props.conversationType !== 1 &&
         !currentIsSystem &&
         !isGroupedWithPrev &&
         message.fromUserId !== props.currentUserId,
@@ -123,6 +126,29 @@ const decoratedMessages = computed(() =>
     }
   }),
 )
+const matchedMessageIds = computed(() => {
+  const query = props.searchQuery?.trim().toLowerCase()
+  if (!query) return []
+
+  return props.messages
+    .filter((message) => {
+      if (message.recalled) return false
+      if (message.msgType !== 'TEXT') return false
+      return (message.content ?? '').toLowerCase().includes(query)
+    })
+    .map((message) => message.messageId)
+})
+const normalizedActiveMatchIndex = computed(() => {
+  const total = matchedMessageIds.value.length
+  if (!total) return -1
+
+  const rawIndex = props.activeMatchIndex ?? 0
+  return ((rawIndex % total) + total) % total
+})
+const activeSearchMessageId = computed(() => {
+  if (normalizedActiveMatchIndex.value < 0) return null
+  return matchedMessageIds.value[normalizedActiveMatchIndex.value] ?? null
+})
 
 watch(
   () => props.messages.length,
@@ -144,6 +170,14 @@ watch(
 )
 
 watch(
+  matchedMessageIds,
+  (value) => {
+    emit('update:search-match-count', value.length)
+  },
+  { immediate: true },
+)
+
+watch(
   () => props.conversationId,
   async () => {
     stickToBottom.value = true
@@ -152,6 +186,17 @@ watch(
     scrollToBottom(true)
   },
   { immediate: true },
+)
+
+watch(
+  [() => props.searchQuery, activeSearchMessageId],
+  async ([query, messageId]) => {
+    if (!query?.trim() || !messageId) return
+    await nextTick()
+    const wrap = getWrapElement()
+    const target = wrap?.querySelector<HTMLElement>(`[data-search-message-id="${messageId}"]`)
+    target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  },
 )
 
 function formatTimelineLabel(value: string): string {
@@ -222,6 +267,7 @@ function requestLoadOlder() {
         <MessageBubble
           v-if="entry.message.msgType !== 'SYSTEM'"
           :message="entry.message"
+          :conversation-type="conversationType"
           :current-user-id="currentUserId"
           :sender-name="entry.senderName"
           :show-avatar="entry.showAvatar"
@@ -232,6 +278,8 @@ function requestLoadOlder() {
           :editing="editingMessageId === entry.message.messageId"
           :editing-draft="editingDraft ?? ''"
           :action-pending="messageActionPendingId === entry.message.messageId"
+          :search-query="searchQuery"
+          :search-active="activeSearchMessageId === entry.message.messageId"
           @retry="emit('retryMessage', $event)"
           @start-edit="emit('start-edit-message', entry.message)"
           @update:editing-draft="emit('update:editing-draft', $event)"
@@ -301,12 +349,12 @@ function requestLoadOlder() {
 
 .message-pane__divider span {
   padding: 7px 14px;
-  border: 0;
+  border: 1px solid var(--color-shell-border);
   border-radius: 999px;
-  background: rgba(102, 61, 142, 0.9);
-  color: #fff;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 90%, transparent);
+  color: var(--color-text-2);
   font: 600 0.7rem/1.2 var(--font-body);
-  box-shadow: 0 10px 24px rgba(48, 25, 72, 0.24);
+  box-shadow: var(--shadow-soft);
 }
 
 @media (max-width: 767px) {

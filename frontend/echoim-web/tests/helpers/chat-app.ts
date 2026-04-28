@@ -47,6 +47,12 @@ export async function openConversation(page: Page, conversationId: number) {
   await page.waitForURL(new RegExp(`/chat/${conversationId}$`))
 }
 
+export async function openLeftPanel(page: Page, mode: 'conversations' | 'me' | 'settings') {
+  await page.evaluate((targetMode) => {
+    window.__ECHOIM_E2E__?.openLeftPanel(targetMode)
+  }, mode)
+}
+
 export async function dropRealtimeConnection(page: Page, pauseReconnect = true) {
   await page.evaluate((shouldPauseReconnect) => {
     window.__ECHOIM_E2E__?.dropRealtimeConnection(shouldPauseReconnect)

@@ -64,6 +64,7 @@ export const useChatStore = defineStore('chat', () => {
   const activeConversationId = ref<number | null>(null)
   const lastOpenedConversationId = ref<number | null>(null)
   const searchQuery = ref('')
+  const archivedConversationIds = ref<number[]>([])
   const loading = ref(false)
   const messagesLoading = ref(false)
   const errors = ref<ChatErrorState>({
@@ -84,6 +85,7 @@ export const useChatStore = defineStore('chat', () => {
 
     return [...conversations.value]
       .filter((item) => {
+        if (archivedConversationIds.value.includes(item.conversationId)) return false
         if (!keyword) return true
         return (
           item.conversationName.toLowerCase().includes(keyword) ||
@@ -262,9 +264,9 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const nextProfile =
-        conversation.conversationType === 2
-          ? await buildGroupConversationProfile(conversation)
-          : await buildSingleConversationProfile(conversation)
+        conversation.conversationType === 1
+          ? await buildSingleConversationProfile(conversation)
+          : await buildCollectiveConversationProfile(conversation)
 
       profiles.value = {
         ...profiles.value,
@@ -290,6 +292,32 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearSearchQuery() {
     searchQuery.value = ''
+  }
+
+  function markConversationUnreadLocally(conversationId: number) {
+    const conversation = conversations.value.find((item) => item.conversationId === conversationId)
+    if (!conversation) return
+
+    conversation.unreadCount = Math.max(conversation.unreadCount, 1)
+    errors.value.noticeMessage = '已标记为未读'
+  }
+
+  function archiveConversationLocally(conversationId: number) {
+    const conversation = conversations.value.find((item) => item.conversationId === conversationId)
+    if (!conversation) return
+
+    if (!archivedConversationIds.value.includes(conversationId)) {
+      archivedConversationIds.value = [...archivedConversationIds.value, conversationId]
+    }
+
+    if (activeConversationId.value === conversationId) {
+      clearActiveConversation()
+    }
+    if (lastOpenedConversationId.value === conversationId) {
+      lastOpenedConversationId.value = null
+    }
+
+    errors.value.noticeMessage = '会话已归档，仅在当前页面隐藏'
   }
 
   async function markConversationRead(conversationId: number) {
@@ -360,6 +388,7 @@ export const useChatStore = defineStore('chat', () => {
     await deleteConversationRequest(conversationId)
 
     conversations.value = conversations.value.filter((item) => item.conversationId !== conversationId)
+    archivedConversationIds.value = archivedConversationIds.value.filter((item) => item !== conversationId)
     messagesByConversation.value = omitRecordKey(messagesByConversation.value, conversationId)
     profiles.value = omitRecordKey(profiles.value, conversationId)
     runtimeMeta.value = omitRecordKey(runtimeMeta.value, conversationId)
@@ -376,6 +405,10 @@ export const useChatStore = defineStore('chat', () => {
   async function sendMessage(payload: { currentUserId: number; content: string }) {
     const conversation = activeConversation.value
     if (!conversation || !payload.content.trim()) return
+    if (!conversation.canSend) {
+      errors.value.noticeMessage = '当前频道仅创建者可发送消息'
+      return
+    }
 
     const existing = messagesByConversation.value[conversation.conversationId] ?? []
     const latestSeq = existing[existing.length - 1]?.seqNo ?? conversation.latestSeq ?? 0
@@ -386,6 +419,7 @@ export const useChatStore = defineStore('chat', () => {
     const optimisticMessage: ChatMessage = {
       messageId: -(Date.now()),
       conversationId: conversation.conversationId,
+      conversationType: conversation.conversationType,
       seqNo: latestSeq + 1,
       clientMsgId,
       fromUserId: payload.currentUserId,
@@ -399,6 +433,7 @@ export const useChatStore = defineStore('chat', () => {
       sendStatus: 0,
       delivered: false,
       read: false,
+      viewCount: 0,
       errorMessage: null,
     }
 
@@ -761,6 +796,7 @@ export const useChatStore = defineStore('chat', () => {
               ...nextMessage,
               delivered: Boolean(message.delivered || nextMessage.delivered),
               read: Boolean(message.read || nextMessage.read),
+              viewCount: Math.max(message.viewCount ?? 0, nextMessage.viewCount ?? 0),
               errorMessage: nextMessage.errorMessage ?? message.errorMessage ?? null,
             }
           : message,
@@ -789,7 +825,7 @@ export const useChatStore = defineStore('chat', () => {
   function updateMessageReceipt(
     conversationId: number,
     messageId: number,
-    partial: Pick<ChatMessage, 'delivered' | 'read'>,
+    partial: Partial<Pick<ChatMessage, 'delivered' | 'read' | 'viewCount'>>,
     clientMsgId?: string | null,
   ) {
     const collection = messagesByConversation.value[conversationId] ?? []
@@ -851,7 +887,11 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (!conversation.groupId) {
-      throw new Error('当前群聊会话缺少群组标识，暂时无法发送')
+      throw new Error('当前群聊或频道会话缺少群组标识，暂时无法发送')
+    }
+
+    if (!conversation.canSend) {
+      throw new Error('当前频道仅创建者可发送消息')
     }
 
     recordDebugEvent(`send:CHAT_GROUP:${message.clientMsgId}`)
@@ -995,24 +1035,26 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function buildGroupConversationProfile(conversation: ConversationSummary): Promise<ConversationProfile> {
+  async function buildCollectiveConversationProfile(conversation: ConversationSummary): Promise<ConversationProfile> {
     if (!conversation.groupId) {
-      throw new Error('当前群聊会话缺少群组标识')
+      throw new Error('当前群聊或频道会话缺少群组标识')
     }
 
     const group = await fetchGroupDetail(conversation.groupId)
+    const isChannel = conversation.conversationType === 3
 
     return {
       conversationId: conversation.conversationId,
       conversationType: conversation.conversationType,
-      subtitle: group.memberCount ? `${group.memberCount} 位成员` : '群聊会话',
+      subtitle: group.memberCount ? `${group.memberCount} 位成员` : isChannel ? '频道会话' : '群聊会话',
       signature: null,
       notice: group.notice ? normalizeDisplayText(group.notice) : null,
       fields: compactProfileFields([
-        { key: 'group-no', label: '群号', value: group.groupNo },
+        { key: 'group-no', label: isChannel ? '频道号' : '群号', value: group.groupNo },
         { key: 'member-count', label: '成员数', value: group.memberCount ? `${group.memberCount}` : '' },
-        { key: 'my-role', label: '我的角色', value: formatGroupRole(group.myRole) },
-        { key: 'owner-user-id', label: '群主 ID', value: group.ownerUserId ? `${group.ownerUserId}` : '' },
+        { key: 'my-role', label: '我的角色', value: formatCollectiveRole(group.myRole, isChannel) },
+        { key: 'send-permission', label: '发送权限', value: isChannel ? (group.canSend ? '可发送消息' : '仅创建者可发言') : '全体成员可发送' },
+        { key: 'owner-user-id', label: isChannel ? '创建者 ID' : '群主 ID', value: group.ownerUserId ? `${group.ownerUserId}` : '' },
       ]),
       actions: buildProfileActions(conversation),
     }
@@ -1049,10 +1091,10 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function formatGroupRole(value: ApiGroupDetail['myRole']) {
+  function formatCollectiveRole(value: ApiGroupDetail['myRole'], isChannel = false) {
     switch (value) {
       case 1:
-        return '群主'
+        return isChannel ? '创建者' : '群主'
       case 3:
         return '管理员'
       case 2:
@@ -1078,6 +1120,7 @@ export const useChatStore = defineStore('chat', () => {
     activeConversationId.value = null
     lastOpenedConversationId.value = null
     searchQuery.value = ''
+    archivedConversationIds.value = []
     loading.value = false
     messagesLoading.value = false
     errors.value = {
@@ -1151,6 +1194,8 @@ export const useChatStore = defineStore('chat', () => {
     clearActiveConversation,
     setSearchQuery,
     clearSearchQuery,
+    markConversationUnreadLocally,
+    archiveConversationLocally,
     markConversationRead,
     toggleConversationTop,
     toggleConversationMute,

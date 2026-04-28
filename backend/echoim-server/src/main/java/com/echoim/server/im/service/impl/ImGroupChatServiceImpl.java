@@ -14,12 +14,14 @@ import com.echoim.server.im.model.WsMessageItem;
 import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.service.ImGroupChatService;
 import com.echoim.server.im.service.ImWsPushService;
+import com.echoim.server.common.ratelimit.LocalRateLimitService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImGroupMapper;
 import com.echoim.server.mapper.ImGroupMemberMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.service.file.FileService;
+import com.echoim.server.service.message.MessageViewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -36,8 +38,10 @@ import java.util.Map;
 public class ImGroupChatServiceImpl implements ImGroupChatService {
 
     private static final int CONVERSATION_TYPE_GROUP = 2;
+    private static final int CONVERSATION_TYPE_CHANNEL = 3;
     private static final int CONVERSATION_STATUS_NORMAL = 1;
     private static final int GROUP_STATUS_NORMAL = 1;
+    private static final int MEMBER_ROLE_OWNER = 1;
     private static final int MESSAGE_TYPE_TEXT = 1;
     private static final int MESSAGE_TYPE_IMAGE = 3;
     private static final int MESSAGE_TYPE_FILE = 5;
@@ -54,6 +58,8 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
     private final ImGroupMemberMapper imGroupMemberMapper;
     private final ImWsPushService imWsPushService;
     private final FileService fileService;
+    private final MessageViewService messageViewService;
+    private final LocalRateLimitService localRateLimitService;
     private final ObjectMapper objectMapper;
 
     public ImGroupChatServiceImpl(ImConversationMapper imConversationMapper,
@@ -63,6 +69,8 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
                                   ImGroupMemberMapper imGroupMemberMapper,
                                   ImWsPushService imWsPushService,
                                   FileService fileService,
+                                  MessageViewService messageViewService,
+                                  LocalRateLimitService localRateLimitService,
                                   ObjectMapper objectMapper) {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
@@ -71,18 +79,21 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         this.imGroupMemberMapper = imGroupMemberMapper;
         this.imWsPushService = imWsPushService;
         this.fileService = fileService;
+        this.messageViewService = messageViewService;
+        this.localRateLimitService = localRateLimitService;
         this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
     public Map<String, Object> sendGroup(LoginUser loginUser, WsMessage message) {
+        localRateLimitService.check("ws-group-send:" + loginUser.getUserId(), 120, 60, "发送过于频繁");
         WsGroupChatData data = objectMapper.convertValue(message.getData(), WsGroupChatData.class);
         validateChatRequest(message, data);
 
         ImMessageEntity duplicate = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
         if (duplicate != null) {
-            WsMessageItem duplicateItem = toWsMessageItem(duplicate);
+            WsMessageItem duplicateItem = toWsMessageItem(duplicate, loginUser.getUserId());
             fileService.enrichWsMessage(loginUser.getUserId(), duplicateItem);
             return sendAckData(duplicateItem, true);
         }
@@ -90,17 +101,18 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         ImConversationEntity conversation = imConversationMapper.selectByIdForUpdate(data.getConversationId());
         validateGroupConversation(conversation, data.getGroupId());
         validateGroup(data.getGroupId());
-        requireActiveMember(data.getGroupId(), loginUser.getUserId());
+        ImGroupMemberEntity currentMember = requireActiveMember(data.getGroupId(), loginUser.getUserId());
+        validateSendPermission(conversation, currentMember);
         ImFileEntity messageFile = validateAndLoadMessageFile(loginUser.getUserId(), data);
 
-        ImMessageEntity entity = buildMessage(loginUser.getUserId(), data, message.getClientMsgId());
+        ImMessageEntity entity = buildMessage(loginUser.getUserId(), data, message.getClientMsgId(), conversation.getConversationType());
         entity.setSeqNo(nextSeqNo(conversation.getId()));
         try {
             imMessageMapper.insert(entity);
         } catch (DuplicateKeyException ex) {
             ImMessageEntity existing = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
             if (existing != null) {
-                WsMessageItem existingItem = toWsMessageItem(existing);
+                WsMessageItem existingItem = toWsMessageItem(existing, loginUser.getUserId());
                 fileService.enrichWsMessage(loginUser.getUserId(), existingItem);
                 return sendAckData(existingItem, true);
             }
@@ -117,11 +129,11 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         }
         imConversationMapper.updateLastMessage(conversation.getId(), entity.getId(), preview(entity, messageFile));
 
-        WsMessageItem senderItem = toWsMessageItem(entity);
+        WsMessageItem senderItem = toWsMessageItem(entity, loginUser.getUserId());
         fileService.enrichWsMessage(loginUser.getUserId(), senderItem);
         pushConversationChange(loginUser.getUserId(), conversation.getId(), senderItem);
         for (Long recipientUserId : recipientUserIds) {
-            WsMessageItem recipientItem = toWsMessageItem(entity);
+            WsMessageItem recipientItem = toWsMessageItem(entity, recipientUserId);
             fileService.enrichWsMessage(recipientUserId, recipientItem);
             pushGroupMessage(recipientUserId, message, recipientItem);
             pushConversationChange(recipientUserId, conversation.getId(), recipientItem);
@@ -147,9 +159,10 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
 
     private void validateGroupConversation(ImConversationEntity conversation, Long groupId) {
         if (conversation == null || !Integer.valueOf(CONVERSATION_STATUS_NORMAL).equals(conversation.getStatus())
-                || !Integer.valueOf(CONVERSATION_TYPE_GROUP).equals(conversation.getConversationType())
+                || (!Integer.valueOf(CONVERSATION_TYPE_GROUP).equals(conversation.getConversationType())
+                && !Integer.valueOf(CONVERSATION_TYPE_CHANNEL).equals(conversation.getConversationType()))
                 || !groupId.equals(conversation.getBizId())) {
-            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "群会话不存在");
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "群组或频道会话不存在");
         }
     }
 
@@ -160,17 +173,25 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         }
     }
 
-    private void requireActiveMember(Long groupId, Long userId) {
+    private ImGroupMemberEntity requireActiveMember(Long groupId, Long userId) {
         ImGroupMemberEntity member = imGroupMemberMapper.selectActiveByGroupIdAndUserId(groupId, userId);
         if (member == null) {
-            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "不是正常群成员，无法发送群消息");
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "不是有效成员，无法发送消息");
+        }
+        return member;
+    }
+
+    private void validateSendPermission(ImConversationEntity conversation, ImGroupMemberEntity member) {
+        if (Integer.valueOf(CONVERSATION_TYPE_CHANNEL).equals(conversation.getConversationType())
+                && !Integer.valueOf(MEMBER_ROLE_OWNER).equals(member.getRole())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "频道仅创建者可发送消息");
         }
     }
 
-    private ImMessageEntity buildMessage(Long fromUserId, WsGroupChatData data, String clientMsgId) {
+    private ImMessageEntity buildMessage(Long fromUserId, WsGroupChatData data, String clientMsgId, Integer conversationType) {
         ImMessageEntity entity = new ImMessageEntity();
         entity.setConversationId(data.getConversationId());
-        entity.setConversationType(CONVERSATION_TYPE_GROUP);
+        entity.setConversationType(conversationType);
         entity.setClientMsgId(clientMsgId);
         entity.setFromUserId(fromUserId);
         entity.setGroupId(data.getGroupId());
@@ -254,10 +275,11 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         return preview.length() > 500 ? preview.substring(0, 500) : preview;
     }
 
-    private WsMessageItem toWsMessageItem(ImMessageEntity entity) {
+    private WsMessageItem toWsMessageItem(ImMessageEntity entity, Long viewerUserId) {
         WsMessageItem item = new WsMessageItem();
         item.setMessageId(entity.getId());
         item.setConversationId(entity.getConversationId());
+        item.setConversationType(entity.getConversationType());
         item.setSeqNo(entity.getSeqNo());
         item.setClientMsgId(entity.getClientMsgId());
         item.setFromUserId(entity.getFromUserId());
@@ -268,6 +290,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         item.setFileId(entity.getFileId());
         item.setSendStatus(entity.getSendStatus());
         item.setSentAt(entity.getSentAt());
+        messageViewService.enrichWsMessage(viewerUserId, item, entity);
         return item;
     }
 

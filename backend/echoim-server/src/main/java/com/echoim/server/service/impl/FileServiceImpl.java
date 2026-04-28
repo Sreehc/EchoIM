@@ -1,6 +1,7 @@
 package com.echoim.server.service.impl;
 
 import com.aliyun.oss.OSS;
+import com.echoim.server.common.audit.AuditLogService;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.config.FileProperties;
@@ -11,11 +12,14 @@ import com.echoim.server.service.file.FileService;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import com.echoim.server.vo.file.FileDownloadVo;
 import com.echoim.server.vo.file.FileInfoVo;
+import org.apache.tika.Tika;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.time.Instant;
@@ -33,13 +37,17 @@ public class FileServiceImpl implements FileService {
     private final ImFileMapper imFileMapper;
     private final FileProperties fileProperties;
     private final ObjectProvider<OSS> ossProvider;
+    private final AuditLogService auditLogService;
+    private final Tika tika = new Tika();
 
     public FileServiceImpl(ImFileMapper imFileMapper,
                            FileProperties fileProperties,
-                           ObjectProvider<OSS> ossProvider) {
+                           ObjectProvider<OSS> ossProvider,
+                           AuditLogService auditLogService) {
         this.imFileMapper = imFileMapper;
         this.fileProperties = fileProperties;
         this.ossProvider = ossProvider;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -51,13 +59,16 @@ public class FileServiceImpl implements FileService {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件大小超出限制");
         }
         int resolvedBizType = resolveBizType(file, bizType);
-        OSS oss = requireOssClient();
         String fileName = normalizeFileName(file.getOriginalFilename());
         String ext = extractExt(fileName);
+        byte[] bytes = readBytes(file);
+        String detectedContentType = detectContentType(bytes, fileName);
+        validateFileSecurity(resolvedBizType, file.getContentType(), detectedContentType, ext, bytes);
+        OSS oss = requireOssClient();
         String objectKey = buildObjectKey(userId, ext);
         try {
-            oss.putObject(fileProperties.getOss().getBucketName(), objectKey, file.getInputStream());
-        } catch (IOException ex) {
+            oss.putObject(fileProperties.getOss().getBucketName(), objectKey, new ByteArrayInputStream(bytes));
+        } catch (Exception ex) {
             throw new BizException(ErrorCode.SYSTEM_ERROR, "文件上传失败");
         }
 
@@ -69,17 +80,19 @@ public class FileServiceImpl implements FileService {
         entity.setObjectKey(objectKey);
         entity.setFileName(fileName);
         entity.setFileExt(ext);
-        entity.setContentType(defaultContentType(file.getContentType()));
+        entity.setContentType(defaultContentType(detectedContentType));
         entity.setFileSize(file.getSize());
         entity.setUrl(buildCanonicalUrl(objectKey));
         entity.setStatus(FILE_STATUS_NORMAL);
         imFileMapper.insert(entity);
+        auditLogService.log("FILE_UPLOAD", Map.of("userId", userId, "fileId", entity.getId(), "fileName", fileName, "bizType", resolvedBizType));
         return toFileInfoVo(entity);
     }
 
     @Override
     public FileInfoVo getFileInfo(Long userId, Long fileId) {
         ImFileEntity entity = requireAccessibleFile(userId, fileId);
+        auditLogService.log("FILE_INFO", Map.of("userId", userId, "fileId", fileId));
         return toFileInfoVo(entity);
     }
 
@@ -91,6 +104,7 @@ public class FileServiceImpl implements FileService {
         vo.setDownloadUrl(generateSignedUrl(entity.getObjectKey()));
         vo.setExpiresIn(fileProperties.getSignedUrlExpireSeconds());
         vo.setExpireAt(LocalDateTime.now().plusSeconds(fileProperties.getSignedUrlExpireSeconds()));
+        auditLogService.log("FILE_DOWNLOAD", Map.of("userId", userId, "fileId", fileId));
         return vo;
     }
 
@@ -211,6 +225,58 @@ public class FileServiceImpl implements FileService {
         }
         String contentType = file.getContentType();
         return contentType != null && contentType.startsWith("image/") ? BIZ_TYPE_IMAGE : BIZ_TYPE_FILE;
+    }
+
+    private byte[] readBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException ex) {
+            throw new BizException(ErrorCode.SYSTEM_ERROR, "读取文件失败");
+        }
+    }
+
+    private String detectContentType(byte[] bytes, String fileName) {
+        try {
+            return defaultContentType(tika.detect(bytes, fileName));
+        } catch (Exception ex) {
+            return "application/octet-stream";
+        }
+    }
+
+    private void validateFileSecurity(int resolvedBizType,
+                                      String clientContentType,
+                                      String detectedContentType,
+                                      String ext,
+                                      byte[] bytes) {
+        if (resolvedBizType == BIZ_TYPE_IMAGE) {
+            validateWhitelist(ext, detectedContentType, fileProperties.getAllowedImageExtensions(), fileProperties.getAllowedImageContentTypes());
+            if (clientContentType != null && !clientContentType.startsWith("image/")) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "图片类型不合法");
+            }
+            try {
+                if (ImageIO.read(new ByteArrayInputStream(bytes)) == null) {
+                    throw new BizException(ErrorCode.PARAM_ERROR, "图片内容不合法");
+                }
+            } catch (IOException ex) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "图片内容不合法");
+            }
+            return;
+        }
+        validateWhitelist(ext, detectedContentType, fileProperties.getAllowedFileExtensions(), fileProperties.getAllowedFileContentTypes());
+        if (clientContentType != null
+                && !"application/octet-stream".equals(clientContentType)
+                && !fileProperties.getAllowedFileContentTypes().contains(clientContentType)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "文件类型不合法");
+        }
+    }
+
+    private void validateWhitelist(String ext, String detectedContentType, List<String> extensions, List<String> contentTypes) {
+        if (!StringUtils.hasText(ext) || extensions.stream().noneMatch(item -> item.equalsIgnoreCase(ext))) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "文件扩展名不合法");
+        }
+        if (!contentTypes.contains(detectedContentType)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "文件内容类型不合法");
+        }
     }
 
     private String normalizeFileName(String originalFilename) {

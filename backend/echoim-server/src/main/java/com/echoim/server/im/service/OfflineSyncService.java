@@ -5,6 +5,7 @@ import com.echoim.server.dto.offline.OfflineSyncRequestDto;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.service.file.FileService;
+import com.echoim.server.service.message.MessageViewService;
 import com.echoim.server.vo.conversation.ConversationItemVo;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import com.echoim.server.vo.offline.OfflineSyncConversationVo;
@@ -26,13 +27,16 @@ public class OfflineSyncService {
     private final ImConversationMapper imConversationMapper;
     private final ImMessageMapper imMessageMapper;
     private final FileService fileService;
+    private final MessageViewService messageViewService;
 
     public OfflineSyncService(ImConversationMapper imConversationMapper,
                               ImMessageMapper imMessageMapper,
-                              FileService fileService) {
+                              FileService fileService,
+                              MessageViewService messageViewService) {
         this.imConversationMapper = imConversationMapper;
         this.imMessageMapper = imMessageMapper;
         this.fileService = fileService;
+        this.messageViewService = messageViewService;
     }
 
     public OfflineSyncResponseVo syncMessages(Long userId, OfflineSyncRequestDto requestDto) {
@@ -66,6 +70,7 @@ public class OfflineSyncService {
                 continue;
             }
             fileService.enrichMessages(userId, messages);
+            messageViewService.enrichMessages(userId, messages);
 
             OfflineSyncConversationVo item = new OfflineSyncConversationVo();
             item.setConversation(conversation);

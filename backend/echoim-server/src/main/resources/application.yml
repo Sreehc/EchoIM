@@ -1,10 +1,12 @@
 spring:
   application:
     name: echoim-server
+  profiles:
+    default: local
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:echoim}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${MYSQL_USERNAME:root}
-    password: ${MYSQL_PASSWORD:root}
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:echoim}?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:}
+    password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
@@ -15,6 +17,10 @@ spring:
     multipart:
       max-file-size: ${ECHOIM_MULTIPART_MAX_FILE_SIZE:100MB}
       max-request-size: ${ECHOIM_MULTIPART_MAX_FILE_SIZE:100MB}
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 server:
   port: ${SERVER_PORT:8080}
@@ -35,12 +41,16 @@ mybatis-plus:
 
 echoim:
   jwt:
-    secret: ${ECHOIM_JWT_SECRET:echoim-server-jwt-secret-key-1234567890}
+    secret: ${ECHOIM_JWT_SECRET:}
     expire-seconds: 7200
   file:
     storage-type: ${ECHOIM_FILE_STORAGE_TYPE:oss}
     max-size: ${ECHOIM_FILE_MAX_SIZE:104857600}
     signed-url-expire-seconds: ${ECHOIM_FILE_SIGNED_URL_EXPIRE_SECONDS:600}
+    allowed-image-content-types: ${ECHOIM_FILE_ALLOWED_IMAGE_CONTENT_TYPES:image/jpeg,image/png,image/gif,image/webp}
+    allowed-image-extensions: ${ECHOIM_FILE_ALLOWED_IMAGE_EXTENSIONS:jpg,jpeg,png,gif,webp}
+    allowed-file-content-types: ${ECHOIM_FILE_ALLOWED_FILE_CONTENT_TYPES:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed}
+    allowed-file-extensions: ${ECHOIM_FILE_ALLOWED_FILE_EXTENSIONS:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip}
   im:
     port: ${ECHOIM_IM_PORT:8091}
     ws-path: /ws

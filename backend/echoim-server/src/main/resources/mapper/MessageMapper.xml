@@ -7,6 +7,7 @@
     <sql id="MessageColumns">
         SELECT m.id AS messageId,
                m.conversation_id AS conversationId,
+               m.conversation_type AS conversationType,
                m.seq_no AS seqNo,
                m.client_msg_id AS clientMsgId,
                m.from_user_id AS fromUserId,
@@ -22,6 +23,7 @@
                    ELSE 'UNKNOWN'
                END AS msgType,
                m.content AS content,
+               m.extra_json AS extraJsonRaw,
                m.file_id AS fileId,
                m.send_status AS sendStatus,
                m.sent_at AS sentAt
@@ -32,7 +34,7 @@
         JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
         JOIN im_conversation c ON c.id = m.conversation_id
         LEFT JOIN im_group_member gm
-               ON c.conversation_type = 2
+               ON c.conversation_type IN (2, 3)
               AND gm.group_id = c.biz_id
               AND gm.user_id = #{userId}
     </sql>
@@ -43,7 +45,7 @@
           AND cu.deleted = 0
           AND c.status = 1
           AND (
-              c.conversation_type != 2
+              c.conversation_type NOT IN (2, 3)
                   OR (
                       gm.id IS NOT NULL
                   AND (gm.status = 1 OR m.seq_no &lt;= cu.last_read_seq)
@@ -83,7 +85,7 @@
         JOIN im_conversation_user cu ON cu.conversation_id = m.conversation_id
         JOIN im_conversation c ON c.id = m.conversation_id
         LEFT JOIN im_group_member gm
-               ON c.conversation_type = 2
+               ON c.conversation_type IN (2, 3)
               AND gm.group_id = c.biz_id
               AND gm.user_id = #{userId}
         <include refid="MessageAccessWhere"/>
@@ -128,6 +130,38 @@
         FROM im_message
         WHERE from_user_id = #{fromUserId}
           AND client_msg_id = #{clientMsgId}
+        LIMIT 1
+    </select>
+
+    <select id="selectAccessibleEntityByIdAndUserId" resultType="com.echoim.server.entity.ImMessageEntity">
+        SELECT m.id,
+               m.conversation_id AS conversationId,
+               m.conversation_type AS conversationType,
+               m.seq_no AS seqNo,
+               m.client_msg_id AS clientMsgId,
+               m.from_user_id AS fromUserId,
+               m.to_user_id AS toUserId,
+               m.group_id AS groupId,
+               m.msg_type AS msgType,
+               m.content,
+               m.extra_json AS extraJson,
+               m.file_id AS fileId,
+               m.send_status AS sendStatus,
+               m.sent_at AS sentAt,
+               m.created_at AS createdAt,
+               m.updated_at AS updatedAt
+        <include refid="MessageAccessJoins"/>
+        WHERE m.id = #{messageId}
+          AND cu.user_id = #{userId}
+          AND cu.deleted = 0
+          AND c.status = 1
+          AND (
+              c.conversation_type NOT IN (2, 3)
+                  OR (
+                      gm.id IS NOT NULL
+                  AND (gm.status = 1 OR m.seq_no &lt;= cu.last_read_seq)
+                  )
+          )
         LIMIT 1
     </select>
 </mapper>

@@ -13,7 +13,8 @@
   --el-text-color-regular: var(--color-text-2);
   --el-text-color-secondary: var(--color-text-3);
   --el-fill-color-light: color-mix(in srgb, var(--color-bg-panel) 72%, transparent);
-  --el-mask-color: rgba(11, 17, 32, 0.48);
+  --el-bg-color-overlay: var(--color-shell-card-strong);
+  --el-mask-color: var(--color-shell-mask);
 }
 
 .el-input__wrapper,
@@ -24,44 +25,149 @@
 
 .el-input__wrapper,
 .el-textarea__inner {
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-surface);
+  border-radius: 16px;
+  background: var(--color-shell-inline);
+  border: 1px solid var(--color-shell-border);
+  color: var(--color-text-1);
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .el-input__wrapper.is-focus,
 .el-textarea__inner:focus {
   box-shadow: 0 0 0 2px var(--color-focus-ring) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-shell-border));
 }
 
 .el-button {
-  min-height: 44px;
-  border-radius: var(--radius-sm);
+  min-height: var(--control-height-md);
+  border-radius: 16px;
   font-weight: 600;
+  border-color: var(--color-shell-border);
+  background: var(--color-shell-action);
+  color: var(--color-text-1);
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .el-button--primary {
   background: var(--color-primary);
   border-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+.el-button:hover,
+.el-button:focus-visible {
+  border-color: var(--color-shell-border-strong);
+  background: var(--color-shell-action-hover);
+  transform: translateY(-1px);
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 88%, white);
+  border-color: color-mix(in srgb, var(--color-primary) 88%, white);
 }
 
 .el-input__wrapper {
   padding-inline: 10px;
-  border: 1px solid transparent;
 }
 
 .el-input__wrapper:hover {
-  background: var(--color-bg-elevated);
+  background: color-mix(in srgb, var(--color-shell-inline) 92%, var(--color-shell-action-hover));
 }
 
 .el-form-item__label {
   color: var(--color-text-2);
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .el-drawer {
-  background: var(--color-bg-surface);
+  background: transparent;
 }
 
 .el-drawer__body {
   padding: 0;
+}
+
+.el-dropdown-menu,
+.el-message-box,
+.el-select-dropdown,
+.el-popover {
+  border: 1px solid var(--color-shell-border) !important;
+  border-radius: 20px !important;
+  background: var(--color-shell-card-strong) !important;
+  box-shadow: var(--shadow-panel) !important;
+  backdrop-filter: blur(16px);
+}
+
+.el-dropdown__popper.el-popper {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.el-dropdown__popper.el-popper .el-popper__arrow::before {
+  background: var(--color-shell-card-strong) !important;
+  border: 1px solid var(--color-shell-border) !important;
+  box-shadow: none !important;
+}
+
+.el-dropdown-menu {
+  padding: 6px !important;
+}
+
+.el-dropdown-menu__item {
+  border-radius: 12px;
+  color: var(--color-text-1);
+}
+
+.el-dropdown-menu__item:not(.is-disabled):hover,
+.el-dropdown-menu__item:not(.is-disabled):focus {
+  background: var(--color-shell-inline);
+  color: var(--color-text-1);
+}
+
+.el-message-box__headerbtn,
+.el-dialog__headerbtn {
+  top: 18px;
+}
+
+.el-message-box__content,
+.el-message-box__header {
+  color: var(--color-text-1);
+}
+
+.el-message-box__btns {
+  padding-top: 8px;
+}
+
+.el-switch {
+  --el-switch-on-color: var(--color-primary);
+  --el-switch-off-color: color-mix(in srgb, var(--color-text-soft) 24%, var(--color-shell-inline));
+}
+
+.el-radio-button__inner {
+  border-radius: 16px !important;
+  background: var(--color-shell-action);
+  border-color: var(--color-shell-border);
+  box-shadow: none !important;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background: color-mix(in srgb, var(--color-primary) 82%, white);
+  border-color: color-mix(in srgb, var(--color-primary) 82%, white);
+}
+
+.el-skeleton__item {
+  background: color-mix(in srgb, var(--color-shell-inline) 82%, transparent) !important;
 }

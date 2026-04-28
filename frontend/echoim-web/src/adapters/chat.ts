@@ -57,6 +57,8 @@ export function adaptConversationSummary(
     peerUserId: item.peerUserId == null ? null : Number(item.peerUserId),
     groupId: item.groupId == null ? null : Number(item.groupId),
     latestSeq: Number(item.latestSeq ?? 0),
+    canSend: item.canSend ?? true,
+    myRole: item.myRole == null ? null : Number(item.myRole),
   }
 }
 
@@ -64,6 +66,7 @@ export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
   return {
     messageId: Number(item.messageId),
     conversationId: Number(item.conversationId),
+    conversationType: item.conversationType,
     seqNo: Number(item.seqNo ?? 0),
     clientMsgId: item.clientMsgId ?? `server-${item.messageId}`,
     fromUserId: Number(item.fromUserId),
@@ -83,6 +86,7 @@ export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
     deliveredAt: item.deliveredAt ? normalizeTime(item.deliveredAt) : null,
     read: Boolean(item.read),
     readAt: item.readAt ? normalizeTime(item.readAt) : null,
+    viewCount: Number(item.viewCount ?? 0),
     forwardSource: adaptForwardSource(item.forwardSource),
     errorMessage: null,
   }
@@ -130,6 +134,7 @@ export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]):
       sendStatus: message.sendStatus,
       delivered: Boolean(previous.delivered || message.delivered),
       read: Boolean(previous.read || message.read),
+      viewCount: Math.max(previous.viewCount ?? 0, message.viewCount ?? 0),
       errorMessage: message.errorMessage ?? previous.errorMessage ?? null,
     })
   }

@@ -4,6 +4,7 @@ public final class ErrorCode {
 
     public static final int SUCCESS = 0;
     public static final int PARAM_ERROR = 40000;
+    public static final int TOO_MANY_REQUESTS = 42900;
     public static final int BUSINESS_CONFLICT = 40900;
     public static final int UNAUTHORIZED = 40100;
     public static final int TOKEN_INVALID = 40101;

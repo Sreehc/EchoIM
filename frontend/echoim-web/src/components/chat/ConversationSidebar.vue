@@ -8,11 +8,15 @@ import {
   CirclePlus,
   Close,
   Collection,
+  Delete,
   EditPen,
+  FolderOpened,
   Guide,
   Lock,
+  MessageBox,
   Moon,
   MoreFilled,
+  Open,
   Plus,
   Search,
   Setting,
@@ -36,6 +40,8 @@ import { STORAGE_KEYS } from '@/utils/storage'
 import ConversationListItem from './ConversationListItem.vue'
 import AvatarBadge from './AvatarBadge.vue'
 import ChatStatePanel from './ChatStatePanel.vue'
+
+type ConversationContextAction = 'open-tab' | 'mark-unread' | 'toggle-top' | 'toggle-mute' | 'archive' | 'delete'
 
 const props = defineProps<{
   currentUser: UserInfo | null
@@ -74,6 +80,7 @@ const emit = defineEmits<{
   'change-password': [payload: ChangePasswordPayload]
   'clear-profile-error': []
   'clear-profile-notice': []
+  'conversation-action': [payload: { command: ConversationContextAction; conversationId: number }]
   logout: []
 }>()
 
@@ -103,6 +110,17 @@ const profileDraft = reactive<{
   signature: '',
 })
 let searchTimer: number | null = null
+const conversationContextMenu = reactive<{
+  visible: boolean
+  x: number
+  y: number
+  conversationId: number | null
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  conversationId: null,
+})
 
 const panelTitle = computed(() => {
   if (props.leftPanelMode === 'me') return '个人中心'
@@ -141,6 +159,22 @@ const notificationPromptCopy = computed(() => {
     description: '开启桌面通知，切到其他窗口也能及时收到提醒。',
   }
 })
+const contextConversation = computed(
+  () => props.conversations.find((item) => item.conversationId === conversationContextMenu.conversationId) ?? null,
+)
+const contextMenuItems = computed(() => [
+  { key: 'open-tab' as const, label: 'Open in new tab', icon: Open, danger: false },
+  { key: 'mark-unread' as const, label: 'Mark as unread', icon: MessageBox, danger: false },
+  { key: 'toggle-top' as const, label: contextConversation.value?.isTop ? 'Unpin' : 'Pin', icon: null, danger: false },
+  {
+    key: 'toggle-mute' as const,
+    label: contextConversation.value?.isMute ? 'Unmute' : 'Mute',
+    icon: null,
+    danger: false,
+  },
+  { key: 'archive' as const, label: 'Archive', icon: FolderOpened, danger: false },
+  { key: 'delete' as const, label: 'Delete Chat', icon: Delete, danger: true },
+])
 
 watch(
   () => props.focusSearchToken,
@@ -213,6 +247,9 @@ onUnmounted(() => {
 })
 
 function handleScroll({ scrollTop }: { scrollTop: number }) {
+  if (conversationContextMenu.visible) {
+    closeConversationContextMenu()
+  }
   emit('update:panelScrollTop', scrollTop)
 }
 
@@ -247,6 +284,10 @@ function handleDocumentPointerDown(event: PointerEvent) {
   if (composeMenuOpen.value && !event.target.closest('.sidebar-compose-menu, .sidebar-panel__fab')) {
     composeMenuOpen.value = false
   }
+
+  if (conversationContextMenu.visible && !event.target.closest('.sidebar-context-menu')) {
+    closeConversationContextMenu()
+  }
 }
 
 function toggleGlobalMenu() {
@@ -265,6 +306,29 @@ function toggleComposeMenu() {
 
 function closeComposeMenu() {
   composeMenuOpen.value = false
+}
+
+function openConversationContextMenu(event: MouseEvent, conversationId: number) {
+  closeGlobalMenu()
+  closeComposeMenu()
+
+  conversationContextMenu.visible = true
+  conversationContextMenu.conversationId = conversationId
+  conversationContextMenu.x = Math.min(event.clientX, window.innerWidth - 248)
+  conversationContextMenu.y = Math.min(event.clientY, window.innerHeight - 332)
+}
+
+function closeConversationContextMenu() {
+  conversationContextMenu.visible = false
+  conversationContextMenu.conversationId = null
+}
+
+function handleConversationContextAction(command: ConversationContextAction) {
+  const conversationId = conversationContextMenu.conversationId
+  if (!conversationId) return
+
+  closeConversationContextMenu()
+  emit('conversation-action', { command, conversationId })
 }
 
 function handlePlaceholderAction() {
@@ -405,7 +469,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               ref="searchInput"
               :model-value="draftSearchQuery"
               :prefix-icon="Search"
-              placeholder="Search"
+              placeholder="搜索会话"
               aria-label="搜索会话"
               clearable
               @update:model-value="handleSearchInput"
@@ -496,11 +560,11 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
           :aria-busy="notificationRequesting"
           @click="requestDesktopNotifications"
         >
+          <span class="sidebar-panel__notice-icon" aria-hidden="true">
+            <Bell />
+          </span>
           <span class="sidebar-panel__notice-copy">
-            <strong>
-              {{ notificationPromptCopy.title }}
-              <Bell aria-hidden="true" />
-            </strong>
+            <strong>{{ notificationPromptCopy.title }}</strong>
             <p>{{ notificationPromptCopy.description }}</p>
           </span>
         </button>
@@ -542,6 +606,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             :search-query="searchQuery"
             :compact="chatPreferences.compactList"
             @click="emit('select', conversation.conversationId)"
+            @contextmenu.prevent="openConversationContextMenu($event, conversation.conversationId)"
           />
         </div>
         <ChatStatePanel
@@ -598,6 +663,53 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
       >
         <EditPen />
       </button>
+
+      <transition name="sidebar-menu-fade">
+        <div
+          v-if="conversationContextMenu.visible && contextConversation"
+          class="sidebar-context-menu"
+          :style="{ left: `${conversationContextMenu.x}px`, top: `${conversationContextMenu.y}px` }"
+          role="menu"
+          aria-label="会话操作菜单"
+        >
+          <button
+            v-for="item in contextMenuItems"
+            :key="item.key"
+            class="sidebar-context-menu__item"
+            :class="{ 'is-danger': item.danger }"
+            type="button"
+            role="menuitem"
+            @click="handleConversationContextAction(item.key)"
+          >
+            <span class="sidebar-context-menu__icon" aria-hidden="true">
+              <component :is="item.icon" v-if="item.icon" />
+              <svg v-else-if="item.key === 'toggle-top'" viewBox="0 0 16 16" class="sidebar-context-menu__glyph">
+                <path
+                  d="M4.45 2.45c0-.52.43-.95.95-.95h5.2c.52 0 .95.43.95.95 0 .28-.12.55-.34.73L9.9 4.28v3.14l1.34 1.22c.2.18.31.44.31.71 0 .53-.42.95-.95.95H8.72v3.6a.72.72 0 1 1-1.44 0v-3.6H5.4a.95.95 0 0 1-.64-1.66L6.1 7.42V4.28L4.79 3.18a.98.98 0 0 1-.34-.73Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linejoin="round"
+                  stroke-width="1.35"
+                />
+              </svg>
+              <svg v-else viewBox="0 0 16 16" class="sidebar-context-menu__glyph">
+                <path
+                  d="M2.2 6.15a.7.7 0 0 1 .7-.7H4.3l2.25-1.9c.46-.39 1.15-.06 1.15.54v7.82c0 .6-.69.93-1.15.54L4.3 10.55H2.9a.7.7 0 0 1-.7-.7v-3.7Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M10.15 6.05 13 8.9m0-2.85-2.85 2.85"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-width="1.35"
+                />
+              </svg>
+            </span>
+            <span class="sidebar-context-menu__label">{{ item.label }}</span>
+          </button>
+        </div>
+      </transition>
     </template>
 
     <template v-else>
@@ -883,16 +995,21 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--color-sidebar-bg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 32%, transparent), transparent 14%),
+    var(--color-shell-panel);
   color: var(--color-text-1);
   overflow: hidden;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 26px;
+  box-shadow: var(--shadow-panel);
 }
 
 .sidebar-panel__header {
   position: relative;
   z-index: 3;
-  padding: 18px 18px 10px;
-  background: var(--color-sidebar-bg);
+  padding: 16px 16px 10px;
+  background: transparent;
 }
 
 .sidebar-panel__header--detail {
@@ -907,7 +1024,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .sidebar-panel__menu-trigger,
@@ -916,21 +1033,25 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   height: 40px;
   display: grid;
   place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 14px;
+  background: var(--color-shell-action);
   color: var(--color-text-2);
   transition:
     background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
 .sidebar-panel__menu-trigger:hover,
 .sidebar-panel__menu-trigger:focus-visible,
 .sidebar-panel__back:hover,
 .sidebar-panel__back:focus-visible {
-  background: var(--color-hover);
+  background: var(--color-shell-action-hover);
+  border-color: var(--color-shell-border-strong);
   color: var(--color-text-1);
+  transform: translateY(-1px);
 }
 
 .sidebar-panel__menu-bars {
@@ -946,11 +1067,10 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-panel__search :deep(.el-input__wrapper) {
-  min-height: 44px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--color-sidebar-muted);
-  box-shadow: none;
+  min-height: var(--control-height-lg);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+  box-shadow: var(--shadow-card);
 }
 
 .sidebar-panel__search :deep(.el-input__inner) {
@@ -963,18 +1083,35 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-panel__notice {
-  margin: 0 18px 10px;
+  margin: 4px 8px 12px 10px;
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px;
-  gap: 0;
-  min-height: 92px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: stretch;
+  gap: 8px;
   overflow: hidden;
-  border-radius: 16px;
-  background: #303030;
-  color: #f4f5f7;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 4%, transparent), transparent 68%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), var(--color-shell-card));
+  color: var(--color-text-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-shell-border);
+  transition:
+    background var(--motion-base) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.sidebar-panel__notice:hover,
+.sidebar-panel__notice:focus-within {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 8%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), var(--color-shell-card));
+  border-color: var(--color-shell-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.035),
-    0 10px 24px rgba(0, 0, 0, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-card);
 }
 
 .sidebar-panel__notice-action,
@@ -986,14 +1123,13 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-panel__notice-action {
   width: 100%;
-  padding: 15px 0 15px 18px;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0 12px 14px;
   text-align: left;
-  transition: background var(--motion-fast) ease;
-}
-
-.sidebar-panel__notice-action:hover,
-.sidebar-panel__notice-action:focus-visible {
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .sidebar-panel__notice-copy {
@@ -1001,55 +1137,66 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   min-width: 0;
 }
 
-.sidebar-panel__notice strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 100%;
-  color: #ffffff;
-  font-size: 0.92rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
-}
-
-.sidebar-panel__notice strong :deep(svg) {
-  width: 16px;
-  height: 16px;
-  color: #ffd35c;
-  flex: 0 0 auto;
-}
-
-.sidebar-panel__notice p {
-  margin-top: 8px;
-  color: #bdc1cb;
-  font-size: 0.8rem;
-  line-height: 1.42;
-}
-
-.sidebar-panel__notice-close {
-  width: 34px;
-  height: 34px;
-  margin: 8px 6px 0 0;
+.sidebar-panel__notice-icon {
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
-  align-self: start;
   border-radius: 50%;
-  color: #aeb3bd;
-  transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+  border: 1px solid color-mix(in srgb, var(--color-shell-border) 88%, transparent);
+  background:
+    radial-gradient(circle at 30% 30%, color-mix(in srgb, #ffffff 8%, transparent), transparent 58%),
+    color-mix(in srgb, var(--color-shell-inline) 92%, transparent);
+  color: color-mix(in srgb, var(--color-text-2) 88%, var(--color-shell-eyebrow));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.sidebar-panel__notice-close :deep(svg) {
+.sidebar-panel__notice-icon :deep(svg) {
   width: 18px;
   height: 18px;
 }
 
+.sidebar-panel__notice strong {
+  display: block;
+  max-width: 100%;
+  color: color-mix(in srgb, var(--color-text-1) 96%, white);
+  font: 700 0.98rem/1.08 var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.sidebar-panel__notice p {
+  margin-top: 5px;
+  color: color-mix(in srgb, var(--color-text-2) 82%, var(--color-text-3));
+  font: 400 0.85rem/1.28 var(--font-body);
+  letter-spacing: -0.01em;
+}
+
+.sidebar-panel__notice-close {
+  width: 28px;
+  height: 28px;
+  margin: 12px 10px 0 0;
+  display: grid;
+  place-items: center;
+  align-self: start;
+  border-radius: 12px;
+  color: var(--color-text-soft);
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+
+.sidebar-panel__notice-close :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+
 .sidebar-panel__notice-close:hover,
 .sidebar-panel__notice-close:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--color-shell-action-hover) 90%, transparent);
+  color: var(--color-text-2);
+  transform: translateY(-1px);
 }
 
 .sidebar-panel__scroll {
@@ -1074,23 +1221,23 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-panel__skeletons,
 .sidebar-detail {
   gap: 12px;
-  padding: 4px 18px 24px;
+  padding: 4px 16px 24px;
 }
 
 .sidebar-panel__fab {
   position: absolute;
-  right: 22px;
-  bottom: 22px;
+  right: 20px;
+  bottom: 20px;
   z-index: 5;
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: 18px;
   background: var(--color-primary);
   color: #fff;
-  box-shadow: 0 14px 30px rgba(135, 116, 225, 0.36);
+  box-shadow: 0 14px 24px color-mix(in srgb, var(--color-primary) 28%, transparent);
 }
 
 .sidebar-panel__fab :deep(svg) {
@@ -1098,17 +1245,81 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   height: 22px;
 }
 
+.sidebar-context-menu {
+  position: fixed;
+  z-index: 30;
+  width: 236px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(32, 33, 38, 0.96);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.sidebar-context-menu__item {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #f4f6fa;
+  text-align: left;
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.sidebar-context-menu__item:hover,
+.sidebar-context-menu__item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-context-menu__item.is-danger {
+  color: #ff6e68;
+}
+
+.sidebar-context-menu__item.is-danger:hover,
+.sidebar-context-menu__item.is-danger:focus-visible {
+  background: rgba(255, 110, 104, 0.1);
+}
+
+.sidebar-context-menu__icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-context-menu__icon :deep(svg),
+.sidebar-context-menu__glyph {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar-context-menu__label {
+  font-size: 0.94rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
 .sidebar-compose-menu {
   position: absolute;
   right: 12px;
-  bottom: 88px;
+  bottom: 80px;
   z-index: 6;
   width: min(286px, calc(100% - 24px));
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  background: #242424;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.36);
+  border: 1px solid var(--color-shell-border);
+  border-radius: 20px;
+  background: var(--color-shell-card-strong);
+  box-shadow: var(--shadow-panel);
 }
 
 .sidebar-compose-menu__item {
@@ -1121,7 +1332,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   padding: 0 16px;
   border: 0;
   background: transparent;
-  color: #f5f6f8;
+  color: var(--color-text-1);
   text-align: left;
   font-size: 0.9rem;
   font-weight: 600;
@@ -1129,7 +1340,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-compose-menu__item:hover,
 .sidebar-compose-menu__item:focus-visible {
-  background: #333333;
+  background: var(--color-shell-action-hover);
 }
 
 .sidebar-compose-menu__icon {
@@ -1138,7 +1349,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #f5f6f8;
+  color: var(--color-shell-eyebrow);
 }
 
 .sidebar-compose-menu__icon :deep(svg) {
@@ -1151,15 +1362,16 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   top: 8px;
   left: 8px;
   z-index: 10;
-  width: min(360px, calc(100% - 16px));
+  width: min(340px, calc(100% - 16px));
   display: grid;
   gap: 0;
   overflow: hidden;
   padding: 0;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: #232323;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+  border-radius: 20px;
+  border: 1px solid var(--color-shell-border);
+  background: var(--color-shell-card-strong);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
 }
 
 .sidebar-global-menu__identity {
@@ -1172,19 +1384,19 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   padding: 8px 18px 8px 16px;
   border: 0;
   background: transparent;
-  color: #f5f6f8;
+  color: var(--color-text-1);
   text-align: left;
 }
 
 .sidebar-global-menu__identity:hover,
 .sidebar-global-menu__identity:focus-visible {
-  background: #313131;
+  background: var(--color-shell-action-hover);
 }
 
 .sidebar-global-menu__identity :deep(.avatar-badge) {
   width: 46px;
   height: 46px;
-  border: 2px solid #8067ff;
+  border: 2px solid color-mix(in srgb, var(--color-primary) 65%, white);
 }
 
 .sidebar-global-menu__copy strong {
@@ -1192,7 +1404,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: #f5f6f8;
+  color: var(--color-text-1);
   font-size: 0.92rem;
   font-weight: 700;
   line-height: 1.18;
@@ -1203,14 +1415,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: #aeb4bf;
+  color: var(--color-text-soft);
   font: 500 0.72rem/1 var(--font-mono);
 }
 
 .sidebar-global-menu__group {
   display: grid;
   padding: 5px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--color-shell-border);
 }
 
 .sidebar-global-menu__item {
@@ -1223,7 +1435,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #f3f4f6;
+  color: var(--color-text-1);
   text-align: left;
   transition:
     background var(--motion-fast) ease,
@@ -1232,11 +1444,11 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-global-menu__item:hover,
 .sidebar-global-menu__item:focus-visible {
-  background: #333333;
+  background: var(--color-shell-action-hover);
 }
 
 .sidebar-global-menu__item.is-active {
-  background: #333333;
+  background: var(--color-shell-inline);
 }
 
 .sidebar-global-menu__icon {
@@ -1245,7 +1457,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #f5f6f8;
+  color: var(--color-shell-eyebrow);
 }
 
 .sidebar-global-menu__icon :deep(svg) {
@@ -1254,7 +1466,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-global-menu__label {
-  color: #f5f6f8;
+  color: var(--color-text-1);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -1289,9 +1501,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-panel__panel-copy span {
   display: block;
-  color: var(--color-text-soft);
-  font: 500 0.66rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
+  color: var(--color-shell-eyebrow);
+  font: var(--font-eyebrow);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   text-align: center;
 }
@@ -1299,7 +1511,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-panel__panel-copy strong {
   display: block;
   margin-top: 6px;
-  font: 700 1rem/1.1 var(--font-display);
+  font: var(--font-title-md);
   text-align: center;
 }
 
@@ -1313,9 +1525,10 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: grid;
   gap: 14px;
   padding: 18px;
-  border-radius: 18px;
-  background: var(--color-sidebar-surface);
-  border: 1px solid var(--color-line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  border: 1px solid var(--color-shell-border);
+  box-shadow: var(--shadow-inset-soft);
 }
 
 .sidebar-hero__copy strong {
@@ -1347,8 +1560,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-section__head span {
   display: block;
-  color: var(--color-text-soft);
-  font: 500 0.64rem/1 var(--font-mono);
+  color: var(--color-shell-eyebrow);
+  font: var(--font-eyebrow);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1356,7 +1569,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-section__head strong {
   display: block;
   margin-top: 6px;
-  font: 700 0.98rem/1.1 var(--font-display);
+  font: var(--font-title-sm);
 }
 
 .info-grid {
@@ -1370,9 +1583,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .theme-card__option,
 .security-card {
   padding: 14px;
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--color-shell-border);
   border-radius: 16px;
-  background: var(--color-sidebar-muted);
+  background: var(--color-shell-card-muted);
 }
 
 .info-grid span {
@@ -1401,9 +1614,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .settings-tabs__item {
   min-height: 40px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-sidebar-surface);
+  border: 1px solid var(--color-shell-border);
+  border-radius: 14px;
+  background: var(--color-shell-action);
   color: var(--color-text-2);
   font-weight: 700;
 }
@@ -1411,7 +1624,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-tabs__item.is-active,
 .settings-tabs__item:hover,
 .settings-tabs__item:focus-visible {
-  background: var(--color-sidebar-pill);
+  background: var(--color-shell-inline);
+  border-color: var(--color-shell-border-strong);
   color: var(--color-text-1);
 }
 
@@ -1440,9 +1654,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: rgba(135, 116, 225, 0.12);
-  color: var(--color-primary);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-shell-glow) 64%, transparent);
+  color: var(--color-shell-eyebrow);
   flex-shrink: 0;
 }
 
@@ -1467,8 +1681,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .theme-card__option.is-active {
-  background: rgba(135, 116, 225, 0.12);
-  border-color: rgba(135, 116, 225, 0.22);
+  background: var(--color-shell-inline);
+  border-color: var(--color-shell-border-strong);
 }
 
 .settings-item {
@@ -1483,16 +1697,21 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-notice--success {
-  background: rgba(52, 211, 153, 0.14);
-  color: #78f3c4;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-shell-card-muted));
+  color: color-mix(in srgb, var(--color-accent) 80%, white);
 }
 
 .sidebar-notice--error {
-  background: rgba(248, 113, 113, 0.14);
-  color: #ffb0b0;
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-shell-card-muted));
+  color: color-mix(in srgb, var(--color-danger) 78%, white);
 }
 
 @media (max-width: 767px) {
+  .sidebar-panel {
+    border-radius: 0;
+    border-inline: 0;
+  }
+
   .sidebar-panel__header,
   .sidebar-panel__skeletons,
   .sidebar-detail {

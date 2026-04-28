@@ -5,6 +5,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 40001,
       conversationId: 30001,
+      conversationType: 1,
       seqNo: 121,
       clientMsgId: 'msg-121',
       fromUserId: 10002,
@@ -21,6 +22,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 40002,
       conversationId: 30001,
+      conversationType: 1,
       seqNo: 122,
       clientMsgId: 'msg-122',
       fromUserId: 10001,
@@ -37,6 +39,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 40003,
       conversationId: 30001,
+      conversationType: 1,
       seqNo: 123,
       clientMsgId: 'msg-123',
       fromUserId: 0,
@@ -51,6 +54,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 40004,
       conversationId: 30001,
+      conversationType: 1,
       seqNo: 124,
       clientMsgId: 'msg-124',
       fromUserId: 10002,
@@ -67,6 +71,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 400045,
       conversationId: 30001,
+      conversationType: 1,
       seqNo: 1245,
       clientMsgId: 'msg-1245',
       fromUserId: 10002,
@@ -83,6 +88,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 40005,
       conversationId: 30001,
+      conversationType: 1,
       seqNo: 125,
       clientMsgId: 'msg-125',
       fromUserId: 10002,
@@ -101,6 +107,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 41001,
       conversationId: 30002,
+      conversationType: 2,
       seqNo: 95,
       clientMsgId: 'grp-95',
       fromUserId: 0,
@@ -115,6 +122,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 41002,
       conversationId: 30002,
+      conversationType: 2,
       seqNo: 96,
       clientMsgId: 'grp-96',
       fromUserId: 10003,
@@ -129,6 +137,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 410021,
       conversationId: 30002,
+      conversationType: 2,
       seqNo: 961,
       clientMsgId: 'grp-961',
       fromUserId: 10003,
@@ -143,6 +152,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 41003,
       conversationId: 30002,
+      conversationType: 2,
       seqNo: 97,
       clientMsgId: 'grp-97',
       fromUserId: 10004,
@@ -157,6 +167,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 41004,
       conversationId: 30002,
+      conversationType: 2,
       seqNo: 98,
       clientMsgId: 'grp-98',
       fromUserId: 10005,
@@ -173,6 +184,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 42001,
       conversationId: 30003,
+      conversationType: 1,
       seqNo: 44,
       clientMsgId: 'single-44',
       fromUserId: 10003,
@@ -191,9 +203,10 @@ export const mockMessages: Record<number, ChatMessage[]> = {
     {
       messageId: 43001,
       conversationId: 30004,
+      conversationType: 3,
       seqNo: 20,
-      clientMsgId: 'ops-20',
-      fromUserId: 10006,
+      clientMsgId: 'channel-20',
+      fromUserId: 10001,
       toUserId: null,
       groupId: 20002,
       msgType: 'TEXT',
@@ -201,6 +214,7 @@ export const mockMessages: Record<number, ChatMessage[]> = {
       fileId: null,
       sentAt: '2026-04-24T19:40:00',
       sendStatus: 1,
+      viewCount: 12,
     },
   ],
 }

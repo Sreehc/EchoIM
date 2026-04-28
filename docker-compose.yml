@@ -1,0 +1,44 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: echoim-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --init-connect=SET NAMES utf8mb4 COLLATE utf8mb4_general_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DB:-echoim}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7.4
+    container_name: echoim-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+
+  echoim-server:
+    build:
+      context: ./backend/echoim-server
+    container_name: echoim-server
+    depends_on:
+      - mysql
+      - redis
+    env_file:
+      - .env
+    environment:
+      MYSQL_HOST: mysql
+      REDIS_HOST: redis
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+      - "${ECHOIM_IM_PORT:-8091}:8091"
+
+volumes:
+  mysql-data:
+  redis-data:

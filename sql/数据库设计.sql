@@ -5,7 +5,8 @@
 -- 3. 存储引擎统一为 InnoDB
 -- 4. 生产环境建议将自增主键替换为雪花 ID 或号段 ID
 
-CREATE DATABASE IF NOT EXISTS echoim DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+DROP DATABASE IF EXISTS echoim;
+CREATE DATABASE echoim DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE echoim;
 
 CREATE TABLE IF NOT EXISTS im_user (
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS im_user (
   UNIQUE KEY uk_user_no (user_no),
   UNIQUE KEY uk_username (username),
   KEY idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户表';
 
 CREATE TABLE IF NOT EXISTS im_friend_request (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '好友申请ID',
@@ -40,7 +41,7 @@ CREATE TABLE IF NOT EXISTS im_friend_request (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   KEY idx_to_user_status (to_user_id, status),
   KEY idx_from_user (from_user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友申请表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='好友申请表';
 
 CREATE TABLE IF NOT EXISTS im_friend (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '好友关系ID',
@@ -52,7 +53,7 @@ CREATE TABLE IF NOT EXISTS im_friend (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_user_friend (user_id, friend_user_id),
   KEY idx_friend_user (friend_user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友关系表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='好友关系表';
 
 CREATE TABLE IF NOT EXISTS im_group (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '群组ID',
@@ -66,7 +67,7 @@ CREATE TABLE IF NOT EXISTS im_group (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_group_no (group_no),
   KEY idx_owner_user (owner_user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群组表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='群组表';
 
 CREATE TABLE IF NOT EXISTS im_group_member (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '群成员ID',
@@ -80,11 +81,11 @@ CREATE TABLE IF NOT EXISTS im_group_member (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_group_user (group_id, user_id),
   KEY idx_user_id (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群成员表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='群成员表';
 
 CREATE TABLE IF NOT EXISTS im_conversation (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '会话ID',
-  conversation_type TINYINT NOT NULL COMMENT '1单聊 2群聊',
+  conversation_type TINYINT NOT NULL COMMENT '1单聊 2群聊 3频道',
   biz_key VARCHAR(64) NOT NULL COMMENT '单聊为较小用户ID_较大用户ID，群聊为group_{groupId}',
   biz_id BIGINT DEFAULT NULL COMMENT '业务ID，群聊时为groupId',
   conversation_name VARCHAR(100) DEFAULT NULL COMMENT '会话名称',
@@ -97,7 +98,7 @@ CREATE TABLE IF NOT EXISTS im_conversation (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_type_biz_key (conversation_type, biz_key),
   KEY idx_last_message_time (last_message_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='会话表';
 
 CREATE TABLE IF NOT EXISTS im_conversation_user (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '用户会话ID',
@@ -112,7 +113,7 @@ CREATE TABLE IF NOT EXISTS im_conversation_user (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_conversation_user (conversation_id, user_id),
   KEY idx_user_id_top (user_id, is_top)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户会话表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户会话表';
 
 CREATE TABLE IF NOT EXISTS im_file (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '文件ID',
@@ -132,12 +133,12 @@ CREATE TABLE IF NOT EXISTS im_file (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   KEY idx_owner_user_id (owner_user_id),
   KEY idx_biz_type (biz_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件资源表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='文件资源表';
 
 CREATE TABLE IF NOT EXISTS im_message (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '消息ID',
   conversation_id BIGINT NOT NULL COMMENT '会话ID',
-  conversation_type TINYINT NOT NULL COMMENT '1单聊 2群聊',
+  conversation_type TINYINT NOT NULL COMMENT '1单聊 2群聊 3频道',
   seq_no BIGINT NOT NULL COMMENT '会话内递增序号',
   client_msg_id VARCHAR(64) NOT NULL COMMENT '客户端消息ID',
   from_user_id BIGINT NOT NULL COMMENT '发送人ID',
@@ -156,7 +157,7 @@ CREATE TABLE IF NOT EXISTS im_message (
   KEY idx_conversation_time (conversation_id, sent_at),
   KEY idx_to_user_id (to_user_id),
   KEY idx_group_id (group_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='消息表';
 
 CREATE TABLE IF NOT EXISTS im_message_receipt (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '回执ID',
@@ -167,7 +168,7 @@ CREATE TABLE IF NOT EXISTS im_message_receipt (
   receipt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '回执时间',
   UNIQUE KEY uk_message_user_receipt (message_id, user_id, receipt_type),
   KEY idx_conversation_user (conversation_id, user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息回执表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='消息回执表';
 
 CREATE TABLE IF NOT EXISTS sys_admin_user (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '管理员ID',
@@ -180,7 +181,7 @@ CREATE TABLE IF NOT EXISTS sys_admin_user (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_admin_username (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='管理员表';
 
 CREATE TABLE IF NOT EXISTS sys_config (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '配置ID',
@@ -192,7 +193,7 @@ CREATE TABLE IF NOT EXISTS sys_config (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_config_key (config_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统配置表';
 
 CREATE TABLE IF NOT EXISTS sys_version (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '版本ID',
@@ -207,7 +208,7 @@ CREATE TABLE IF NOT EXISTS sys_version (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_version_code (version_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='版本信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='版本信息表';
 
 CREATE TABLE IF NOT EXISTS sys_beauty_no (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '靓号ID',
@@ -219,7 +220,7 @@ CREATE TABLE IF NOT EXISTS sys_beauty_no (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_beauty_no (beauty_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='靓号表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='靓号表';
 
 CREATE TABLE IF NOT EXISTS sys_operation_log (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '日志ID',
@@ -234,7 +235,7 @@ CREATE TABLE IF NOT EXISTS sys_operation_log (
   KEY idx_admin_user_id (admin_user_id),
   KEY idx_module_name (module_name),
   KEY idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='操作日志表';
 
 -- Redis key 规划建议
 -- echoim:online:user:{userId}

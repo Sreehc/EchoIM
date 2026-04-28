@@ -10,4 +10,6 @@ public interface AuthService {
     RegisterResponseVo register(RegisterRequestDto requestDto);
 
     LoginResponseVo login(LoginRequestDto requestDto);
+
+    void changePassword(Long userId, String oldPassword, String newPassword);
 }

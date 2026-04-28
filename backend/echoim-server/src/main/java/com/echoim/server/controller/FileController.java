@@ -3,6 +3,7 @@ package com.echoim.server.controller;
 import com.echoim.server.common.ApiResponse;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
+import com.echoim.server.common.ratelimit.RateLimit;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.vo.file.FileDownloadVo;
 import com.echoim.server.vo.file.FileInfoVo;
@@ -22,6 +23,7 @@ public class FileController {
 
     @RequireLogin
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "file-upload", permits = 20, windowSeconds = 60, message = "上传过于频繁")
     public ApiResponse<FileInfoVo> upload(@RequestPart("file") MultipartFile file,
                                           @RequestParam(value = "bizType", required = false) Integer bizType) {
         return ApiResponse.success(fileService.upload(LoginUserContext.requireUserId(), file, bizType));

@@ -73,9 +73,17 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
                 default -> writeNotice(ctx, message, ErrorCode.PARAM_ERROR, "不支持的消息类型");
             }
         } catch (BizException ex) {
-            writeNotice(ctx, message, ex.getCode(), ex.getMessage());
+            if (message.getType() == WsMessageType.CHAT_SINGLE || message.getType() == WsMessageType.CHAT_GROUP) {
+                writeWsMessage(ctx, WsMessageType.ACK, message, failedSendAck(ex));
+            } else {
+                writeNotice(ctx, message, ex.getCode(), ex.getMessage());
+            }
         } catch (Exception ex) {
-            writeNotice(ctx, message, ErrorCode.SYSTEM_ERROR, ex.getMessage());
+            if (message.getType() == WsMessageType.CHAT_SINGLE || message.getType() == WsMessageType.CHAT_GROUP) {
+                writeWsMessage(ctx, WsMessageType.ACK, message, failedSendAck(new BizException(ErrorCode.SYSTEM_ERROR, ex.getMessage())));
+            } else {
+                writeNotice(ctx, message, ErrorCode.SYSTEM_ERROR, ex.getMessage());
+            }
         }
     }
 
@@ -125,6 +133,17 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
         data.put("code", code);
         data.put("message", message == null ? "系统异常" : message);
         writeWsMessage(ctx, WsMessageType.NOTICE, request, data);
+    }
+
+    private Map<String, Object> failedSendAck(BizException ex) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("ackType", "SEND");
+        data.put("status", "FAILED");
+        data.put("duplicate", false);
+        data.put("retryable", ex.getCode() == ErrorCode.SYSTEM_ERROR || ex.getCode() == ErrorCode.TOO_MANY_REQUESTS);
+        data.put("code", ex.getCode());
+        data.put("message", ex.getMessage());
+        return data;
     }
 
     private void writeWsMessage(ChannelHandlerContext ctx, WsMessageType type, WsMessage request, Object data) throws JsonProcessingException {

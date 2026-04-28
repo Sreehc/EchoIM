@@ -9,16 +9,16 @@
                c.conversation_type AS conversationType,
                CASE
                    WHEN c.conversation_type = 1 THEN COALESCE(NULLIF(f.remark, ''), other_u.nickname, c.conversation_name)
-                   WHEN c.conversation_type = 2 THEN COALESCE(g.group_name, c.conversation_name)
+                   WHEN c.conversation_type IN (2, 3) THEN COALESCE(g.group_name, c.conversation_name)
                    ELSE c.conversation_name
                END AS conversationName,
                CASE
                    WHEN c.conversation_type = 1 THEN COALESCE(other_u.avatar_url, c.avatar_url)
-                   WHEN c.conversation_type = 2 THEN COALESCE(g.avatar_url, c.avatar_url)
+                   WHEN c.conversation_type IN (2, 3) THEN COALESCE(g.avatar_url, c.avatar_url)
                    ELSE c.avatar_url
                END AS avatarUrl,
                CASE
-                   WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN (
+                   WHEN c.conversation_type IN (2, 3) AND current_gm.status != 1 THEN (
                        SELECT CASE m.msg_type
                                   WHEN 3 THEN '[图片]'
                                   WHEN 5 THEN '[文件]'
@@ -33,7 +33,7 @@
                    ELSE c.last_message_preview
                END AS lastMessagePreview,
                CASE
-                   WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN (
+                   WHEN c.conversation_type IN (2, 3) AND current_gm.status != 1 THEN (
                        SELECT m.sent_at
                        FROM im_message m
                        WHERE m.conversation_id = c.id
@@ -51,11 +51,11 @@
                    ELSE NULL
                END AS peerUserId,
                CASE
-                   WHEN c.conversation_type = 2 THEN c.biz_id
+                   WHEN c.conversation_type IN (2, 3) THEN c.biz_id
                    ELSE NULL
                END AS groupId,
                CASE
-                   WHEN c.conversation_type = 2 AND current_gm.status != 1 THEN COALESCE((
+                   WHEN c.conversation_type IN (2, 3) AND current_gm.status != 1 THEN COALESCE((
                        SELECT m.seq_no
                        FROM im_message m
                        WHERE m.conversation_id = c.id
@@ -64,7 +64,12 @@
                        LIMIT 1
                    ), 0)
                    ELSE COALESCE(lm.seq_no, 0)
-               END AS latestSeq
+               END AS latestSeq,
+               CASE
+                   WHEN c.conversation_type = 3 THEN COALESCE(current_gm.role = 1, FALSE)
+                   ELSE TRUE
+               END AS canSend,
+               current_gm.role AS myRole
     </sql>
 
     <sql id="ConversationItemJoins">
@@ -80,10 +85,10 @@
                ON f.user_id = #{userId}
               AND f.friend_user_id = other_u.id
         LEFT JOIN im_group g
-               ON c.conversation_type = 2
+               ON c.conversation_type IN (2, 3)
               AND g.id = c.biz_id
         LEFT JOIN im_group_member current_gm
-               ON c.conversation_type = 2
+               ON c.conversation_type IN (2, 3)
               AND current_gm.group_id = c.biz_id
               AND current_gm.user_id = #{userId}
     </sql>
@@ -102,13 +107,13 @@
         <include refid="ConversationItemColumns"/>
         <include refid="ConversationItemJoins"/>
         LEFT JOIN im_group_member gm
-               ON c.conversation_type = 2
+               ON c.conversation_type IN (2, 3)
               AND gm.group_id = c.biz_id
               AND gm.user_id = #{userId}
         WHERE cu.user_id = #{userId}
           AND cu.deleted = 0
           AND c.status = 1
-          AND (c.conversation_type != 2 OR gm.status = 1)
+          AND (c.conversation_type NOT IN (2, 3) OR gm.status = 1)
         ORDER BY cu.is_top DESC, c.last_message_time DESC, c.id DESC
     </select>
 
@@ -165,6 +170,25 @@
                updated_at AS updatedAt
         FROM im_conversation
         WHERE conversation_type = 2
+          AND biz_id = #{groupId}
+        LIMIT 1
+    </select>
+
+    <select id="selectChannelConversationByGroupId" resultType="com.echoim.server.entity.ImConversationEntity">
+        SELECT id,
+               conversation_type AS conversationType,
+               biz_key AS bizKey,
+               biz_id AS bizId,
+               conversation_name AS conversationName,
+               avatar_url AS avatarUrl,
+               last_message_id AS lastMessageId,
+               last_message_preview AS lastMessagePreview,
+               last_message_time AS lastMessageTime,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_conversation
+        WHERE conversation_type = 3
           AND biz_id = #{groupId}
         LIMIT 1
     </select>

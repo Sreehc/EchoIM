@@ -1,6 +1,9 @@
 package com.echoim.server.controller;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireLogin;
+import com.echoim.server.common.auth.LoginUserContext;
+import com.echoim.server.common.ratelimit.RateLimit;
 import com.echoim.server.dto.auth.LoginRequestDto;
 import com.echoim.server.dto.auth.RegisterRequestDto;
 import com.echoim.server.service.auth.AuthService;
@@ -27,6 +30,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @RateLimit(keyType = RateLimit.KeyType.IP, name = "auth-login", permits = 10, windowSeconds = 60, message = "登录过于频繁")
     public ApiResponse<LoginResponseVo> login(@Valid @RequestBody LoginRequestDto requestDto) {
         return ApiResponse.success(authService.login(requestDto));
     }
@@ -37,7 +41,9 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
+    @RequireLogin
     public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(LoginUserContext.requireUserId(), request.oldPassword(), request.newPassword());
         return ApiResponse.success();
     }
 

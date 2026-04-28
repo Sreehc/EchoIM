@@ -11,6 +11,8 @@ public class GroupDetailVo {
     private Integer status;
     private Long memberCount;
     private Integer myRole;
+    private Integer conversationType;
+    private Boolean canSend;
 
     public Long getGroupId() {
         return groupId;
@@ -82,5 +84,21 @@ public class GroupDetailVo {
 
     public void setMyRole(Integer myRole) {
         this.myRole = myRole;
+    }
+
+    public Integer getConversationType() {
+        return conversationType;
+    }
+
+    public void setConversationType(Integer conversationType) {
+        this.conversationType = conversationType;
+    }
+
+    public Boolean getCanSend() {
+        return canSend;
+    }
+
+    public void setCanSend(Boolean canSend) {
+        this.canSend = canSend;
     }
 }

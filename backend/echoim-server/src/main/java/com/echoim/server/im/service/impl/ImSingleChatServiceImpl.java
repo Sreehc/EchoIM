@@ -15,12 +15,14 @@ import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.model.WsReadData;
 import com.echoim.server.im.service.ImSingleChatService;
 import com.echoim.server.im.service.ImWsPushService;
+import com.echoim.server.common.ratelimit.LocalRateLimitService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.friend.FriendService;
+import com.echoim.server.service.message.MessageViewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -39,6 +41,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
     private static final int CONVERSATION_TYPE_SINGLE = 1;
     private static final int CONVERSATION_TYPE_GROUP = 2;
+    private static final int CONVERSATION_TYPE_CHANNEL = 3;
     private static final int CONVERSATION_STATUS_NORMAL = 1;
     private static final int MESSAGE_TYPE_TEXT = 1;
     private static final int MESSAGE_TYPE_IMAGE = 3;
@@ -60,6 +63,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private final ImWsPushService imWsPushService;
     private final FriendService friendService;
     private final FileService fileService;
+    private final MessageViewService messageViewService;
+    private final LocalRateLimitService localRateLimitService;
     private final ObjectMapper objectMapper;
 
     public ImSingleChatServiceImpl(ImConversationMapper imConversationMapper,
@@ -69,6 +74,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
                                    ImWsPushService imWsPushService,
                                    FriendService friendService,
                                    FileService fileService,
+                                   MessageViewService messageViewService,
+                                   LocalRateLimitService localRateLimitService,
                                    ObjectMapper objectMapper) {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
@@ -77,18 +84,21 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         this.imWsPushService = imWsPushService;
         this.friendService = friendService;
         this.fileService = fileService;
+        this.messageViewService = messageViewService;
+        this.localRateLimitService = localRateLimitService;
         this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
     public Map<String, Object> sendSingle(LoginUser loginUser, WsMessage message) {
+        localRateLimitService.check("ws-single-send:" + loginUser.getUserId(), 120, 60, "发送过于频繁");
         WsChatSingleData data = objectMapper.convertValue(message.getData(), WsChatSingleData.class);
         validateChatRequest(message, data);
 
         ImMessageEntity duplicate = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
         if (duplicate != null) {
-            WsMessageItem duplicateItem = toWsMessageItem(duplicate);
+            WsMessageItem duplicateItem = toWsMessageItem(duplicate, loginUser.getUserId());
             fileService.enrichWsMessage(loginUser.getUserId(), duplicateItem);
             return sendAckData(duplicateItem, true);
         }
@@ -110,7 +120,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         } catch (DuplicateKeyException ex) {
             ImMessageEntity existing = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
             if (existing != null) {
-                WsMessageItem existingItem = toWsMessageItem(existing);
+                WsMessageItem existingItem = toWsMessageItem(existing, loginUser.getUserId());
                 fileService.enrichWsMessage(loginUser.getUserId(), existingItem);
                 return sendAckData(existingItem, true);
             }
@@ -121,9 +131,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         imConversationUserMapper.incrementUnread(conversation.getId(), data.getToUserId());
         imConversationMapper.updateLastMessage(conversation.getId(), entity.getId(), preview(entity, messageFile));
 
-        WsMessageItem senderItem = toWsMessageItem(entity);
+        WsMessageItem senderItem = toWsMessageItem(entity, loginUser.getUserId());
         fileService.enrichWsMessage(loginUser.getUserId(), senderItem);
-        WsMessageItem receiverItem = toWsMessageItem(entity);
+        WsMessageItem receiverItem = toWsMessageItem(entity, data.getToUserId());
         fileService.enrichWsMessage(data.getToUserId(), receiverItem);
         pushSingleMessage(data.getToUserId(), message, receiverItem);
         pushConversationChange(loginUser.getUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, senderItem);
@@ -168,6 +178,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         ImConversationEntity conversation = imConversationMapper.selectByIdForUpdate(conversationId);
         validateConversationForRead(conversation);
         ImConversationUserEntity member = requireMember(conversation.getId(), userId);
+        long previousLastReadSeq = member.getLastReadSeq() == null ? 0L : member.getLastReadSeq();
         long effectiveLastReadSeq = Math.max(member.getLastReadSeq() == null ? 0L : member.getLastReadSeq(), lastReadSeq);
 
         imConversationUserMapper.updateReadState(conversation.getId(), userId, effectiveLastReadSeq);
@@ -177,6 +188,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
             imMessageReceiptMapper.insertReadReceiptsUpToSeq(conversation.getId(), userId, effectiveLastReadSeq, RECEIPT_TYPE_READ);
             otherMemberId(conversation.getId(), userId)
                     .ifPresent(targetUserId -> imWsPushService.pushToUser(targetUserId, WsMessageType.READ, traceId, clientMsgId, readData));
+        } else if (Integer.valueOf(CONVERSATION_TYPE_CHANNEL).equals(conversation.getConversationType())
+                && effectiveLastReadSeq > previousLastReadSeq) {
+            pushChannelReadUpdates(conversation, userId, previousLastReadSeq, effectiveLastReadSeq);
         }
         pushConversationChange(userId, conversation.getId(), CHANGE_TYPE_READ_UPDATE, null);
         return readData;
@@ -210,7 +224,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
             throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
         }
         if (!Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(conversation.getConversationType())
-                && !Integer.valueOf(CONVERSATION_TYPE_GROUP).equals(conversation.getConversationType())) {
+                && !Integer.valueOf(CONVERSATION_TYPE_GROUP).equals(conversation.getConversationType())
+                && !Integer.valueOf(CONVERSATION_TYPE_CHANNEL).equals(conversation.getConversationType())) {
             throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
         }
     }
@@ -335,7 +350,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     }
 
     private Map<String, Object> sendAckData(ImMessageEntity entity, boolean duplicate) {
-        return sendAckData(toWsMessageItem(entity), duplicate);
+        return sendAckData(toWsMessageItem(entity, entity.getFromUserId()), duplicate);
     }
 
     private Map<String, Object> sendAckData(WsMessageItem item, boolean duplicate) {
@@ -367,10 +382,11 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         return data;
     }
 
-    private WsMessageItem toWsMessageItem(ImMessageEntity entity) {
+    private WsMessageItem toWsMessageItem(ImMessageEntity entity, Long viewerUserId) {
         WsMessageItem item = new WsMessageItem();
         item.setMessageId(entity.getId());
         item.setConversationId(entity.getConversationId());
+        item.setConversationType(entity.getConversationType());
         item.setSeqNo(entity.getSeqNo());
         item.setClientMsgId(entity.getClientMsgId());
         item.setFromUserId(entity.getFromUserId());
@@ -381,7 +397,47 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         item.setFileId(entity.getFileId());
         item.setSendStatus(entity.getSendStatus());
         item.setSentAt(entity.getSentAt());
+        messageViewService.enrichWsMessage(viewerUserId, item, entity);
         return item;
+    }
+
+    private void pushChannelReadUpdates(ImConversationEntity conversation,
+                                        Long readerUserId,
+                                        Long previousLastReadSeq,
+                                        Long effectiveLastReadSeq) {
+        List<com.echoim.server.vo.conversation.MessageItemVo> affectedMessages =
+                imMessageMapper.selectMessageAfterSeqByConversationIdAndUserId(
+                        conversation.getId(),
+                        readerUserId,
+                        previousLastReadSeq,
+                        Math.toIntExact(Math.max(1L, effectiveLastReadSeq - previousLastReadSeq))
+                );
+        if (affectedMessages.isEmpty()) {
+            return;
+        }
+
+        List<com.echoim.server.vo.conversation.MessageItemVo> creatorMessages = affectedMessages.stream()
+                .filter(message -> !readerUserId.equals(message.getFromUserId()))
+                .toList();
+        if (creatorMessages.isEmpty()) {
+            return;
+        }
+
+        List<Long> ownerUserIds = creatorMessages.stream()
+                .map(com.echoim.server.vo.conversation.MessageItemVo::getFromUserId)
+                .filter(userId -> userId != null && userId > 0)
+                .distinct()
+                .toList();
+        for (Long ownerUserId : ownerUserIds) {
+            for (com.echoim.server.vo.conversation.MessageItemVo affectedMessage : creatorMessages) {
+                ImMessageEntity entity = imMessageMapper.selectById(affectedMessage.getMessageId());
+                if (entity == null) {
+                    continue;
+                }
+                WsMessageItem messageItem = toWsMessageItem(entity, ownerUserId);
+                pushConversationChange(ownerUserId, conversation.getId(), CHANGE_TYPE_READ_UPDATE, messageItem);
+            }
+        }
     }
 
     private void pushSingleMessage(Long toUserId, WsMessage request, WsMessageItem item) {

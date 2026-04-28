@@ -16,6 +16,8 @@ public class ConversationItemVo {
     private Long peerUserId;
     private Long groupId;
     private Long latestSeq;
+    private Boolean canSend;
+    private Integer myRole;
 
     public Long getConversationId() {
         return conversationId;
@@ -111,5 +113,21 @@ public class ConversationItemVo {
 
     public void setLatestSeq(Long latestSeq) {
         this.latestSeq = latestSeq;
+    }
+
+    public Boolean getCanSend() {
+        return canSend;
+    }
+
+    public void setCanSend(Boolean canSend) {
+        this.canSend = canSend;
+    }
+
+    public Integer getMyRole() {
+        return myRole;
+    }
+
+    public void setMyRole(Integer myRole) {
+        this.myRole = myRole;
     }
 }

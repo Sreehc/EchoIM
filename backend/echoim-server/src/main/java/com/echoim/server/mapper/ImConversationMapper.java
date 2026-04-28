@@ -26,9 +26,16 @@ public interface ImConversationMapper extends BaseMapper<ImConversationEntity> {
 
     ImConversationEntity selectGroupConversationByGroupId(@Param("groupId") Long groupId);
 
+    ImConversationEntity selectChannelConversationByGroupId(@Param("groupId") Long groupId);
+
     ImConversationEntity selectByIdForUpdate(@Param("conversationId") Long conversationId);
 
     void updateLastMessage(@Param("conversationId") Long conversationId,
                            @Param("lastMessageId") Long lastMessageId,
                            @Param("lastMessagePreview") String lastMessagePreview);
+
+    void updateLastMessageState(@Param("conversationId") Long conversationId,
+                                @Param("lastMessageId") Long lastMessageId,
+                                @Param("lastMessagePreview") String lastMessagePreview,
+                                @Param("lastMessageTime") java.time.LocalDateTime lastMessageTime);
 }

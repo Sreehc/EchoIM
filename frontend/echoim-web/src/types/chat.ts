@@ -43,7 +43,7 @@ export interface AuthSession {
   userInfo: UserInfo
 }
 
-export type ConversationType = 1 | 2
+export type ConversationType = 1 | 2 | 3
 export type MessageType = 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM'
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'ready' | 'reconnecting'
 
@@ -68,6 +68,8 @@ export interface ConversationSummary {
   peerUserId: number | null
   groupId: number | null
   latestSeq: number
+  canSend: boolean
+  myRole: number | null
 }
 
 export interface ChatFile {
@@ -86,6 +88,7 @@ export interface ChatFile {
 export interface ChatMessage {
   messageId: number
   conversationId: number
+  conversationType: ConversationType
   seqNo: number
   clientMsgId: string
   fromUserId: number
@@ -105,6 +108,7 @@ export interface ChatMessage {
   deliveredAt?: string | null
   read?: boolean
   readAt?: string | null
+  viewCount?: number
   forwardSource?: MessageForwardSource | null
   errorMessage?: string | null
 }

@@ -1,13 +1,16 @@
 package com.echoim.server.vo.conversation;
 
+import com.echoim.server.vo.message.MessageForwardSourceVo;
 import java.time.LocalDateTime;
 
 import com.echoim.server.vo.file.FileInfoVo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class MessageItemVo {
 
     private Long messageId;
     private Long conversationId;
+    private Integer conversationType;
     private Long seqNo;
     private String clientMsgId;
     private Long fromUserId;
@@ -19,6 +22,18 @@ public class MessageItemVo {
     private FileInfoVo file;
     private Integer sendStatus;
     private LocalDateTime sentAt;
+    private Boolean recalled;
+    private LocalDateTime recalledAt;
+    private Boolean edited;
+    private LocalDateTime editedAt;
+    private Boolean delivered;
+    private LocalDateTime deliveredAt;
+    private Boolean read;
+    private LocalDateTime readAt;
+    private Integer viewCount;
+    private MessageForwardSourceVo forwardSource;
+    @JsonIgnore
+    private String extraJsonRaw;
 
     public Long getMessageId() {
         return messageId;
@@ -34,6 +49,14 @@ public class MessageItemVo {
 
     public void setConversationId(Long conversationId) {
         this.conversationId = conversationId;
+    }
+
+    public Integer getConversationType() {
+        return conversationType;
+    }
+
+    public void setConversationType(Integer conversationType) {
+        this.conversationType = conversationType;
     }
 
     public Long getSeqNo() {
@@ -122,5 +145,93 @@ public class MessageItemVo {
 
     public void setSentAt(LocalDateTime sentAt) {
         this.sentAt = sentAt;
+    }
+
+    public Boolean getRecalled() {
+        return recalled;
+    }
+
+    public void setRecalled(Boolean recalled) {
+        this.recalled = recalled;
+    }
+
+    public LocalDateTime getRecalledAt() {
+        return recalledAt;
+    }
+
+    public void setRecalledAt(LocalDateTime recalledAt) {
+        this.recalledAt = recalledAt;
+    }
+
+    public Boolean getEdited() {
+        return edited;
+    }
+
+    public void setEdited(Boolean edited) {
+        this.edited = edited;
+    }
+
+    public LocalDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    public void setEditedAt(LocalDateTime editedAt) {
+        this.editedAt = editedAt;
+    }
+
+    public Boolean getDelivered() {
+        return delivered;
+    }
+
+    public void setDelivered(Boolean delivered) {
+        this.delivered = delivered;
+    }
+
+    public LocalDateTime getDeliveredAt() {
+        return deliveredAt;
+    }
+
+    public void setDeliveredAt(LocalDateTime deliveredAt) {
+        this.deliveredAt = deliveredAt;
+    }
+
+    public Boolean getRead() {
+        return read;
+    }
+
+    public void setRead(Boolean read) {
+        this.read = read;
+    }
+
+    public LocalDateTime getReadAt() {
+        return readAt;
+    }
+
+    public void setReadAt(LocalDateTime readAt) {
+        this.readAt = readAt;
+    }
+
+    public Integer getViewCount() {
+        return viewCount;
+    }
+
+    public void setViewCount(Integer viewCount) {
+        this.viewCount = viewCount;
+    }
+
+    public MessageForwardSourceVo getForwardSource() {
+        return forwardSource;
+    }
+
+    public void setForwardSource(MessageForwardSourceVo forwardSource) {
+        this.forwardSource = forwardSource;
+    }
+
+    public String getExtraJsonRaw() {
+        return extraJsonRaw;
+    }
+
+    public void setExtraJsonRaw(String extraJsonRaw) {
+        this.extraJsonRaw = extraJsonRaw;
     }
 }

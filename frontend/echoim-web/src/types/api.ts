@@ -57,6 +57,8 @@ export interface ApiGroupDetail {
   status: number | null
   memberCount: number | null
   myRole: number | null
+  conversationType: ConversationType | null
+  canSend: boolean | null
 }
 
 export interface ApiConversationItem {
@@ -72,11 +74,14 @@ export interface ApiConversationItem {
   peerUserId: number | null
   groupId: number | null
   latestSeq: number | null
+  canSend: boolean | null
+  myRole: number | null
 }
 
 export interface ApiMessageItem {
   messageId: number
   conversationId: number
+  conversationType: ConversationType
   seqNo: number
   clientMsgId: string
   fromUserId: number
@@ -96,6 +101,7 @@ export interface ApiMessageItem {
   deliveredAt?: string | null
   read?: boolean | null
   readAt?: string | null
+  viewCount?: number | null
   forwardSource?: MessageForwardSource | null
 }
 

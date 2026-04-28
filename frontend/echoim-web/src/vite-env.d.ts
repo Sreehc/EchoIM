@@ -14,6 +14,7 @@ interface Window {
   __ECHOIM_E2E__?: {
     getConnectionStatus: () => string
     getActiveConversationId: () => number | null
+    getLeftPanelMode: () => 'conversations' | 'me' | 'settings'
     listConversations: () => Array<{
       conversationId: number
       conversationName: string
@@ -23,6 +24,7 @@ interface Window {
       unreadCount: number
     }>
     openConversation: (conversationId: number) => Promise<void>
+    openLeftPanel: (mode: 'conversations' | 'me' | 'settings') => void
     dropRealtimeConnection: (pauseReconnect?: boolean) => void
     reconnectRealtime: () => Promise<void>
     getErrors: () => Record<string, string | null>

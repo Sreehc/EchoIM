@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
@@ -12,6 +12,8 @@ import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
 import type { ChangePasswordPayload, ChatMessage, LeftPanelMode, UpdateCurrentUserProfilePayload } from '@/types/chat'
 
+type ConversationActionCommand = 'open-tab' | 'mark-unread' | 'toggle-top' | 'toggle-mute' | 'archive' | 'delete'
+
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const uiStore = useUiStore()
@@ -20,6 +22,10 @@ const router = useRouter()
 const editingMessageId = ref<number | null>(null)
 const editingMessageDraft = ref('')
 const messageActionPendingId = ref<number | null>(null)
+const messageSearchOpen = ref(false)
+const messageSearchQuery = ref('')
+const messageSearchMatchCount = ref(0)
+const activeMessageSearchIndex = ref(0)
 
 const shouldShowConversationList = computed(() => !uiStore.isMobile || uiStore.mobileView === 'list')
 const shouldShowMainPanel = computed(() => !uiStore.isMobile || uiStore.mobileView === 'chat')
@@ -109,6 +115,7 @@ watch(
   () => chatStore.activeConversationId,
   () => {
     cancelMessageEditing()
+    closeMessageSearch()
   },
 )
 
@@ -190,6 +197,14 @@ async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 
   const conversationId = chatStore.activeConversationId
   if (!conversationId) return
 
+  await runConversationAction(command, conversationId)
+  uiStore.setTopbarMenuOpen(false)
+}
+
+async function runConversationAction(
+  command: 'toggle-top' | 'toggle-mute' | 'mark-read' | 'delete',
+  conversationId: number,
+) {
   try {
     if (command === 'toggle-top') {
       await chatStore.toggleConversationTop(conversationId)
@@ -211,24 +226,72 @@ async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 
   } catch {
     return
   }
+}
 
-  uiStore.setTopbarMenuOpen(false)
+async function handleConversationContextAction(payload: { command: ConversationActionCommand; conversationId: number }) {
+  if (payload.command === 'open-tab') {
+    const target = router.resolve({ name: 'chat-home', params: { conversationId: payload.conversationId } })
+    window.open(target.href, '_blank', 'noopener')
+    return
+  }
+
+  if (payload.command === 'mark-unread') {
+    chatStore.markConversationUnreadLocally(payload.conversationId)
+    if (chatStore.activeConversationId === payload.conversationId) {
+      chatStore.clearActiveConversation()
+      uiStore.setProfileOpen(false)
+      uiStore.setMobileView('list')
+      await router.push('/chat')
+    }
+    return
+  }
+
+  if (payload.command === 'archive') {
+    chatStore.archiveConversationLocally(payload.conversationId)
+    if (chatStore.activeConversationId === payload.conversationId) {
+      uiStore.setProfileOpen(false)
+      uiStore.setMobileView('list')
+      await router.push('/chat')
+    }
+    return
+  }
+
+  await runConversationAction(payload.command, payload.conversationId)
 }
 
 function handleFocusSearch() {
+  if (!chatStore.activeConversation) return
+
   uiStore.setGlobalMenuOpen(false)
   uiStore.setTopbarMenuOpen(false)
-  uiStore.returnToConversationList()
+  messageSearchOpen.value = true
+}
 
-  if (uiStore.isMobile && chatStore.activeConversationId) {
-    chatStore.clearActiveConversation()
-    uiStore.setMobileView('list')
-    router.push('/chat')
+function closeMessageSearch() {
+  messageSearchOpen.value = false
+  messageSearchQuery.value = ''
+  messageSearchMatchCount.value = 0
+  activeMessageSearchIndex.value = 0
+}
+
+function cycleMessageSearch(step: -1 | 1) {
+  if (!messageSearchMatchCount.value) return
+
+  activeMessageSearchIndex.value =
+    (activeMessageSearchIndex.value + step + messageSearchMatchCount.value) % messageSearchMatchCount.value
+}
+
+function handleMessageSearchCountUpdate(value: number) {
+  messageSearchMatchCount.value = value
+
+  if (!value) {
+    activeMessageSearchIndex.value = 0
+    return
   }
 
-  nextTick(() => {
-    uiStore.requestSidebarSearchFocus()
-  })
+  if (activeMessageSearchIndex.value >= value) {
+    activeMessageSearchIndex.value = 0
+  }
 }
 
 async function handleRetry() {
@@ -315,10 +378,19 @@ async function handleRecallMessage(messageId: number) {
 
 function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape') return
+  if (messageSearchOpen.value) {
+    closeMessageSearch()
+    event.preventDefault()
+    return
+  }
   if (uiStore.closeFloatingUi()) {
     event.preventDefault()
   }
 }
+
+watch(messageSearchQuery, () => {
+  activeMessageSearchIndex.value = 0
+})
 
 function dismissTransientBanner() {
   chatStore.clearNoticeMessage()
@@ -401,6 +473,7 @@ function registerDebugHooks() {
       @change-password="changePassword"
       @clear-profile-error="authStore.clearProfileError"
       @clear-profile-notice="authStore.clearProfileNotice"
+      @conversation-action="handleConversationContextAction"
       @logout="handleLogout"
     />
 
@@ -411,8 +484,15 @@ function registerDebugHooks() {
           :profile="chatStore.activeProfile"
           :is-mobile="uiStore.isMobile"
           :menu-open="uiStore.topbarMenuOpen"
+          :message-search-open="messageSearchOpen"
+          :message-search-query="messageSearchQuery"
+          :message-search-match-count="messageSearchMatchCount"
+          :active-message-search-index="activeMessageSearchIndex"
           @back="handleBack"
           @focus-search="handleFocusSearch"
+          @close-search="closeMessageSearch"
+          @navigate-search-match="cycleMessageSearch"
+          @update:message-search-query="messageSearchQuery = $event"
           @action="handleConversationAction"
           @update:menu-open="uiStore.setTopbarMenuOpen"
           @open-profile="openProfile"
@@ -445,9 +525,12 @@ function registerDebugHooks() {
             :editing-message-id="editingMessageId"
             :editing-draft="editingMessageDraft"
             :message-action-pending-id="messageActionPendingId"
+            :search-query="messageSearchQuery"
+            :active-match-index="activeMessageSearchIndex"
             @retry="chatStore.loadConversationMessages(chatStore.activeConversation.conversationId, true)"
             @load-older="handleLoadOlderMessages"
             @retry-message="chatStore.retryMessage"
+            @update:search-match-count="handleMessageSearchCountUpdate"
             @start-edit-message="startEditingMessage"
             @update:editing-draft="editingMessageDraft = $event"
             @cancel-edit-message="cancelMessageEditing"
@@ -456,6 +539,12 @@ function registerDebugHooks() {
           />
           <MessageComposer
             :enter-to-send="uiStore.chatPreferences.enterToSend"
+            :can-send="chatStore.activeConversation.canSend"
+            :disabled-reason="
+              chatStore.activeConversation.conversationType === 3
+                ? '仅频道创建者可发送消息'
+                : '当前会话暂不可发送消息'
+            "
             @send="chatStore.sendMessage({ currentUserId: authStore.currentUser?.userId ?? 0, content: $event })"
           />
         </div>
@@ -482,8 +571,8 @@ function registerDebugHooks() {
 <style scoped>
 .chat-page {
   display: grid;
-  grid-template-columns: 404px minmax(0, 1fr);
-  gap: 0;
+  grid-template-columns: 388px minmax(0, 1fr);
+  gap: 10px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -500,8 +589,10 @@ function registerDebugHooks() {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--color-line);
-  background: var(--color-bg-surface);
+  border: 1px solid var(--color-shell-border);
+  border-radius: 28px;
+  background: var(--color-shell-panel);
+  box-shadow: var(--shadow-panel);
   overflow: hidden;
 }
 
@@ -534,7 +625,7 @@ function registerDebugHooks() {
 .chat-page__stage::after {
   background:
     linear-gradient(180deg, var(--color-chat-stage-top), transparent 18%),
-    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 24%),
+    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 26%),
     radial-gradient(circle at top right, var(--color-chat-stage-glow), transparent 38%);
 }
 
@@ -545,23 +636,23 @@ function registerDebugHooks() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 18px;
-  border-bottom: 1px solid var(--color-line);
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--color-shell-border);
   color: var(--color-text-2);
   font-size: 0.78rem;
-  background: rgba(33, 33, 33, 0.92);
+  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
 }
 
 .chat-page__banner.is-warning {
-  background: color-mix(in srgb, var(--color-warning) 9%, var(--color-bg-surface));
+  background: color-mix(in srgb, var(--color-warning) 9%, var(--color-shell-card));
 }
 
 .chat-page__banner.is-error {
-  background: color-mix(in srgb, var(--color-danger) 9%, var(--color-bg-surface));
+  background: color-mix(in srgb, var(--color-danger) 9%, var(--color-shell-card));
 }
 
 .chat-page__banner.is-muted {
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg-surface));
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-shell-card));
 }
 
 .chat-page__banner button {
@@ -576,7 +667,7 @@ function registerDebugHooks() {
   min-height: 0;
   position: relative;
   background:
-    linear-gradient(180deg, rgba(10, 10, 16, 0.28), transparent 16%),
+    linear-gradient(180deg, rgba(10, 10, 16, 0.18), transparent 16%),
     var(--color-chat-stage-base);
 }
 
@@ -616,7 +707,7 @@ function registerDebugHooks() {
 
 @media (max-width: 1279px) {
   .chat-page {
-    grid-template-columns: 356px minmax(0, 1fr);
+    grid-template-columns: 348px minmax(0, 1fr);
   }
 }
 
@@ -629,6 +720,7 @@ function registerDebugHooks() {
   .chat-page__sidebar,
   .chat-page__main {
     border-inline: 0;
+    border-radius: 0;
   }
 
 }

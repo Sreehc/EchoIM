@@ -17,4 +17,38 @@
           AND seq_no &lt;= #{lastReadSeq}
           AND from_user_id != #{userId}
     </insert>
+
+    <select id="selectReceiptStatsByMessageIds" resultType="com.echoim.server.vo.message.MessageReceiptStatVo">
+        SELECT mr.message_id AS messageId,
+               MAX(CASE WHEN mr.receipt_type = 1 THEN mr.receipt_at END) AS deliveredAt,
+               MAX(CASE WHEN mr.receipt_type = 2 THEN mr.receipt_at END) AS readAt
+        FROM im_message_receipt mr
+        WHERE mr.message_id IN
+        <foreach collection="messageIds" item="messageId" open="(" close=")" separator=",">
+            #{messageId}
+        </foreach>
+        GROUP BY mr.message_id
+    </select>
+
+    <select id="selectChannelViewStatsByMessageIds" resultType="com.echoim.server.vo.message.MessageReceiptStatVo">
+        SELECT m.id AS messageId,
+               COUNT(cu.user_id) AS viewCount
+        FROM im_message m
+        JOIN im_conversation c ON c.id = m.conversation_id
+        JOIN im_conversation_user cu
+          ON cu.conversation_id = m.conversation_id
+         AND cu.deleted = 0
+         AND cu.last_read_seq &gt;= m.seq_no
+         AND cu.user_id != m.from_user_id
+        JOIN im_group_member gm
+          ON gm.group_id = c.biz_id
+         AND gm.user_id = cu.user_id
+         AND gm.status = 1
+        WHERE c.conversation_type = 3
+          AND m.id IN
+        <foreach collection="messageIds" item="messageId" open="(" close=")" separator=",">
+            #{messageId}
+        </foreach>
+        GROUP BY m.id
+    </select>
 </mapper>

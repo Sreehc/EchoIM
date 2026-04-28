@@ -37,4 +37,7 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
 
     ImMessageEntity selectByFromUserIdAndClientMsgId(@Param("fromUserId") Long fromUserId,
                                                      @Param("clientMsgId") String clientMsgId);
+
+    ImMessageEntity selectAccessibleEntityByIdAndUserId(@Param("messageId") Long messageId,
+                                                        @Param("userId") Long userId);
 }

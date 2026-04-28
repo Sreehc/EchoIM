@@ -14,6 +14,7 @@ import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.im.service.ImSingleChatService;
 import com.echoim.server.service.conversation.ConversationService;
 import com.echoim.server.service.file.FileService;
+import com.echoim.server.service.message.MessageViewService;
 import com.echoim.server.vo.conversation.ConversationItemVo;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import org.springframework.stereotype.Service;
@@ -29,17 +30,20 @@ public class ConversationServiceImpl implements ConversationService {
     private final ImMessageMapper imMessageMapper;
     private final ImSingleChatService imSingleChatService;
     private final FileService fileService;
+    private final MessageViewService messageViewService;
 
     public ConversationServiceImpl(ImConversationMapper imConversationMapper,
                                    ImConversationUserMapper imConversationUserMapper,
                                    ImMessageMapper imMessageMapper,
                                    ImSingleChatService imSingleChatService,
-                                   FileService fileService) {
+                                   FileService fileService,
+                                   MessageViewService messageViewService) {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imMessageMapper = imMessageMapper;
         this.imSingleChatService = imSingleChatService;
         this.fileService = fileService;
+        this.messageViewService = messageViewService;
     }
 
     @Override
@@ -81,6 +85,7 @@ public class ConversationServiceImpl implements ConversationService {
             total = imMessageMapper.countMessageByConversationIdAndUserId(conversationId, userId);
         }
         fileService.enrichMessages(userId, list);
+        messageViewService.enrichMessages(userId, list);
         return new PageResponse<>(list, pageNo, pageSize, total);
     }
 

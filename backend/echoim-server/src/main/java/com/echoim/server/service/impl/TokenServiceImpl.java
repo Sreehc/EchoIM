@@ -9,8 +9,10 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.WeakKeyException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +27,15 @@ public class TokenServiceImpl implements TokenService {
 
     public TokenServiceImpl(JwtProperties jwtProperties) {
         this.jwtProperties = jwtProperties;
-        this.secretKey = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+        String secret = jwtProperties.getSecret();
+        if (!StringUtils.hasText(secret)) {
+            throw new IllegalStateException("JWT secret 未配置，请设置 ECHOIM_JWT_SECRET 或在 application-local.yml 中配置 echoim.jwt.secret");
+        }
+        try {
+            this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        } catch (WeakKeyException ex) {
+            throw new IllegalStateException("JWT secret 长度不足，至少需要 32 个字符", ex);
+        }
     }
 
     @Override

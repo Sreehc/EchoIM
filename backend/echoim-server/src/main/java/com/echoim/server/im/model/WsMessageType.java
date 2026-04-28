@@ -8,6 +8,8 @@ public enum WsMessageType {
     CHAT_GROUP,
     ACK,
     READ,
+    MESSAGE_RECALL,
+    MESSAGE_EDIT,
     NOTICE,
     CONVERSATION_CHANGE,
     FORCE_OFFLINE,

@@ -7,9 +7,9 @@ const props = withDefaults(
     name?: string | null
     seed?: string | number | null
     avatarUrl?: string | null
-    size?: 'sm' | 'md' | 'lg'
+    size?: 'sm' | 'md' | 'lg' | 'xl'
     online?: boolean
-    type?: 'user' | 'group'
+    type?: 'user' | 'group' | 'channel'
   }>(),
   {
     name: '',
@@ -23,7 +23,11 @@ const props = withDefaults(
 
 const initials = computed(() => {
   const source = props.name?.trim() ?? ''
-  if (!source) return props.type === 'group' ? '群' : ''
+  if (!source) {
+    if (props.type === 'group') return '群'
+    if (props.type === 'channel') return '频'
+    return ''
+  }
   return source.slice(0, 1).toUpperCase()
 })
 
@@ -44,7 +48,7 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
     <img v-if="avatarUrl" :src="avatarUrl" :alt="name || 'avatar'" class="avatar-badge__image" />
     <template v-else>
       <span v-if="initials" class="avatar-badge__initials">{{ initials }}</span>
-      <component :is="type === 'group' ? UserFilled : User" v-else class="avatar-badge__icon" />
+      <component :is="type === 'user' ? User : UserFilled" v-else class="avatar-badge__icon" />
     </template>
     <span v-if="online" class="avatar-badge__online"></span>
   </div>
@@ -57,11 +61,12 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--color-line) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-line) 70%, transparent);
   color: #fff;
   font-family: var(--font-display);
   font-weight: 700;
   flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .avatar-badge.size-sm {
@@ -80,6 +85,12 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
   width: 44px;
   height: 44px;
   font-size: 0.92rem;
+}
+
+.avatar-badge.size-xl {
+  width: 52px;
+  height: 52px;
+  font-size: 0.98rem;
 }
 
 .avatar-badge__image {
@@ -109,24 +120,30 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
   background: var(--color-online);
 }
 
+.avatar-badge.size-xl .avatar-badge__online {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+}
+
 .type-user.tone-0 {
-  background: linear-gradient(135deg, #8fa2ba 0%, #73849c 100%);
+  background: linear-gradient(135deg, #97abc1 0%, #75879d 100%);
 }
 
 .type-user.tone-1 {
-  background: linear-gradient(135deg, #90aabf 0%, #738ba0 100%);
+  background: linear-gradient(135deg, #96afc3 0%, #768ea2 100%);
 }
 
 .type-user.tone-2 {
-  background: linear-gradient(135deg, #8fa89f 0%, #70867f 100%);
+  background: linear-gradient(135deg, #95ada5 0%, #718781 100%);
 }
 
 .type-user.tone-3 {
-  background: linear-gradient(135deg, #9d9bc0 0%, #7f7ea1 100%);
+  background: linear-gradient(135deg, #a3a1c4 0%, #7f7ea1 100%);
 }
 
 .type-user.tone-4 {
-  background: linear-gradient(135deg, #9da3ac 0%, #7f8690 100%);
+  background: linear-gradient(135deg, #a4abb3 0%, #818892 100%);
 }
 
 .type-group.tone-0 {
@@ -147,5 +164,25 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
 
 .type-group.tone-4 {
   background: linear-gradient(135deg, #737983 0%, #5e656f 100%);
+}
+
+.type-channel.tone-0 {
+  background: linear-gradient(135deg, #56799d 0%, #3f5f83 100%);
+}
+
+.type-channel.tone-1 {
+  background: linear-gradient(135deg, #4d7692 0%, #3d6077 100%);
+}
+
+.type-channel.tone-2 {
+  background: linear-gradient(135deg, #547b88 0%, #41626d 100%);
+}
+
+.type-channel.tone-3 {
+  background: linear-gradient(135deg, #5f7198 0%, #485982 100%);
+}
+
+.type-channel.tone-4 {
+  background: linear-gradient(135deg, #546f86 0%, #415969 100%);
 }
 </style>

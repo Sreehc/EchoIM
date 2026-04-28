@@ -13,22 +13,33 @@ onMounted(() => {
 <template>
   <div class="chat-shell">
     <div class="chat-shell__backdrop"></div>
-    <a href="#chat-main" class="skip-link">跳到主内容</a>
-    <RouterView />
+    <nav class="skip-nav" aria-label="辅助跳转">
+      <a href="#chat-main" class="skip-link">跳到主内容</a>
+    </nav>
+    <div class="chat-shell__content">
+      <RouterView />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .chat-shell {
   position: relative;
-  min-height: 100dvh;
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-bg-app);
 }
 
 .chat-shell__backdrop {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%);
+  background:
+    radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 22%),
+    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--color-shell-glow) 70%, transparent), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 20%);
   pointer-events: none;
 }
 
@@ -37,10 +48,17 @@ onMounted(() => {
   left: 24px;
   top: -48px;
   z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   padding: 10px 14px;
   border-radius: 999px;
-  background: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 84%, white);
   color: #fff;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  line-height: 1;
   transition: top var(--motion-fast) ease;
 }
 
@@ -48,8 +66,21 @@ onMounted(() => {
   top: 16px;
 }
 
+.skip-nav {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 10;
+}
+
+.chat-shell__content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+}
+
 @media (max-width: 767px) {
-  .chat-shell {
+  .chat-shell__content {
     padding: 0;
   }
 }

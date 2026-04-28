@@ -30,8 +30,15 @@ const emit = defineEmits<{
   min-height: 100%;
   display: grid;
   place-content: center;
-  gap: 10px;
+  gap: 12px;
   justify-items: center;
+  padding: 26px 22px;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 24px;
+  background: var(--color-shell-card);
+  box-shadow:
+    var(--shadow-inset-soft),
+    var(--shadow-card);
   text-align: center;
   color: var(--color-text-2);
 }
@@ -41,16 +48,15 @@ const emit = defineEmits<{
 }
 
 .state-panel__eyebrow {
-  color: var(--color-text-soft);
-  font: 600 0.68rem/1 var(--font-mono);
+  color: var(--color-shell-eyebrow);
+  font: var(--font-eyebrow);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
 }
 
 .state-panel strong {
   color: var(--color-text-1);
-  font-size: 0.96rem;
-  line-height: 1.15;
+  font: var(--font-title-sm);
 }
 
 .state-panel p {
@@ -61,11 +67,11 @@ const emit = defineEmits<{
 }
 
 .state-panel__action {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--color-line);
+  min-height: var(--control-height-sm);
+  padding: 0 16px;
+  border: 1px solid var(--color-shell-border);
   border-radius: 999px;
-  background: var(--color-bg-elevated);
+  background: var(--color-shell-action);
   color: var(--color-text-1);
   font-size: 0.84rem;
   font-weight: 600;
@@ -73,7 +79,7 @@ const emit = defineEmits<{
 
 .state-panel__action:hover,
 .state-panel__action:focus-visible {
-  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-line));
-  background: var(--color-selected);
+  border-color: var(--color-shell-border-strong);
+  background: var(--color-shell-action-hover);
 }
 </style>

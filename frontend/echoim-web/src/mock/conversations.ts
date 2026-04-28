@@ -14,6 +14,8 @@ export const mockConversations: ConversationSummary[] = [
     peerUserId: 10002,
     groupId: null,
     latestSeq: 126,
+    canSend: true,
+    myRole: null,
   },
   {
     conversationId: 30002,
@@ -28,6 +30,8 @@ export const mockConversations: ConversationSummary[] = [
     peerUserId: null,
     groupId: 20001,
     latestSeq: 98,
+    canSend: true,
+    myRole: 1,
   },
   {
     conversationId: 30003,
@@ -42,13 +46,15 @@ export const mockConversations: ConversationSummary[] = [
     peerUserId: 10003,
     groupId: null,
     latestSeq: 44,
+    canSend: true,
+    myRole: null,
   },
   {
     conversationId: 30004,
-    conversationType: 2,
-    conversationName: '运维值守',
+    conversationType: 3,
+    conversationName: '产品发布频道',
     avatarUrl: null,
-    lastMessagePreview: '消息服务凌晨 02:00 会做一次灰度切换。',
+    lastMessagePreview: '频道成员只读，消息尾部显示真实查看人数。',
     lastMessageTime: '2026-04-24T19:40:00',
     unreadCount: 0,
     isTop: 0,
@@ -56,6 +62,8 @@ export const mockConversations: ConversationSummary[] = [
     peerUserId: null,
     groupId: 20002,
     latestSeq: 20,
+    canSend: false,
+    myRole: 2,
   },
   {
     conversationId: 30005,
@@ -70,5 +78,7 @@ export const mockConversations: ConversationSummary[] = [
     peerUserId: 10007,
     groupId: null,
     latestSeq: 0,
+    canSend: true,
+    myRole: null,
   },
 ]

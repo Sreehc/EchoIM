@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Document, Picture } from '@element-plus/icons-vue'
-import type { ChatMessage } from '@/types/chat'
-import { formatMessageTime } from '@/utils/format'
+import type { ChatMessage, ConversationType } from '@/types/chat'
+import { formatMessageTime, highlightText } from '@/utils/format'
 import AvatarBadge from './AvatarBadge.vue'
 
 const props = defineProps<{
   message: ChatMessage
+  conversationType: ConversationType
   currentUserId: number
   senderName: string
   showAvatar: boolean
@@ -17,6 +18,8 @@ const props = defineProps<{
   editing?: boolean
   editingDraft?: string
   actionPending?: boolean
+  searchQuery?: string
+  searchActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -48,10 +51,32 @@ const statusMeta = computed(() => {
   }
 
   return {
-    label: props.message.read ? '已读' : '发送成功',
-    glyph: '✓✓',
-    tone: props.message.read ? 'read' : 'sent',
+    label:
+      props.conversationType === 2
+        ? '发送成功'
+        : props.message.read
+          ? '已读'
+          : '已发送',
+    glyph:
+      props.conversationType === 2
+        ? '✓✓'
+        : props.message.read
+          ? '✓✓'
+          : '✓',
+    tone:
+      props.conversationType === 2
+        ? 'group'
+        : props.message.read
+          ? 'read'
+          : 'sent',
   }
+})
+const channelViewLabel = computed(() => {
+  if (!isSelf.value || props.conversationType !== 3 || props.message.sendStatus !== 1) {
+    return ''
+  }
+
+  return `${props.message.viewCount ?? 0} 人看过`
 })
 const attachmentMeta = computed(() => {
   if (props.message.msgType === 'IMAGE') {
@@ -86,6 +111,13 @@ const bubbleText = computed(() => {
 
   return props.message.content ?? ''
 })
+const highlightedBubbleText = computed(() => {
+  if (props.message.recalled) {
+    return [{ text: bubbleText.value, matched: false }]
+  }
+
+  return highlightText(bubbleText.value, props.searchQuery ?? '')
+})
 
 function formatFileSize(value: number | null) {
   if (!value || value <= 0) return ''
@@ -105,7 +137,9 @@ function formatFileSize(value: number | null) {
       'is-grouped': groupedWithPrev,
       'is-grouped-next': groupedWithNext,
       'is-compact': compact,
+      'is-search-active': searchActive,
     }"
+    :data-search-message-id="message.messageId"
   >
     <AvatarBadge
       v-if="!isSystem && showAvatar"
@@ -113,7 +147,7 @@ function formatFileSize(value: number | null) {
       :name="senderName"
       :seed="message.fromUserId"
       size="sm"
-      :type="message.groupId ? 'group' : 'user'"
+      type="user"
     />
     <div v-else-if="!isSystem && !isSelf" class="message-row__avatar-spacer"></div>
     <div
@@ -176,14 +210,20 @@ function formatFileSize(value: number | null) {
             </button>
           </div>
         </div>
-        <p v-else>{{ bubbleText }}</p>
+        <p v-else class="message-bubble__text">
+          <template v-for="(part, index) in highlightedBubbleText" :key="`${message.messageId}-${index}`">
+            <mark v-if="part.matched" class="message-bubble__highlight">{{ part.text }}</mark>
+            <template v-else>{{ part.text }}</template>
+          </template>
+        </p>
       </template>
 
       <footer v-if="!isSystem" class="message-bubble__meta">
         <span>{{ formatMessageTime(message.sentAt) }}</span>
         <span v-if="message.edited && !message.recalled" class="message-bubble__edited">已编辑</span>
+        <span v-if="channelViewLabel" class="message-bubble__views">{{ channelViewLabel }}</span>
         <span
-          v-if="isSelf"
+          v-else-if="isSelf"
           class="message-bubble__status"
           :class="`is-${statusMeta.tone}`"
           :aria-label="statusMeta.label"
@@ -232,7 +272,7 @@ function formatFileSize(value: number | null) {
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  margin-top: 10px;
+  margin-top: 11px;
 }
 
 .message-row.is-compact {
@@ -262,11 +302,11 @@ function formatFileSize(value: number | null) {
 
 .message-bubble {
   max-width: min(64ch, 76%);
-  padding: 8px 11px 7px;
+  padding: 9px 12px 8px;
   border: 1px solid var(--color-bubble-peer-line);
-  border-radius: 13px 13px 13px 5px;
+  border-radius: 16px 16px 16px 6px;
   background: var(--color-bubble-peer);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-card);
 }
 
 .message-bubble.is-compact {
@@ -275,8 +315,14 @@ function formatFileSize(value: number | null) {
 
 .message-bubble.is-self {
   border-color: var(--color-bubble-self-line);
-  border-radius: 13px 13px 5px 13px;
+  border-radius: 16px 16px 6px 16px;
   background: var(--color-bubble-self);
+}
+
+.message-bubble.is-search-active {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 28%, transparent),
+    var(--shadow-float);
 }
 
 .message-bubble.is-grouped:not(.is-self) {
@@ -307,7 +353,7 @@ function formatFileSize(value: number | null) {
 .message-bubble__sender {
   display: inline-block;
   margin-bottom: 4px;
-  color: #83c4ff;
+  color: var(--color-shell-eyebrow);
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -318,6 +364,13 @@ function formatFileSize(value: number | null) {
   line-height: 1.45;
 }
 
+.message-bubble__highlight {
+  padding: 0 0.08em;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, #ffe7a2 72%, #fff);
+  color: #342100;
+}
+
 .message-bubble__meta {
   display: flex;
   justify-content: flex-end;
@@ -325,7 +378,7 @@ function formatFileSize(value: number | null) {
   flex-wrap: wrap;
   gap: 5px;
   margin-top: 5px;
-  color: color-mix(in srgb, var(--color-text-2) 78%, transparent);
+  color: color-mix(in srgb, var(--color-text-2) 82%, transparent);
   font: 500 0.64rem/1 var(--font-body);
 }
 
@@ -348,6 +401,14 @@ function formatFileSize(value: number | null) {
 
 .message-bubble__status.is-read {
   color: var(--color-primary-strong);
+}
+
+.message-bubble__status.is-sent {
+  letter-spacing: 0;
+}
+
+.message-bubble__status.is-group {
+  color: color-mix(in srgb, #d6efff 86%, var(--color-primary));
 }
 
 .message-bubble__status.is-failed {
@@ -388,6 +449,12 @@ function formatFileSize(value: number | null) {
 
 .message-bubble__edited {
   color: var(--color-text-soft);
+}
+
+.message-bubble__views {
+  color: color-mix(in srgb, var(--color-text-2) 84%, transparent);
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.01em;
 }
 
 .message-bubble__editor {
