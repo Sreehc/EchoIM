@@ -5,7 +5,9 @@ import com.echoim.server.common.PageResponse;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.dto.user.UpdateProfileRequestDto;
+import com.echoim.server.dto.user.UsernameCheckRequestDto;
 import com.echoim.server.service.user.UserProfileService;
+import jakarta.validation.constraints.NotBlank;
 import com.echoim.server.vo.user.UserPublicProfileVo;
 import com.echoim.server.vo.user.UserProfileVo;
 import com.echoim.server.vo.user.UserSearchItemVo;
@@ -13,6 +15,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @Validated
 @RestController
@@ -51,5 +55,17 @@ public class UserController {
     @GetMapping("/{id}")
     public ApiResponse<UserPublicProfileVo> profile(@PathVariable Long id) {
         return ApiResponse.success(userProfileService.getPublicProfile(LoginUserContext.requireUserId(), id));
+    }
+
+    @RequireLogin
+    @GetMapping("/by-username/{username}")
+    public ApiResponse<UserPublicProfileVo> profileByUsername(@PathVariable @NotBlank String username) {
+        return ApiResponse.success(userProfileService.getPublicProfileByUsername(LoginUserContext.requireUserId(), username));
+    }
+
+    @RequireLogin
+    @PostMapping("/username/check")
+    public ApiResponse<Map<String, Object>> checkUsername(@Valid @RequestBody UsernameCheckRequestDto requestDto) {
+        return ApiResponse.success(userProfileService.checkUsername(LoginUserContext.requireUserId(), requestDto.getUsername()));
     }
 }

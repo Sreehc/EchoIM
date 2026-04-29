@@ -6,11 +6,22 @@ import type {
   OfflineSyncRequest,
   PageResponse,
 } from '@/types/api'
+import type { ConversationFolder } from '@/types/chat'
 import { deleteJson, getJson, postJson, putJson } from './http'
 
 export function fetchConversations(pageNo = 1, pageSize = 100) {
+  return fetchConversationsByFolder('inbox', pageNo, pageSize)
+}
+
+export function fetchConversationsByArchive(archived = false, pageNo = 1, pageSize = 100) {
   return getJson<PageResponse<ApiConversationItem>>(
-    `/api/conversations?pageNo=${pageNo}&pageSize=${pageSize}`,
+    `/api/conversations?pageNo=${pageNo}&pageSize=${pageSize}&archived=${archived ? 1 : 0}`,
+  )
+}
+
+export function fetchConversationsByFolder(folder: ConversationFolder, pageNo = 1, pageSize = 100) {
+  return getJson<PageResponse<ApiConversationItem>>(
+    `/api/conversations?pageNo=${pageNo}&pageSize=${pageSize}&folder=${encodeURIComponent(folder)}`,
   )
 }
 
@@ -53,6 +64,22 @@ export function deleteConversation(conversationId: number) {
 
 export function markConversationReadRequest(conversationId: number, lastReadSeq: number) {
   return putJson(`/api/conversations/${conversationId}/read`, { lastReadSeq })
+}
+
+export function updateConversationArchive(conversationId: number, archived: boolean) {
+  return putJson(`/api/conversations/${conversationId}/archive`, { archived })
+}
+
+export function markConversationUnreadRequest(conversationId: number) {
+  return putJson(`/api/conversations/${conversationId}/unread`, { unread: true })
+}
+
+export function createSingleConversation(targetUserId: number) {
+  return postJson<ApiConversationItem>('/api/conversations/single', { targetUserId })
+}
+
+export function createSavedConversation() {
+  return postJson<ApiConversationItem>('/api/conversations/saved')
 }
 
 export function fetchImInfo() {

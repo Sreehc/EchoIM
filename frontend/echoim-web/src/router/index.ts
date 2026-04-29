@@ -33,7 +33,7 @@ router.beforeEach((to) => {
     return { name: 'login' }
   }
 
-  if (to.meta.guestOnly && authStore.isAuthenticated) {
+  if (to.meta.guestOnly && authStore.isAuthenticated && to.query.add !== '1') {
     return { name: 'chat-home' }
   }
 

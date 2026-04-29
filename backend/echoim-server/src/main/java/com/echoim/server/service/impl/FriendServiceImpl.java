@@ -172,19 +172,20 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public void validateSingleChatAllowed(Long fromUserId, Long toUserId) {
+        if (fromUserId == null || toUserId == null || fromUserId.equals(toUserId)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "单聊目标错误");
+        }
+        ImUserEntity targetUser = requireTargetUser(toUserId);
+        if (!Integer.valueOf(1).equals(targetUser.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "目标用户不可发起私聊");
+        }
         ImFriendEntity senderRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(fromUserId, toUserId);
         ImFriendEntity receiverRelation = imFriendMapper.selectRelationByUserIdAndFriendUserId(toUserId, fromUserId);
-        if (senderRelation == null || !Integer.valueOf(FRIEND_STATUS_NORMAL).equals(senderRelation.getStatus())) {
-            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不可用");
+        if (senderRelation != null && Integer.valueOf(FRIEND_STATUS_BLOCKED).equals(senderRelation.getStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "你已拉黑对方");
         }
-        if (receiverRelation == null || Integer.valueOf(FRIEND_STATUS_DELETED).equals(receiverRelation.getStatus())) {
-            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不可用");
-        }
-        if (Integer.valueOf(FRIEND_STATUS_BLOCKED).equals(receiverRelation.getStatus())) {
+        if (receiverRelation != null && Integer.valueOf(FRIEND_STATUS_BLOCKED).equals(receiverRelation.getStatus())) {
             throw new BizException(ErrorCode.BUSINESS_CONFLICT, "对方已拉黑你");
-        }
-        if (!Integer.valueOf(FRIEND_STATUS_NORMAL).equals(receiverRelation.getStatus())) {
-            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "好友关系不可用");
         }
     }
 
@@ -234,6 +235,10 @@ public class FriendServiceImpl implements FriendService {
     private void ensureConversationUser(Long conversationId, Long userId) {
         ImConversationUserEntity existing = imConversationUserMapper.selectByConversationIdAndUserId(conversationId, userId);
         if (existing != null) {
+            existing.setDeleted(0);
+            existing.setIsArchived(0);
+            existing.setManualUnread(0);
+            imConversationUserMapper.updateById(existing);
             return;
         }
         ImConversationUserEntity entity = new ImConversationUserEntity();
@@ -243,6 +248,8 @@ public class FriendServiceImpl implements FriendService {
         entity.setLastReadSeq(0L);
         entity.setIsTop(0);
         entity.setIsMute(0);
+        entity.setIsArchived(0);
+        entity.setManualUnread(0);
         entity.setDeleted(0);
         imConversationUserMapper.insert(entity);
     }

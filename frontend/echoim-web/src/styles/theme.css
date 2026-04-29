@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Manrope:wght@500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Urbanist:wght@500;600;700;800&display=swap');
 
 *,
 *::before,
@@ -30,6 +30,7 @@ body {
   font: 400 16px/1.55 var(--font-body);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
 }
 
 body::before {
@@ -38,9 +39,10 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--color-shell-glow) 115%, transparent), transparent 24%),
-    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 18%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 26%);
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--color-shell-glow) 140%, transparent), transparent 24%),
+    radial-gradient(circle at 84% 4%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 18%),
+    radial-gradient(circle at 52% 100%, color-mix(in srgb, var(--color-bg-surface) 96%, transparent), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 28%);
   opacity: 0.9;
 }
 
@@ -50,9 +52,9 @@ body::after {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-mask) 28%, transparent), transparent 24%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.02));
-  opacity: 0.44;
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-mask) 24%, transparent), transparent 22%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.015));
+  opacity: 0.38;
 }
 
 button,
@@ -86,7 +88,7 @@ ul {
 
 :focus-visible {
   outline: 2px solid color-mix(in srgb, var(--color-primary) 72%, white);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 #app {

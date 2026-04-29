@@ -55,3 +55,8 @@ echoim:
     port: ${ECHOIM_IM_PORT:8091}
     ws-path: /ws
     heartbeat-timeout-seconds: 60
+  call:
+    ring-timeout-seconds: ${ECHOIM_CALL_RING_TIMEOUT_SECONDS:30}
+    ice-servers:
+      - urls:
+          - ${ECHOIM_CALL_STUN_URL:stun:stun.l.google.com:19302}

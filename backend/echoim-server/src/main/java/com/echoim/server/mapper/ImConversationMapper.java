@@ -12,6 +12,7 @@ import java.util.List;
 public interface ImConversationMapper extends BaseMapper<ImConversationEntity> {
 
     List<ConversationItemVo> selectConversationPageByUserId(@Param("userId") Long userId,
+                                                            @Param("archived") int archived,
                                                             @Param("offset") long offset,
                                                             @Param("pageSize") long pageSize);
 
@@ -20,13 +21,16 @@ public interface ImConversationMapper extends BaseMapper<ImConversationEntity> {
     ConversationItemVo selectConversationItemByUserId(@Param("conversationId") Long conversationId,
                                                       @Param("userId") Long userId);
 
-    long countConversationByUserId(@Param("userId") Long userId);
+    long countConversationByUserId(@Param("userId") Long userId,
+                                   @Param("archived") int archived);
 
     ImConversationEntity selectSingleConversationByBizKey(@Param("bizKey") String bizKey);
 
     ImConversationEntity selectGroupConversationByGroupId(@Param("groupId") Long groupId);
 
     ImConversationEntity selectChannelConversationByGroupId(@Param("groupId") Long groupId);
+
+    ImConversationEntity selectCollectiveConversationByGroupId(@Param("groupId") Long groupId);
 
     ImConversationEntity selectByIdForUpdate(@Param("conversationId") Long conversationId);
 

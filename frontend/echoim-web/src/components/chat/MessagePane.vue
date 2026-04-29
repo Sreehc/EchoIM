@@ -23,6 +23,9 @@ const props = defineProps<{
   messageActionPendingId?: number | null
   searchQuery?: string
   activeMatchIndex?: number
+  forwardSelectionMode?: boolean
+  selectedForwardMessageIds?: number[]
+  jumpMessageId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -34,12 +37,17 @@ const emit = defineEmits<{
   'cancel-edit-message': []
   'save-edit-message': [payload: { messageId: number; content: string }]
   'recall-message': [messageId: number]
+  'reply-message': [message: ChatMessage]
+  'forward-message': [message: ChatMessage]
+  'toggle-forward-selection': [message: ChatMessage]
+  'toggle-reaction': [payload: { messageId: number; emoji: string }]
   'update:search-match-count': [value: number]
 }>()
 
 const scroller = ref()
 const stickToBottom = ref(true)
 const restoreAnchor = ref<{ scrollHeight: number; scrollTop: number } | null>(null)
+const flashMessageId = ref<number | null>(null)
 
 function getWrapElement() {
   return scroller.value?.wrapRef as HTMLElement | undefined
@@ -199,6 +207,15 @@ watch(
   },
 )
 
+watch(
+  () => props.jumpMessageId,
+  async (value) => {
+    if (!value) return
+    await nextTick()
+    jumpToMessage(value)
+  },
+)
+
 function formatTimelineLabel(value: string): string {
   const date = new Date(value)
   const now = new Date()
@@ -222,6 +239,18 @@ function requestLoadOlder() {
     }
   }
   emit('loadOlder')
+}
+
+function jumpToMessage(messageId: number) {
+  const wrap = getWrapElement()
+  const target = wrap?.querySelector<HTMLElement>(`[data-search-message-id="${messageId}"]`)
+  target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  flashMessageId.value = messageId
+  window.setTimeout(() => {
+    if (flashMessageId.value === messageId) {
+      flashMessageId.value = null
+    }
+  }, 1800)
 }
 </script>
 
@@ -279,8 +308,15 @@ function requestLoadOlder() {
           :editing-draft="editingDraft ?? ''"
           :action-pending="messageActionPendingId === entry.message.messageId"
           :search-query="searchQuery"
-          :search-active="activeSearchMessageId === entry.message.messageId"
+          :search-active="activeSearchMessageId === entry.message.messageId || flashMessageId === entry.message.messageId"
+          :forward-selection-mode="forwardSelectionMode"
+          :selected-for-forward="selectedForwardMessageIds?.includes(entry.message.messageId)"
           @retry="emit('retryMessage', $event)"
+          @reply="emit('reply-message', entry.message)"
+          @forward="emit('forward-message', entry.message)"
+          @toggle-forward-selection="emit('toggle-forward-selection', entry.message)"
+          @toggle-reaction="emit('toggle-reaction', { messageId: entry.message.messageId, emoji: $event })"
+          @jump-to-source="jumpToMessage"
           @start-edit="emit('start-edit-message', entry.message)"
           @update:editing-draft="emit('update:editing-draft', $event)"
           @cancel-edit="emit('cancel-edit-message')"

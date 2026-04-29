@@ -4,11 +4,20 @@ import jakarta.validation.constraints.NotBlank;
 
 public class UpdateProfileRequestDto {
 
+    private String username;
     @NotBlank(message = "昵称不能为空")
     private String nickname;
     private String avatarUrl;
     private Integer gender;
     private String signature;
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
     public String getNickname() {
         return nickname;

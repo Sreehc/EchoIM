@@ -7,6 +7,7 @@ public class GroupCreateVo {
     private String groupName;
     private Long conversationId;
     private Integer memberCount;
+    private Integer conversationType;
 
     public Long getGroupId() {
         return groupId;
@@ -46,5 +47,13 @@ public class GroupCreateVo {
 
     public void setMemberCount(Integer memberCount) {
         this.memberCount = memberCount;
+    }
+
+    public Integer getConversationType() {
+        return conversationType;
+    }
+
+    public void setConversationType(Integer conversationType) {
+        this.conversationType = conversationType;
     }
 }

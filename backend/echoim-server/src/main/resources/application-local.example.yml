@@ -1,4 +1,14 @@
 echoim:
+  call:
+    ring-timeout-seconds: 30
+    ice-servers:
+      - urls:
+          - stun:stun.l.google.com:19302
+      - urls:
+          - turn:your-turn-host:3478?transport=udp
+          - turn:your-turn-host:3478?transport=tcp
+        username: your-turn-username
+        credential: your-turn-password
   jwt:
     secret: ${ECHOIM_JWT_SECRET:your-jwt-secret}
   file:

@@ -43,7 +43,9 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
     private static final int GROUP_STATUS_NORMAL = 1;
     private static final int MEMBER_ROLE_OWNER = 1;
     private static final int MESSAGE_TYPE_TEXT = 1;
+    private static final int MESSAGE_TYPE_STICKER = 2;
     private static final int MESSAGE_TYPE_IMAGE = 3;
+    private static final int MESSAGE_TYPE_GIF = 4;
     private static final int MESSAGE_TYPE_FILE = 5;
     private static final int FILE_BIZ_TYPE_IMAGE = 2;
     private static final int FILE_BIZ_TYPE_FILE = 4;
@@ -152,7 +154,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         if (msgType == MESSAGE_TYPE_TEXT && !StringUtils.hasText(data.getContent())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文本消息内容不能为空");
         }
-        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
+        if ((msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件消息必须传 fileId");
         }
     }
@@ -208,8 +210,14 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         if (!StringUtils.hasText(msgType) || "TEXT".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_TEXT;
         }
+        if ("STICKER".equalsIgnoreCase(msgType)) {
+            return MESSAGE_TYPE_STICKER;
+        }
         if ("IMAGE".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_IMAGE;
+        }
+        if ("GIF".equalsIgnoreCase(msgType)) {
+            return MESSAGE_TYPE_GIF;
         }
         if ("FILE".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_FILE;
@@ -221,8 +229,14 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         if (Integer.valueOf(MESSAGE_TYPE_TEXT).equals(msgType)) {
             return "TEXT";
         }
+        if (Integer.valueOf(MESSAGE_TYPE_STICKER).equals(msgType)) {
+            return "STICKER";
+        }
         if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(msgType)) {
             return "IMAGE";
+        }
+        if (Integer.valueOf(MESSAGE_TYPE_GIF).equals(msgType)) {
+            return "GIF";
         }
         if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(msgType)) {
             return "FILE";
@@ -232,7 +246,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
 
     private ImFileEntity validateAndLoadMessageFile(Long userId, WsGroupChatData data) {
         int msgType = toMessageType(data.getMsgType());
-        if (msgType == MESSAGE_TYPE_IMAGE) {
+        if (msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_IMAGE);
         }
         if (msgType == MESSAGE_TYPE_FILE) {
@@ -262,7 +276,11 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
 
     private String preview(ImMessageEntity entity, ImFileEntity messageFile) {
         String preview;
-        if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(entity.getMsgType())) {
+        if (Integer.valueOf(MESSAGE_TYPE_STICKER).equals(entity.getMsgType())) {
+            preview = "[贴纸]";
+        } else if (Integer.valueOf(MESSAGE_TYPE_GIF).equals(entity.getMsgType())) {
+            preview = "[GIF]";
+        } else if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(entity.getMsgType())) {
             preview = "[图片]";
         } else if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(entity.getMsgType())) {
             preview = "[文件] " + (messageFile == null ? "" : messageFile.getFileName());

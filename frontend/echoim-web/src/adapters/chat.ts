@@ -1,9 +1,19 @@
 import type {
   ApiConversationItem,
+  ApiGlobalSearchMessageItem,
   ApiMessageItem,
   ApiOfflineSyncConversation,
 } from '@/types/api'
-import type { ChatFile, ChatMessage, ConversationSummary, MessageForwardSource } from '@/types/chat'
+import type {
+  ChatFile,
+  ChatMessage,
+  ConversationSummary,
+  GlobalSearchMessageItem,
+  MessageForwardSource,
+  MessageReactionStat,
+  MessageReplySource,
+  StickerPayload,
+} from '@/types/chat'
 import { normalizeDisplayText } from '@/utils/text'
 
 function normalizeTime(value: string | null | undefined): string {
@@ -41,6 +51,34 @@ function adaptForwardSource(source: MessageForwardSource | null | undefined): Me
   }
 }
 
+function adaptReplySource(source: MessageReplySource | null | undefined): MessageReplySource | null {
+  if (!source) return null
+
+  return {
+    sourceMessageId: Number(source.sourceMessageId),
+    sourceConversationId: Number(source.sourceConversationId),
+    sourceSenderId: Number(source.sourceSenderId),
+    sourceMsgType: source.sourceMsgType,
+    sourcePreview: source.sourcePreview == null ? null : normalizeDisplayText(source.sourcePreview),
+  }
+}
+
+function adaptReactionStats(stats: MessageReactionStat[] | null | undefined): MessageReactionStat[] {
+  return (stats ?? []).map((stat) => ({
+    emoji: stat.emoji,
+    count: Number(stat.count ?? 0),
+    reacted: Boolean(stat.reacted),
+  }))
+}
+
+function adaptSticker(sticker: StickerPayload | null | undefined): StickerPayload | null {
+  if (!sticker) return null
+  return {
+    stickerId: sticker.stickerId,
+    title: normalizeDisplayText(sticker.title) || '贴纸',
+  }
+}
+
 export function adaptConversationSummary(
   item: ApiConversationItem,
 ): ConversationSummary {
@@ -59,6 +97,10 @@ export function adaptConversationSummary(
     latestSeq: Number(item.latestSeq ?? 0),
     canSend: item.canSend ?? true,
     myRole: item.myRole == null ? null : Number(item.myRole),
+    archived: Boolean(item.archived),
+    manualUnread: Boolean(item.manualUnread),
+    specialType: item.specialType ?? null,
+    folderHints: item.folderHints ?? null,
   }
 }
 
@@ -88,6 +130,9 @@ export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
     readAt: item.readAt ? normalizeTime(item.readAt) : null,
     viewCount: Number(item.viewCount ?? 0),
     forwardSource: adaptForwardSource(item.forwardSource),
+    replySource: adaptReplySource(item.replySource),
+    reactions: adaptReactionStats(item.reactions),
+    sticker: adaptSticker(item.sticker),
     errorMessage: null,
   }
 }
@@ -97,8 +142,16 @@ export function messagePreviewFromMessage(message: ChatMessage): string {
     return '撤回了一条消息'
   }
 
+  if (message.msgType === 'STICKER') {
+    return message.sticker?.title ? `[贴纸] ${message.sticker.title}` : '[贴纸]'
+  }
+
   if (message.msgType === 'IMAGE') {
     return message.file?.fileName ? `[图片] ${message.file.fileName}` : '[图片]'
+  }
+
+  if (message.msgType === 'GIF') {
+    return message.file?.fileName ? `[GIF] ${message.file.fileName}` : '[GIF]'
   }
 
   if (message.msgType === 'FILE') {
@@ -160,5 +213,21 @@ export function mapOfflineConversation(
     fromSeq: Number(item.fromSeq ?? 0),
     toSeq: Number(item.toSeq ?? 0),
     hasMore: Boolean(item.hasMore),
+  }
+}
+
+export function adaptGlobalSearchMessage(item: ApiGlobalSearchMessageItem): GlobalSearchMessageItem {
+  return {
+    messageId: Number(item.messageId),
+    conversationId: Number(item.conversationId),
+    conversationType: item.conversationType,
+    conversationName: normalizeDisplayText(item.conversationName) || `会话 ${item.conversationId}`,
+    specialType: item.specialType ?? null,
+    fromUserId: Number(item.fromUserId),
+    senderName: normalizeDisplayText(item.senderName) || `用户 ${item.fromUserId}`,
+    msgType: item.msgType,
+    preview: normalizeDisplayText(item.preview) || '',
+    sentAt: normalizeTime(item.sentAt),
+    archived: Boolean(item.archived),
   }
 }

@@ -4,6 +4,7 @@ import type {
   AuthSession,
   ChangePasswordPayload,
   CurrentUserProfile,
+  StoredAccount,
   UpdateCurrentUserProfilePayload,
 } from '@/types/chat'
 import { changePasswordRequest, loginRequest, logoutRequest } from '@/services/auth'
@@ -12,6 +13,7 @@ import { STORAGE_KEYS } from '@/utils/storage'
 import { normalizeDisplayText } from '@/utils/text'
 
 export const useAuthStore = defineStore('auth', () => {
+  const storedAccounts = ref<StoredAccount[]>(readStoredAccounts())
   const session = ref<AuthSession | null>(readStoredSession())
   const isLoading = ref(false)
   const profile = ref<CurrentUserProfile | null>(null)
@@ -23,13 +25,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => Boolean(session.value?.token))
   const currentUser = computed(() => session.value?.userInfo ?? null)
+  const hasStoredAccounts = computed(() => storedAccounts.value.length > 0)
 
   async function login(username: string, password: string) {
     isLoading.value = true
 
     try {
-      session.value = normalizeSession(await loginRequest(username, password))
-      persistSession(session.value)
+      const nextSession = normalizeSession(await loginRequest(username, password))
+      setSession(nextSession)
     } finally {
       isLoading.value = false
     }
@@ -92,6 +95,25 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await logoutRequest()
     } finally {
+      if (session.value?.userInfo.userId != null) {
+        removeStoredAccount(session.value.userInfo.userId)
+      } else {
+        clearSession()
+      }
+    }
+  }
+
+  function activateStoredAccount(userId: number) {
+    const account = storedAccounts.value.find((item) => item.userInfo.userId === userId)
+    if (!account) return null
+    setSession(account)
+    return session.value
+  }
+
+  function removeStoredAccount(userId: number) {
+    storedAccounts.value = storedAccounts.value.filter((item) => item.userInfo.userId !== userId)
+    persistStoredAccounts(storedAccounts.value)
+    if (session.value?.userInfo.userId === userId) {
       clearSession()
     }
   }
@@ -104,18 +126,18 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(STORAGE_KEYS.session)
   }
 
-  function setSession(nextSession: AuthSession | null) {
+  function setSession(nextSession: AuthSession | StoredAccount | null) {
     session.value = nextSession ? normalizeSession(nextSession) : null
     if (!nextSession) {
       profile.value = null
-    }
-
-    if (nextSession) {
-      persistSession(session.value)
+      localStorage.removeItem(STORAGE_KEYS.session)
       return
     }
 
-    localStorage.removeItem(STORAGE_KEYS.session)
+    if (session.value) {
+      persistSession(session.value)
+      upsertStoredAccount(session.value)
+    }
   }
 
   function clearProfileNotice() {
@@ -129,7 +151,7 @@ export const useAuthStore = defineStore('auth', () => {
   function syncSessionUserInfo(nextProfile: CurrentUserProfile) {
     if (!session.value) return
 
-    session.value = normalizeSession({
+    setSession({
       ...session.value,
       userInfo: {
         userId: nextProfile.userId,
@@ -138,11 +160,25 @@ export const useAuthStore = defineStore('auth', () => {
         avatarUrl: nextProfile.avatarUrl,
       },
     })
-    persistSession(session.value)
+  }
+
+  function upsertStoredAccount(nextSession: AuthSession) {
+    const nextAccount = toStoredAccount(nextSession)
+    const existingIndex = storedAccounts.value.findIndex((item) => item.userInfo.userId === nextAccount.userInfo.userId)
+    if (existingIndex === -1) {
+      storedAccounts.value = [nextAccount, ...storedAccounts.value]
+    } else {
+      const nextList = [...storedAccounts.value]
+      nextList.splice(existingIndex, 1)
+      storedAccounts.value = [nextAccount, ...nextList]
+    }
+    persistStoredAccounts(storedAccounts.value)
   }
 
   return {
     session,
+    storedAccounts,
+    hasStoredAccounts,
     isLoading,
     profile,
     profileLoading,
@@ -154,6 +190,8 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser,
     login,
     logout,
+    activateStoredAccount,
+    removeStoredAccount,
     clearSession,
     setSession,
     ensureCurrentProfile,
@@ -175,9 +213,24 @@ function readStoredSession(): AuthSession | null {
   }
 }
 
+function readStoredAccounts(): StoredAccount[] {
+  const raw = localStorage.getItem(STORAGE_KEYS.storedAccounts)
+  if (!raw) return []
+
+  try {
+    return (JSON.parse(raw) as StoredAccount[]).map(normalizeStoredAccount)
+  } catch {
+    return []
+  }
+}
+
 function persistSession(session: AuthSession | null) {
   if (!session) return
   localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session))
+}
+
+function persistStoredAccounts(accounts: StoredAccount[]) {
+  localStorage.setItem(STORAGE_KEYS.storedAccounts, JSON.stringify(accounts))
 }
 
 function normalizeSession(session: AuthSession): AuthSession {
@@ -187,6 +240,20 @@ function normalizeSession(session: AuthSession): AuthSession {
       ...session.userInfo,
       nickname: normalizeDisplayText(session.userInfo.nickname),
     },
+  }
+}
+
+function normalizeStoredAccount(account: StoredAccount): StoredAccount {
+  return {
+    ...normalizeSession(account),
+    lastActiveAt: account.lastActiveAt || new Date(0).toISOString(),
+  }
+}
+
+function toStoredAccount(session: AuthSession): StoredAccount {
+  return {
+    ...normalizeSession(session),
+    lastActiveAt: new Date().toISOString(),
   }
 }
 

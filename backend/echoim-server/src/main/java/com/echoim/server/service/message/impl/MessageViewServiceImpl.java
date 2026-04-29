@@ -2,11 +2,15 @@ package com.echoim.server.service.message.impl;
 
 import com.echoim.server.entity.ImMessageEntity;
 import com.echoim.server.im.model.WsMessageItem;
+import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
 import com.echoim.server.service.message.MessageViewService;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import com.echoim.server.vo.message.MessageForwardSourceVo;
+import com.echoim.server.vo.message.MessageReactionStatVo;
+import com.echoim.server.vo.message.MessageReplySourceVo;
 import com.echoim.server.vo.message.MessageReceiptStatVo;
+import com.echoim.server.vo.message.StickerPayloadVo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -22,11 +26,14 @@ public class MessageViewServiceImpl implements MessageViewService {
     private static final int MESSAGE_STATUS_RECALLED = 3;
 
     private final ImMessageReceiptMapper imMessageReceiptMapper;
+    private final ImMessageReactionMapper imMessageReactionMapper;
     private final ObjectMapper objectMapper;
 
     public MessageViewServiceImpl(ImMessageReceiptMapper imMessageReceiptMapper,
+                                  ImMessageReactionMapper imMessageReactionMapper,
                                   ObjectMapper objectMapper) {
         this.imMessageReceiptMapper = imMessageReceiptMapper;
+        this.imMessageReactionMapper = imMessageReactionMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -36,8 +43,13 @@ public class MessageViewServiceImpl implements MessageViewService {
             return;
         }
         Map<Long, MessageReceiptStatVo> receiptMap = loadReceiptMap(messages, viewerUserId);
+        Map<Long, List<MessageReactionStatVo>> reactionMap = loadReactionMap(messages.stream()
+                .map(MessageItemVo::getMessageId)
+                .filter(Objects::nonNull)
+                .toList(), viewerUserId);
         for (MessageItemVo message : messages) {
             applyExtra(message, viewerUserId);
+            message.setReactions(reactionMap.getOrDefault(message.getMessageId(), List.of()));
             MessageReceiptStatVo stat = receiptMap.get(message.getMessageId());
             if (stat != null) {
                 message.setDelivered(stat.getDeliveredAt() != null);
@@ -56,6 +68,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         }
         Map<String, Object> extraMap = parseExtra(entity.getExtraJson());
         applyExtra(item, viewerUserId, extraMap);
+        item.setReactions(loadReactionMap(List.of(entity.getId()), viewerUserId).getOrDefault(entity.getId(), List.of()));
         if (Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(entity.getConversationType())
                 && Objects.equals(entity.getFromUserId(), viewerUserId)) {
             List<MessageReceiptStatVo> stats = imMessageReceiptMapper.selectReceiptStatsByMessageIds(List.of(entity.getId()));
@@ -127,6 +140,8 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setEdited(Boolean.TRUE.equals(extraMap.get("edited")));
         item.setEditedAt(readDateTime(extraMap.get("editedAt")));
         item.setForwardSource(readForwardSource(extraMap.get("forwardSource")));
+        item.setReplySource(readReplySource(extraMap.get("replySource")));
+        item.setSticker(readSticker(extraMap.get("sticker")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -146,6 +161,8 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setEdited(Boolean.TRUE.equals(extraMap.get("edited")));
         item.setEditedAt(readDateTime(extraMap.get("editedAt")));
         item.setForwardSource(readForwardSource(extraMap.get("forwardSource")));
+        item.setReplySource(readReplySource(extraMap.get("replySource")));
+        item.setSticker(readSticker(extraMap.get("sticker")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -176,6 +193,31 @@ public class MessageViewServiceImpl implements MessageViewService {
             return null;
         }
         return objectMapper.convertValue(value, MessageForwardSourceVo.class);
+    }
+
+    private MessageReplySourceVo readReplySource(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return objectMapper.convertValue(value, MessageReplySourceVo.class);
+    }
+
+    private StickerPayloadVo readSticker(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return objectMapper.convertValue(value, StickerPayloadVo.class);
+    }
+
+    private Map<Long, List<MessageReactionStatVo>> loadReactionMap(List<Long> messageIds, Long viewerUserId) {
+        if (messageIds == null || messageIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<MessageReactionStatVo>> reactionMap = new HashMap<>();
+        for (MessageReactionStatVo stat : imMessageReactionMapper.selectReactionStatsByMessageIds(messageIds, viewerUserId)) {
+            reactionMap.computeIfAbsent(stat.getMessageId(), ignored -> new ArrayList<>()).add(stat);
+        }
+        return reactionMap;
     }
 
     private Map<String, Object> parseExtra(String extraJson) {

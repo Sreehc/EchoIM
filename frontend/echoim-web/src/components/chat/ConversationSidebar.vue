@@ -9,7 +9,6 @@ import {
   Close,
   Collection,
   Delete,
-  EditPen,
   FolderOpened,
   Guide,
   Lock,
@@ -27,10 +26,12 @@ import {
 import type {
   ChangePasswordPayload,
   ChatPreferences,
+  ConversationFolder,
   ConversationSummary,
   CurrentUserProfile,
   LeftPanelMode,
   SettingsSection,
+  StoredAccount,
   ThemeMode,
   UpdateCurrentUserProfilePayload,
   UserInfo,
@@ -42,12 +43,15 @@ import AvatarBadge from './AvatarBadge.vue'
 import ChatStatePanel from './ChatStatePanel.vue'
 
 type ConversationContextAction = 'open-tab' | 'mark-unread' | 'toggle-top' | 'toggle-mute' | 'archive' | 'delete'
+type ComposeAction = 'single' | 'group' | 'channel'
 
 const props = defineProps<{
   currentUser: UserInfo | null
   currentProfile: CurrentUserProfile | null
+  storedAccounts: StoredAccount[]
   conversations: ConversationSummary[]
   selectedConversationId: number | null
+  conversationFolder: ConversationFolder
   searchQuery: string
   theme: ThemeMode
   leftPanelMode: LeftPanelMode
@@ -63,6 +67,9 @@ const props = defineProps<{
   passwordSaving?: boolean
   profileError?: string | null
   profileNotice?: string | null
+  usernameChecking?: boolean
+  usernameAvailable?: boolean | null
+  usernameMessage?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -76,11 +83,19 @@ const emit = defineEmits<{
   'update:globalMenuOpen': [value: boolean]
   'update:chatPreferences': [value: Partial<ChatPreferences>]
   'open-panel': [mode: LeftPanelMode]
+  'open-global-search': []
+  'open-saved-messages': []
+  'add-account': []
+  'switch-account': [userId: number]
+  'remove-account': [userId: number]
+  'check-username': [username: string]
   'save-profile': [payload: UpdateCurrentUserProfilePayload]
   'change-password': [payload: ChangePasswordPayload]
   'clear-profile-error': []
   'clear-profile-notice': []
   'conversation-action': [payload: { command: ConversationContextAction; conversationId: number }]
+  'update:conversation-folder': [value: ConversationFolder]
+  'compose-action': [value: ComposeAction]
   logout: []
 }>()
 
@@ -99,17 +114,29 @@ const passwordForm = reactive({
   localError: '',
 })
 const profileDraft = reactive<{
+  username: string
   nickname: string
   avatarUrl: string
   gender: number | null
   signature: string
 }>({
+  username: '',
   nickname: '',
   avatarUrl: '',
   gender: null,
   signature: '',
 })
+const usernameAvailability = reactive<{
+  checking: boolean
+  available: boolean | null
+  message: string | null
+}>({
+  checking: false,
+  available: null,
+  message: null,
+})
 let searchTimer: number | null = null
+let usernameTimer: number | null = null
 const conversationContextMenu = reactive<{
   visible: boolean
   x: number
@@ -129,9 +156,9 @@ const panelTitle = computed(() => {
 })
 
 const panelEyebrow = computed(() => {
-  if (props.leftPanelMode === 'me') return 'Echo account'
-  if (props.leftPanelMode === 'settings') return 'Workspace settings'
-  return 'Workspace panel'
+  if (props.leftPanelMode === 'me') return 'My Echo'
+  if (props.leftPanelMode === 'settings') return 'Preferences'
+  return 'Workspace'
 })
 const shouldShowNotificationPrompt = computed(
   () =>
@@ -163,17 +190,17 @@ const contextConversation = computed(
   () => props.conversations.find((item) => item.conversationId === conversationContextMenu.conversationId) ?? null,
 )
 const contextMenuItems = computed(() => [
-  { key: 'open-tab' as const, label: 'Open in new tab', icon: Open, danger: false },
-  { key: 'mark-unread' as const, label: 'Mark as unread', icon: MessageBox, danger: false },
-  { key: 'toggle-top' as const, label: contextConversation.value?.isTop ? 'Unpin' : 'Pin', icon: null, danger: false },
+  { key: 'open-tab' as const, label: '新标签页打开', icon: Open, danger: false },
+  { key: 'mark-unread' as const, label: '标为未读', icon: MessageBox, danger: false },
+  { key: 'toggle-top' as const, label: contextConversation.value?.isTop ? '取消置顶' : '置顶会话', icon: null, danger: false },
   {
     key: 'toggle-mute' as const,
-    label: contextConversation.value?.isMute ? 'Unmute' : 'Mute',
+    label: contextConversation.value?.isMute ? '关闭免打扰' : '消息免打扰',
     icon: null,
     danger: false,
   },
-  { key: 'archive' as const, label: 'Archive', icon: FolderOpened, danger: false },
-  { key: 'delete' as const, label: 'Delete Chat', icon: Delete, danger: true },
+  { key: 'archive' as const, label: contextConversation.value?.archived ? '恢复到收件箱' : '归档会话', icon: FolderOpened, danger: false },
+  { key: 'delete' as const, label: '删除会话', icon: Delete, danger: true },
 ])
 
 watch(
@@ -217,9 +244,11 @@ watch(
   () => props.currentProfile,
   (value) => {
     profileDraft.nickname = value?.nickname ?? props.currentUser?.nickname ?? ''
+    profileDraft.username = value?.username ?? props.currentUser?.username ?? ''
     profileDraft.avatarUrl = value?.avatarUrl ?? props.currentUser?.avatarUrl ?? ''
     profileDraft.gender = value?.gender ?? null
     profileDraft.signature = value?.signature ?? ''
+    resetUsernameState()
   },
   { immediate: true },
 )
@@ -235,6 +264,19 @@ watch(
   },
 )
 
+watch(
+  () => profileDraft.username,
+  (value) => {
+    if (!editingProfile.value) return
+    if (usernameTimer) {
+      window.clearTimeout(usernameTimer)
+    }
+    usernameTimer = window.setTimeout(() => {
+      emit('check-username', value)
+    }, 220)
+  },
+)
+
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
 })
@@ -242,6 +284,9 @@ onMounted(() => {
 onUnmounted(() => {
   if (searchTimer) {
     window.clearTimeout(searchTimer)
+  }
+  if (usernameTimer) {
+    window.clearTimeout(usernameTimer)
   }
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
 })
@@ -336,6 +381,40 @@ function handlePlaceholderAction() {
   closeComposeMenu()
 }
 
+function handleAddAccount() {
+  closeGlobalMenu()
+  closeComposeMenu()
+  emit('add-account')
+}
+
+function handleSwitchAccount(userId: number) {
+  closeGlobalMenu()
+  closeComposeMenu()
+  emit('switch-account', userId)
+}
+
+function handleRemoveAccount(userId: number) {
+  emit('remove-account', userId)
+}
+
+function handleOpenGlobalSearch() {
+  closeGlobalMenu()
+  closeComposeMenu()
+  emit('open-global-search')
+}
+
+function handleOpenSavedMessages() {
+  closeGlobalMenu()
+  closeComposeMenu()
+  emit('open-saved-messages')
+}
+
+function handleComposeAction(action: ComposeAction) {
+  closeGlobalMenu()
+  closeComposeMenu()
+  emit('compose-action', action)
+}
+
 function handleLogout() {
   closeGlobalMenu()
   closeComposeMenu()
@@ -384,20 +463,32 @@ function startProfileEditing() {
 
 function cancelProfileEditing() {
   editingProfile.value = false
+  profileDraft.username = props.currentProfile?.username ?? props.currentUser?.username ?? ''
   profileDraft.nickname = props.currentProfile?.nickname ?? props.currentUser?.nickname ?? ''
   profileDraft.avatarUrl = props.currentProfile?.avatarUrl ?? props.currentUser?.avatarUrl ?? ''
   profileDraft.gender = props.currentProfile?.gender ?? null
   profileDraft.signature = props.currentProfile?.signature ?? ''
+  resetUsernameState()
 }
 
 function submitProfile() {
+  if (!profileDraft.username.trim() || !profileDraft.nickname.trim()) {
+    return
+  }
   emit('save-profile', {
+    username: profileDraft.username.trim(),
     nickname: profileDraft.nickname.trim(),
     avatarUrl: profileDraft.avatarUrl.trim() || null,
     gender: profileDraft.gender,
     signature: profileDraft.signature.trim() || null,
   })
   editingProfile.value = false
+}
+
+function resetUsernameState() {
+  usernameAvailability.checking = false
+  usernameAvailability.available = null
+  usernameAvailability.message = null
 }
 
 function submitPassword() {
@@ -450,32 +541,117 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   <aside class="sidebar-panel" :class="[`mode-${leftPanelMode}`]">
     <template v-if="leftPanelMode === 'conversations'">
       <header class="sidebar-panel__header sidebar-panel__header--conversations">
-        <div class="sidebar-panel__toolbar">
+        <div class="sidebar-panel__identity-row">
           <button
-            class="sidebar-panel__menu-trigger"
+            class="sidebar-panel__identity"
             type="button"
-            aria-label="打开工作区菜单"
-            data-testid="sidebar-open-menu"
-            @click="toggleGlobalMenu"
+            @click="openPanel('me')"
           >
-            <span class="sidebar-panel__menu-bars" aria-hidden="true">
-              <span></span>
-              <span></span>
-              <span></span>
-            </span>
+            <AvatarBadge
+              :name="currentUser?.nickname"
+              :avatar-url="currentUser?.avatarUrl"
+              size="md"
+            />
+            <div class="sidebar-panel__identity-copy">
+              <strong>{{ currentUser?.nickname ?? '未登录' }}</strong>
+              <span>@{{ currentUser?.username ?? 'echo_demo_01' }}</span>
+            </div>
           </button>
+          <div class="sidebar-panel__toolbar-actions">
+            <button
+              class="sidebar-panel__menu-trigger"
+              type="button"
+              aria-label="打开设置"
+              data-testid="sidebar-open-settings"
+              @click="openPanel('settings')"
+            >
+              <Setting />
+            </button>
+            <button
+              class="sidebar-panel__menu-trigger"
+              type="button"
+              aria-label="打开工作区菜单"
+              data-testid="sidebar-open-menu"
+              @click="toggleGlobalMenu"
+            >
+              <MoreFilled />
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-panel__toolbar">
           <div class="sidebar-panel__search">
             <el-input
               ref="searchInput"
               :model-value="draftSearchQuery"
               :prefix-icon="Search"
-              placeholder="搜索会话"
+              placeholder="搜索好友、群聊或消息"
               aria-label="搜索会话"
               clearable
               @update:model-value="handleSearchInput"
               @clear="clearSearch"
             />
           </div>
+          <button
+            class="sidebar-panel__compose-trigger"
+            type="button"
+            aria-label="打开新建菜单"
+            aria-haspopup="menu"
+            :aria-expanded="composeMenuOpen"
+            data-testid="sidebar-open-compose"
+            @click="toggleComposeMenu"
+          >
+            <Plus />
+          </button>
+        </div>
+        <div class="sidebar-panel__folders">
+          <button
+            class="sidebar-panel__folder"
+            :class="{ 'is-active': conversationFolder === 'inbox' }"
+            type="button"
+            @click="emit('update:conversation-folder', 'inbox')"
+          >
+            收件箱
+          </button>
+          <button
+            class="sidebar-panel__folder"
+            :class="{ 'is-active': conversationFolder === 'unread' }"
+            type="button"
+            @click="emit('update:conversation-folder', 'unread')"
+          >
+            未读
+          </button>
+          <button
+            class="sidebar-panel__folder"
+            :class="{ 'is-active': conversationFolder === 'single' }"
+            type="button"
+            @click="emit('update:conversation-folder', 'single')"
+          >
+            私聊
+          </button>
+          <button
+            class="sidebar-panel__folder"
+            :class="{ 'is-active': conversationFolder === 'group' }"
+            type="button"
+            @click="emit('update:conversation-folder', 'group')"
+          >
+            群组
+          </button>
+          <button
+            class="sidebar-panel__folder"
+            :class="{ 'is-active': conversationFolder === 'channel' }"
+            type="button"
+            @click="emit('update:conversation-folder', 'channel')"
+          >
+            频道
+          </button>
+          <button
+            class="sidebar-panel__folder"
+            :class="{ 'is-active': conversationFolder === 'archived' }"
+            type="button"
+            @click="emit('update:conversation-folder', 'archived')"
+          >
+            已归档
+          </button>
         </div>
 
         <transition name="sidebar-menu-fade">
@@ -505,22 +681,46 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             </button>
 
             <div class="sidebar-global-menu__group">
-              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handleAddAccount">
                 <span class="sidebar-global-menu__icon"><Plus /></span>
                 <span class="sidebar-global-menu__label">添加账号</span>
+              </button>
+              <button
+                v-for="account in storedAccounts"
+                :key="account.userInfo.userId"
+                class="sidebar-global-menu__item"
+                type="button"
+                role="menuitem"
+                @click="handleSwitchAccount(account.userInfo.userId)"
+              >
+                <span class="sidebar-global-menu__icon"><UserFilled /></span>
+                <span class="sidebar-global-menu__label">
+                  {{ account.userInfo.nickname }}
+                  <small v-if="currentUser?.userId === account.userInfo.userId">当前</small>
+                </span>
+                <span class="sidebar-global-menu__meta">@{{ account.userInfo.username }}</span>
+                <span
+                  v-if="storedAccounts.length > 1 && currentUser?.userId !== account.userInfo.userId"
+                  class="sidebar-global-menu__remove"
+                  role="button"
+                  tabindex="0"
+                  @click.stop="handleRemoveAccount(account.userInfo.userId)"
+                >
+                  移除
+                </span>
               </button>
             </div>
 
             <div class="sidebar-global-menu__group">
-              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handleOpenSavedMessages">
                 <span class="sidebar-global-menu__icon"><Collection /></span>
-                <span class="sidebar-global-menu__label">收藏消息</span>
+                <span class="sidebar-global-menu__label">Saved Messages</span>
               </button>
-              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handleOpenGlobalSearch">
                 <span class="sidebar-global-menu__icon"><CirclePlus /></span>
-                <span class="sidebar-global-menu__label">我的动态</span>
+                <span class="sidebar-global-menu__label">全局搜索</span>
               </button>
-              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="openPanel('contacts')">
                 <span class="sidebar-global-menu__icon"><User /></span>
                 <span class="sidebar-global-menu__label">联系人</span>
               </button>
@@ -622,8 +822,12 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
         <ChatStatePanel
           v-else
           compact
-          title="这里还没有会话"
-          description="新的单聊或群聊会在这里按照最近消息时间排序展示。"
+          :title="conversationFolder === 'archived' ? '这里还没有归档会话' : '这里还没有会话'"
+          :description="
+            conversationFolder === 'archived'
+              ? '归档后的会话会集中出现在这里。'
+              : '新的单聊、群组或频道会在这里按最近消息时间排序展示。'
+          "
           role="status"
           aria-live="polite"
         />
@@ -637,32 +841,20 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
           aria-label="新建菜单"
           data-testid="sidebar-compose-menu"
         >
-          <button class="sidebar-compose-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+          <button class="sidebar-compose-menu__item" type="button" role="menuitem" @click="handleComposeAction('channel')">
             <span class="sidebar-compose-menu__icon"><Guide /></span>
             <span>新建频道</span>
           </button>
-          <button class="sidebar-compose-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+          <button class="sidebar-compose-menu__item" type="button" role="menuitem" @click="handleComposeAction('group')">
             <span class="sidebar-compose-menu__icon"><UserFilled /></span>
             <span>新建群组</span>
           </button>
-          <button class="sidebar-compose-menu__item" type="button" role="menuitem" @click="handlePlaceholderAction">
+          <button class="sidebar-compose-menu__item" type="button" role="menuitem" @click="handleComposeAction('single')">
             <span class="sidebar-compose-menu__icon"><ChatRound /></span>
             <span>新建私聊</span>
           </button>
         </div>
       </transition>
-
-      <button
-        class="sidebar-panel__fab"
-        type="button"
-        aria-label="打开新建菜单"
-        aria-haspopup="menu"
-        :aria-expanded="composeMenuOpen"
-        data-testid="sidebar-open-compose"
-        @click="toggleComposeMenu"
-      >
-        <EditPen />
-      </button>
 
       <transition name="sidebar-menu-fade">
         <div
@@ -764,7 +956,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               </article>
               <article>
                 <span>用户名</span>
-                <strong>{{ currentProfile?.username ?? currentUser?.username ?? '加载中' }}</strong>
+                <strong>@{{ currentProfile?.username ?? currentUser?.username ?? '加载中' }}</strong>
               </article>
               <article>
                 <span>手机号</span>
@@ -783,6 +975,17 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               <strong>Edit identity</strong>
             </div>
             <el-form label-position="top" class="profile-form">
+              <el-form-item label="公开用户名">
+                <el-input
+                  v-model="profileDraft.username"
+                  :disabled="!editingProfile || profileSaving"
+                  maxlength="24"
+                  placeholder="3-24 位字母、数字或下划线"
+                />
+                <div v-if="editingProfile && (usernameChecking || usernameMessage)" class="profile-form__hint" :class="{ 'is-error': usernameAvailable === false }">
+                  {{ usernameChecking ? '正在检查用户名可用性…' : usernameMessage }}
+                </div>
+              </el-form-item>
               <el-form-item label="昵称">
                 <el-input v-model="profileDraft.nickname" :disabled="!editingProfile || profileSaving" maxlength="24" />
               </el-form-item>
@@ -822,7 +1025,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
                   type="primary"
                   data-testid="profile-save"
                   :loading="profileSaving"
-                  :disabled="!profileDraft.nickname.trim()"
+                  :disabled="!profileDraft.nickname.trim() || !profileDraft.username.trim() || usernameChecking || usernameAvailable === false"
                   @click="submitProfile"
                 >
                   保存资料
@@ -996,20 +1199,72 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: flex;
   flex-direction: column;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 32%, transparent), transparent 14%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 36%, transparent), transparent 14%),
     var(--color-shell-panel);
   color: var(--color-text-1);
   overflow: hidden;
   border: 1px solid var(--color-shell-border);
-  border-radius: 26px;
+  border-radius: 32px;
   box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(24px);
 }
 
 .sidebar-panel__header {
   position: relative;
   z-index: 3;
-  padding: 16px 16px 10px;
+  padding: 18px 18px 12px;
   background: transparent;
+}
+
+.sidebar-panel__identity-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.sidebar-panel__identity {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.sidebar-panel__identity-copy {
+  min-width: 0;
+}
+
+.sidebar-panel__identity-copy strong,
+.sidebar-panel__identity-copy span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar-panel__identity-copy strong {
+  color: var(--color-text-1);
+  font: 700 0.96rem/1.15 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.sidebar-panel__identity-copy span {
+  margin-top: 5px;
+  color: var(--color-text-soft);
+  font: 500 0.72rem/1 var(--font-mono);
+}
+
+.sidebar-panel__toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .sidebar-panel__header--detail {
@@ -1022,19 +1277,47 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-panel__toolbar {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 42px;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.sidebar-panel__folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.sidebar-panel__folder {
+  min-width: 68px;
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  color: var(--color-text-2);
+  font: 600 0.74rem/1 var(--font-body);
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+
+.sidebar-panel__folder.is-active {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-card-strong));
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-shell-border));
+  color: var(--color-text-1);
 }
 
 .sidebar-panel__menu-trigger,
 .sidebar-panel__back {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   border: 1px solid var(--color-shell-border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--color-shell-action);
   color: var(--color-text-2);
   transition:
@@ -1054,20 +1337,31 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   transform: translateY(-1px);
 }
 
-.sidebar-panel__menu-bars {
-  display: inline-grid;
-  gap: 4px;
+.sidebar-panel__compose-trigger {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action));
+  color: var(--color-primary-strong);
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
-.sidebar-panel__menu-bars span {
-  width: 18px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
+.sidebar-panel__compose-trigger:hover,
+.sidebar-panel__compose-trigger:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 34%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-action-hover));
 }
 
 .sidebar-panel__search :deep(.el-input__wrapper) {
-  min-height: var(--control-height-lg);
+  min-height: 48px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
   box-shadow: var(--shadow-card);
@@ -1083,14 +1377,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-panel__notice {
-  margin: 4px 8px 12px 10px;
+  margin: 4px 12px 14px;
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
   align-items: stretch;
   gap: 8px;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 22px;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 4%, transparent), transparent 68%),
     linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), var(--color-shell-card));
@@ -1204,7 +1498,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-panel__scroll--list {
-  padding-bottom: 82px;
+  padding-bottom: 92px;
 }
 
 .sidebar-panel__list,
@@ -1215,34 +1509,13 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-panel__list {
   gap: 2px;
-  padding: 0 8px 0 10px;
+  padding: 0 10px 0 12px;
 }
 
 .sidebar-panel__skeletons,
 .sidebar-detail {
   gap: 12px;
-  padding: 4px 16px 24px;
-}
-
-.sidebar-panel__fab {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  z-index: 5;
-  width: 54px;
-  height: 54px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 18px;
-  background: var(--color-primary);
-  color: #fff;
-  box-shadow: 0 14px 24px color-mix(in srgb, var(--color-primary) 28%, transparent);
-}
-
-.sidebar-panel__fab :deep(svg) {
-  width: 22px;
-  height: 22px;
+  padding: 4px 18px 26px;
 }
 
 .sidebar-context-menu {
@@ -1250,11 +1523,11 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   z-index: 30;
   width: 236px;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  background: rgba(32, 33, 38, 0.96);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--color-shell-border);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, rgba(20, 20, 22, 0.12));
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(22px);
 }
 
 .sidebar-context-menu__item {
@@ -1266,9 +1539,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   gap: 12px;
   padding: 0 12px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: transparent;
-  color: #f4f6fa;
+  color: var(--color-text-1);
   text-align: left;
   transition:
     background var(--motion-fast) ease,
@@ -1277,7 +1550,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-context-menu__item:hover,
 .sidebar-context-menu__item:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-shell-inline);
 }
 
 .sidebar-context-menu__item.is-danger {
@@ -1286,7 +1559,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-context-menu__item.is-danger:hover,
 .sidebar-context-menu__item.is-danger:focus-visible {
-  background: rgba(255, 110, 104, 0.1);
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-shell-inline));
 }
 
 .sidebar-context-menu__icon {
@@ -1311,20 +1584,20 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-compose-menu {
   position: absolute;
-  right: 12px;
-  bottom: 80px;
+  right: 14px;
+  bottom: 88px;
   z-index: 6;
   width: min(286px, calc(100% - 24px));
   overflow: hidden;
   border: 1px solid var(--color-shell-border);
-  border-radius: 20px;
+  border-radius: 24px;
   background: var(--color-shell-card-strong);
   box-shadow: var(--shadow-panel);
 }
 
 .sidebar-compose-menu__item {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
@@ -1359,15 +1632,15 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-global-menu {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 10px;
+  left: 10px;
   z-index: 10;
   width: min(340px, calc(100% - 16px));
   display: grid;
   gap: 0;
   overflow: hidden;
   padding: 0;
-  border-radius: 20px;
+  border-radius: 24px;
   border: 1px solid var(--color-shell-border);
   background: var(--color-shell-card-strong);
   box-shadow: var(--shadow-panel);
@@ -1380,7 +1653,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   grid-template-columns: 50px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  min-height: 64px;
+  min-height: 72px;
   padding: 8px 18px 8px 16px;
   border: 0;
   background: transparent;
@@ -1421,16 +1694,16 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-global-menu__group {
   display: grid;
-  padding: 5px 0;
+  padding: 6px 0;
   border-top: 1px solid var(--color-shell-border);
 }
 
 .sidebar-global-menu__item {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 14px 0 18px;
   border: 0;
   border-radius: 0;
@@ -1471,6 +1744,24 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   font-weight: 600;
 }
 
+.sidebar-global-menu__label small {
+  margin-left: 6px;
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.sidebar-global-menu__meta {
+  color: var(--color-text-soft);
+  font: 500 0.68rem/1 var(--font-mono);
+}
+
+.sidebar-global-menu__remove {
+  color: var(--color-danger);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .sidebar-global-menu__chevron {
   display: inline-flex;
   justify-content: flex-end;
@@ -1499,6 +1790,17 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   min-width: 0;
 }
 
+.profile-form__hint {
+  margin-top: 8px;
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.profile-form__hint.is-error {
+  color: var(--color-danger);
+}
+
 .sidebar-panel__panel-copy span {
   display: block;
   color: var(--color-shell-eyebrow);
@@ -1524,8 +1826,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-section {
   display: grid;
   gap: 14px;
-  padding: 18px;
-  border-radius: 22px;
+  padding: 20px;
+  border-radius: 24px;
   background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
   border: 1px solid var(--color-shell-border);
   box-shadow: var(--shadow-inset-soft);
@@ -1582,9 +1884,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-item,
 .theme-card__option,
 .security-card {
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--color-shell-card-muted);
 }
 
@@ -1613,9 +1915,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .settings-tabs__item {
-  min-height: 40px;
+  min-height: 42px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--color-shell-action);
   color: var(--color-text-2);
   font-weight: 700;
@@ -1690,8 +1992,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-notice {
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 13px 15px;
+  border-radius: 16px;
   font-size: 0.8rem;
   line-height: 1.42;
 }

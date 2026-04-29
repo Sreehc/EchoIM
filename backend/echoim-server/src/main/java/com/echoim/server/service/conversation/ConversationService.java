@@ -14,9 +14,17 @@ public interface ConversationService {
 
     void readConversation(Long userId, Long conversationId, Long lastReadSeq);
 
+    ConversationItemVo createSingleConversation(Long userId, Long targetUserId);
+
+    ConversationItemVo createSavedConversation(Long userId);
+
     void updateTop(Long userId, Long conversationId, Integer isTop);
 
     void updateMute(Long userId, Long conversationId, Integer isMute);
+
+    void updateArchive(Long userId, Long conversationId, boolean archived);
+
+    void markConversationUnread(Long userId, Long conversationId, boolean unread);
 
     void deleteConversation(Long userId, Long conversationId);
 }

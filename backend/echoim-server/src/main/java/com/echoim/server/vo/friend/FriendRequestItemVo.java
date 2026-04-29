@@ -11,6 +11,9 @@ public class FriendRequestItemVo {
     private Integer status;
     private String direction;
     private LocalDateTime createdAt;
+    private String userNo;
+    private String nickname;
+    private String avatarUrl;
 
     public Long getRequestId() {
         return requestId;
@@ -66,5 +69,29 @@ public class FriendRequestItemVo {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getUserNo() {
+        return userNo;
+    }
+
+    public void setUserNo(String userNo) {
+        this.userNo = userNo;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 }

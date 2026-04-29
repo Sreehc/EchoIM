@@ -1,11 +1,25 @@
 import type {
   ChangePasswordPayload,
+  CallIceServer,
+  CallSessionSummary,
+  CallType,
   ChatFile,
   ConversationType,
   CurrentUserProfile,
+  FriendRequestItem,
   MessageForwardSource,
+  MessageReplySource,
   MessageType,
+  GroupMemberItem,
+  GroupCreatePayload,
+  GroupCreateResult,
+  GroupUpdatePayload,
+  FriendListItem,
+  MessageReactionStat,
+  StickerPayload,
+  SpecialConversationType,
   UpdateCurrentUserProfilePayload,
+  UserSearchItem,
   UserInfo,
 } from './chat'
 
@@ -33,6 +47,8 @@ export interface ApiLoginResponse {
 export type ApiCurrentUserProfile = CurrentUserProfile
 export type ApiUpdateCurrentUserProfilePayload = UpdateCurrentUserProfilePayload
 export type ApiChangePasswordPayload = ChangePasswordPayload
+export type ApiCallSessionSummary = CallSessionSummary
+export type ApiCallIceServer = CallIceServer
 
 export interface ApiUserPublicProfile {
   userId: number
@@ -76,6 +92,10 @@ export interface ApiConversationItem {
   latestSeq: number | null
   canSend: boolean | null
   myRole: number | null
+  archived?: boolean | null
+  manualUnread?: boolean | null
+  specialType?: SpecialConversationType | null
+  folderHints?: string[] | null
 }
 
 export interface ApiMessageItem {
@@ -103,6 +123,9 @@ export interface ApiMessageItem {
   readAt?: string | null
   viewCount?: number | null
   forwardSource?: MessageForwardSource | null
+  replySource?: MessageReplySource | null
+  reactions?: MessageReactionStat[] | null
+  sticker?: StickerPayload | null
 }
 
 export interface ApiOfflineSyncConversation {
@@ -136,6 +159,15 @@ export type WsMessageType =
   | 'READ'
   | 'MESSAGE_RECALL'
   | 'MESSAGE_EDIT'
+  | 'CALL_INVITE'
+  | 'CALL_ACCEPT'
+  | 'CALL_REJECT'
+  | 'CALL_CANCEL'
+  | 'CALL_END'
+  | 'CALL_OFFER'
+  | 'CALL_ANSWER'
+  | 'CALL_ICE_CANDIDATE'
+  | 'CALL_STATE'
   | 'NOTICE'
   | 'CONVERSATION_CHANGE'
   | 'FORCE_OFFLINE'
@@ -194,6 +226,17 @@ export interface WsConversationChangePayload {
   message?: ApiMessageItem
 }
 
+export interface WsCallSummaryPayload extends ApiCallSessionSummary {}
+
+export interface WsCallSignalPayload {
+  callId: number
+  conversationId: number
+  sdp?: string | null
+  candidate?: string | null
+  sdpMid?: string | null
+  sdpMLineIndex?: number | null
+}
+
 export interface WsSendSinglePayload {
   conversationId: number
   toUserId: number
@@ -210,6 +253,44 @@ export interface WsSendGroupPayload {
   content: string | null
   fileId: number | null
   extraJson?: unknown
+}
+
+export interface CreateCallPayload {
+  conversationId: number
+  callType: CallType
+}
+
+export type ApiUserSearchItem = UserSearchItem
+export type ApiGroupCreatePayload = GroupCreatePayload
+export type ApiGroupCreateResult = GroupCreateResult
+export type ApiFriendListItem = FriendListItem
+export type ApiFriendRequestItem = FriendRequestItem
+export type ApiGroupMemberItem = GroupMemberItem
+export type ApiGroupUpdatePayload = GroupUpdatePayload
+
+export interface ApiGlobalSearchResult {
+  conversations: ApiConversationItem[]
+  users: ApiUserSearchItem[]
+  messages: ApiGlobalSearchMessageItem[]
+}
+
+export interface ApiGlobalSearchMessageItem {
+  messageId: number
+  conversationId: number
+  conversationType: ConversationType
+  conversationName: string
+  specialType?: SpecialConversationType | null
+  fromUserId: number
+  senderName: string
+  msgType: MessageType
+  preview: string
+  sentAt: string | null
+  archived: boolean | null
+}
+
+export interface ApiUsernameAvailability {
+  available: boolean
+  username: string
 }
 
 export interface WsAckRequestPayload {

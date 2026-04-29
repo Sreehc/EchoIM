@@ -14,6 +14,7 @@ public class ImGroupEntity {
     private String groupNo;
     private String groupName;
     private Long ownerUserId;
+    private Integer conversationType;
     private String avatarUrl;
     private String notice;
     private Integer status;
@@ -50,6 +51,14 @@ public class ImGroupEntity {
 
     public void setOwnerUserId(Long ownerUserId) {
         this.ownerUserId = ownerUserId;
+    }
+
+    public Integer getConversationType() {
+        return conversationType;
+    }
+
+    public void setConversationType(Integer conversationType) {
+        this.conversationType = conversationType;
     }
 
     public String getAvatarUrl() {

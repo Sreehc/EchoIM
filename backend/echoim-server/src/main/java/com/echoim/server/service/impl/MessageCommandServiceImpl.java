@@ -6,6 +6,7 @@ import com.echoim.server.common.exception.BizException;
 import com.echoim.server.common.audit.AuditLogService;
 import com.echoim.server.dto.message.EditMessageRequestDto;
 import com.echoim.server.dto.message.ForwardMessageRequestDto;
+import com.echoim.server.entity.ImMessageReactionEntity;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImMessageEntity;
@@ -20,9 +21,12 @@ import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.service.config.SystemConfigService;
+import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.message.MessageCommandService;
 import com.echoim.server.service.message.MessageViewService;
+import com.echoim.server.vo.conversation.MessageItemVo;
 import com.echoim.server.vo.message.MessageForwardSourceVo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,37 +44,48 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     private static final int CONVERSATION_TYPE_GROUP = 2;
     private static final int CONVERSATION_TYPE_CHANNEL = 3;
     private static final int MESSAGE_TYPE_TEXT = 1;
+    private static final int MESSAGE_TYPE_STICKER = 2;
+    private static final int MESSAGE_TYPE_IMAGE = 3;
+    private static final int MESSAGE_TYPE_GIF = 4;
+    private static final int MESSAGE_TYPE_FILE = 5;
     private static final int MESSAGE_TYPE_SYSTEM = 6;
     private static final int MESSAGE_STATUS_RECALLED = 3;
     private static final String CONFIG_KEY_RECALL_SECONDS = "message.recall-seconds";
+    private static final String SAVED_BIZ_KEY_PREFIX = "saved_";
 
     private final ImMessageMapper imMessageMapper;
+    private final ImMessageReactionMapper imMessageReactionMapper;
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
     private final ImSingleChatService imSingleChatService;
     private final ImGroupChatService imGroupChatService;
     private final ImWsPushService imWsPushService;
+    private final FileService fileService;
     private final MessageViewService messageViewService;
     private final SystemConfigService systemConfigService;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
     public MessageCommandServiceImpl(ImMessageMapper imMessageMapper,
+                                     ImMessageReactionMapper imMessageReactionMapper,
                                      ImConversationMapper imConversationMapper,
                                      ImConversationUserMapper imConversationUserMapper,
                                      ImSingleChatService imSingleChatService,
                                      ImGroupChatService imGroupChatService,
                                      ImWsPushService imWsPushService,
+                                     FileService fileService,
                                      MessageViewService messageViewService,
                                      SystemConfigService systemConfigService,
                                      AuditLogService auditLogService,
                                      ObjectMapper objectMapper) {
         this.imMessageMapper = imMessageMapper;
+        this.imMessageReactionMapper = imMessageReactionMapper;
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imSingleChatService = imSingleChatService;
         this.imGroupChatService = imGroupChatService;
         this.imWsPushService = imWsPushService;
+        this.fileService = fileService;
         this.messageViewService = messageViewService;
         this.systemConfigService = systemConfigService;
         this.auditLogService = auditLogService;
@@ -146,6 +161,44 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         return Map.of("forwardedCount", forwardedCount);
     }
 
+    @Override
+    @Transactional
+    public MessageItemVo toggleReaction(Long userId, Long messageId, String emoji) {
+        String normalizedEmoji = emoji == null ? "" : emoji.trim();
+        if (normalizedEmoji.isEmpty() || normalizedEmoji.length() > 16) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "表情参数错误");
+        }
+        ImMessageEntity message = imMessageMapper.selectAccessibleEntityByIdAndUserId(messageId, userId);
+        if (message == null) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "消息不存在");
+        }
+        if (Integer.valueOf(MESSAGE_STATUS_RECALLED).equals(message.getSendStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "已撤回消息不能添加反应");
+        }
+
+        ImMessageReactionEntity existing = imMessageReactionMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessageReactionEntity>()
+                        .eq(ImMessageReactionEntity::getMessageId, messageId)
+                        .eq(ImMessageReactionEntity::getUserId, userId)
+                        .last("LIMIT 1"));
+        if (existing != null && normalizedEmoji.equals(existing.getEmoji())) {
+            imMessageReactionMapper.deleteById(existing.getId());
+        } else if (existing != null) {
+            existing.setEmoji(normalizedEmoji);
+            imMessageReactionMapper.updateById(existing);
+        } else {
+            ImMessageReactionEntity reaction = new ImMessageReactionEntity();
+            reaction.setMessageId(messageId);
+            reaction.setUserId(userId);
+            reaction.setEmoji(normalizedEmoji);
+            imMessageReactionMapper.insert(reaction);
+        }
+
+        auditLogService.log("MESSAGE_REACTION", Map.of("userId", userId, "messageId", messageId, "emoji", normalizedEmoji));
+        notifyMessageMutation(message, userId, null, "MESSAGE_REACTION");
+        return buildMessageItem(message, userId);
+    }
+
     private ImMessageEntity requireOwnedMessage(Long userId, Long messageId) {
         ImMessageEntity message = imMessageMapper.selectById(messageId);
         if (message == null || !Objects.equals(message.getFromUserId(), userId)) {
@@ -195,11 +248,13 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     }
 
     private WsMessage buildSingleForwardMessage(LoginUser loginUser, ImMessageEntity sourceMessage, ImConversationEntity conversation) {
-        Long toUserId = imConversationUserMapper.selectByConversationId(conversation.getId()).stream()
-                .map(ImConversationUserEntity::getUserId)
-                .filter(memberId -> !memberId.equals(loginUser.getUserId()))
-                .findFirst()
-                .orElseThrow(() -> new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "目标单聊不存在"));
+        Long toUserId = isSavedMessagesConversation(conversation)
+                ? loginUser.getUserId()
+                : imConversationUserMapper.selectByConversationId(conversation.getId()).stream()
+                        .map(ImConversationUserEntity::getUserId)
+                        .filter(memberId -> !memberId.equals(loginUser.getUserId()))
+                        .findFirst()
+                        .orElseThrow(() -> new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "目标单聊不存在"));
         WsChatSingleData data = new WsChatSingleData();
         data.setConversationId(conversation.getId());
         data.setToUserId(toUserId);
@@ -247,17 +302,21 @@ public class MessageCommandServiceImpl implements MessageCommandService {
 
     private String buildPreview(ImMessageEntity sourceMessage) {
         return switch (sourceMessage.getMsgType()) {
-            case 3 -> "[图片]";
-            case 5 -> "[文件]";
+            case MESSAGE_TYPE_STICKER -> "[贴纸]";
+            case MESSAGE_TYPE_IMAGE -> "[图片]";
+            case MESSAGE_TYPE_GIF -> "[GIF]";
+            case MESSAGE_TYPE_FILE -> "[文件]";
             default -> sourceMessage.getContent();
         };
     }
 
     private String resolveWsMsgType(Integer msgType) {
         return switch (msgType) {
-            case 3 -> "IMAGE";
-            case 5 -> "FILE";
-            case 6 -> "SYSTEM";
+            case MESSAGE_TYPE_STICKER -> "STICKER";
+            case MESSAGE_TYPE_IMAGE -> "IMAGE";
+            case MESSAGE_TYPE_GIF -> "GIF";
+            case MESSAGE_TYPE_FILE -> "FILE";
+            case MESSAGE_TYPE_SYSTEM -> "SYSTEM";
             default -> "TEXT";
         };
     }
@@ -269,7 +328,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         }
         String preview = Integer.valueOf(MESSAGE_STATUS_RECALLED).equals(message.getSendStatus())
                 ? "撤回了一条消息"
-                : message.getContent();
+                : buildPreview(message);
         imConversationMapper.updateLastMessageState(conversation.getId(), message.getId(), preview, message.getSentAt());
     }
 
@@ -283,9 +342,11 @@ public class MessageCommandServiceImpl implements MessageCommandService {
                 continue;
             }
             WsMessageItem item = toWsMessageItem(message, member.getUserId());
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("message", item);
-            imWsPushService.pushToUser(member.getUserId(), type, null, message.getClientMsgId(), payload);
+            if (type != null) {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("message", item);
+                imWsPushService.pushToUser(member.getUserId(), type, null, message.getClientMsgId(), payload);
+            }
             var conversationItem = imConversationMapper.selectConversationItemByUserId(message.getConversationId(), member.getUserId());
             if (conversationItem != null) {
                 imWsPushService.pushConversationChange(member.getUserId(), changeType, conversationItem, item);
@@ -308,7 +369,28 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         item.setFileId(entity.getFileId());
         item.setSendStatus(entity.getSendStatus());
         item.setSentAt(entity.getSentAt());
+        fileService.enrichWsMessage(viewerUserId, item);
         messageViewService.enrichWsMessage(viewerUserId, item, entity);
+        return item;
+    }
+
+    private MessageItemVo buildMessageItem(ImMessageEntity entity, Long viewerUserId) {
+        MessageItemVo item = new MessageItemVo();
+        item.setMessageId(entity.getId());
+        item.setConversationId(entity.getConversationId());
+        item.setConversationType(entity.getConversationType());
+        item.setSeqNo(entity.getSeqNo());
+        item.setClientMsgId(entity.getClientMsgId());
+        item.setFromUserId(entity.getFromUserId());
+        item.setToUserId(entity.getToUserId());
+        item.setGroupId(entity.getGroupId());
+        item.setMsgType(resolveWsMsgType(entity.getMsgType()));
+        item.setContent(entity.getContent());
+        item.setFileId(entity.getFileId());
+        item.setSendStatus(entity.getSendStatus());
+        item.setSentAt(entity.getSentAt());
+        fileService.enrichMessages(viewerUserId, List.of(item));
+        messageViewService.enrichMessages(viewerUserId, List.of(item));
         return item;
     }
 
@@ -317,6 +399,10 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         loginUser.setUserId(userId);
         loginUser.setTokenType("user");
         return loginUser;
+    }
+
+    private boolean isSavedMessagesConversation(ImConversationEntity conversation) {
+        return conversation.getBizKey() != null && conversation.getBizKey().startsWith(SAVED_BIZ_KEY_PREFIX);
     }
 
     private List<Long> distinctNonNull(List<Long> values) {

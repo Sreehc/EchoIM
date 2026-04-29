@@ -20,6 +20,27 @@
         LIMIT 1
     </select>
 
+    <select id="selectByUsernameExcludingUserId" resultType="com.echoim.server.entity.ImUserEntity">
+        SELECT id,
+               user_no AS userNo,
+               username,
+               password_hash AS passwordHash,
+               nickname,
+               avatar_url AS avatarUrl,
+               gender,
+               phone,
+               email,
+               signature,
+               status,
+               last_login_at AS lastLoginAt,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_user
+        WHERE username = #{username}
+          AND (#{excludeUserId} IS NULL OR id != #{excludeUserId})
+        LIMIT 1
+    </select>
+
     <sql id="FriendStatusCase">
         CASE
             WHEN u.id = #{currentUserId} THEN 'SELF'
@@ -123,6 +144,23 @@
                <include refid="PendingRequestIdExpr"/> AS pendingRequestId
         FROM im_user u
         WHERE u.id = #{targetUserId}
+          AND u.status = 1
+        LIMIT 1
+    </select>
+
+    <select id="selectPublicProfileByUsername" resultType="com.echoim.server.vo.user.UserPublicProfileVo">
+        SELECT u.id AS userId,
+               u.user_no AS userNo,
+               u.username AS username,
+               u.nickname AS nickname,
+               u.avatar_url AS avatarUrl,
+               u.gender AS gender,
+               u.signature AS signature,
+               u.status AS status,
+               <include refid="FriendStatusCase"/> AS friendStatus,
+               <include refid="PendingRequestIdExpr"/> AS pendingRequestId
+        FROM im_user u
+        WHERE u.username = #{username}
           AND u.status = 1
         LIMIT 1
     </select>

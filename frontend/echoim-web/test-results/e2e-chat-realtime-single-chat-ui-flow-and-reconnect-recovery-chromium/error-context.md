@@ -12,104 +12,166 @@
 # Error details
 
 ```
-Error: expect(page).toHaveURL(expected) failed
-
-Expected pattern: /\/chat/
-Received string:  "http://127.0.0.1:4173/login"
-Timeout: 15000ms
-
-Call log:
-  - Expect "toHaveURL" with timeout 15000ms
-    19 × unexpected value "http://127.0.0.1:4173/login"
-
+Error: Channel closed
 ```
 
-# Test source
+# Page snapshot
 
-```ts
-  1  | import { expect, type Page } from '@playwright/test'
-  2  | 
-  3  | interface E2EConversation {
-  4  |   conversationId: number
-  5  |   conversationName: string
-  6  |   peerUserId: number | null
-  7  |   groupId: number | null
-  8  |   lastMessagePreview: string
-  9  |   unreadCount: number
-  10 | }
-  11 | 
-  12 | export async function login(page: Page, username: string, password: string) {
-  13 |   await page.goto('/login')
-  14 |   await page.getByLabel('用户名').fill(username)
-  15 |   await page.getByLabel('密码').fill(password)
-  16 |   await page.getByRole('button', { name: '登录' }).click()
-> 17 |   await expect(page).toHaveURL(/\/chat/)
-     |                      ^ Error: expect(page).toHaveURL(expected) failed
-  18 |   await page.waitForFunction(() => Boolean(window.__ECHOIM_E2E__))
-  19 |   await page.waitForFunction(() => window.__ECHOIM_E2E__?.getConnectionStatus() === 'ready')
-  20 | }
-  21 | 
-  22 | export async function listConversations(page: Page) {
-  23 |   return page.evaluate(() => window.__ECHOIM_E2E__?.listConversations() ?? []) as Promise<E2EConversation[]>
-  24 | }
-  25 | 
-  26 | export async function waitForSingleConversation(page: Page, peerUserId: number) {
-  27 |   await page.waitForFunction(
-  28 |     (targetPeerUserId) =>
-  29 |       Boolean(window.__ECHOIM_E2E__?.listConversations().find((item) => item.peerUserId === targetPeerUserId)),
-  30 |     peerUserId,
-  31 |   )
-  32 | 
-  33 |   const conversations = await listConversations(page)
-  34 |   const conversation = conversations.find((item) => item.peerUserId === peerUserId)
-  35 |   if (!conversation) {
-  36 |     throw new Error(`Missing conversation for peerUserId=${peerUserId}`)
-  37 |   }
-  38 | 
-  39 |   return conversation
-  40 | }
-  41 | 
-  42 | export async function openConversation(page: Page, conversationId: number) {
-  43 |   await page.evaluate(async (targetConversationId) => {
-  44 |     await window.__ECHOIM_E2E__?.openConversation(targetConversationId)
-  45 |   }, conversationId)
-  46 | 
-  47 |   await page.waitForURL(new RegExp(`/chat/${conversationId}$`))
-  48 | }
-  49 | 
-  50 | export async function openLeftPanel(page: Page, mode: 'conversations' | 'me' | 'settings') {
-  51 |   await page.evaluate((targetMode) => {
-  52 |     window.__ECHOIM_E2E__?.openLeftPanel(targetMode)
-  53 |   }, mode)
-  54 | }
-  55 | 
-  56 | export async function dropRealtimeConnection(page: Page, pauseReconnect = true) {
-  57 |   await page.evaluate((shouldPauseReconnect) => {
-  58 |     window.__ECHOIM_E2E__?.dropRealtimeConnection(shouldPauseReconnect)
-  59 |   }, pauseReconnect)
-  60 | 
-  61 |   await page.waitForFunction(() => window.__ECHOIM_E2E__?.getConnectionStatus() === 'reconnecting')
-  62 | }
-  63 | 
-  64 | export async function reconnectRealtime(page: Page) {
-  65 |   await page.evaluate(async () => {
-  66 |     await window.__ECHOIM_E2E__?.reconnectRealtime()
-  67 |   })
-  68 | 
-  69 |   await page.waitForFunction(() => window.__ECHOIM_E2E__?.getConnectionStatus() === 'ready')
-  70 | }
-  71 | 
-  72 | export async function sendMessage(page: Page, content: string) {
-  73 |   await page.getByLabel('消息输入框').fill(content)
-  74 |   await page.getByTestId('send-message').click()
-  75 | }
-  76 | 
-  77 | export function statusForMessage(page: Page, messageText: string) {
-  78 |   return page
-  79 |     .locator('[data-testid^="message-row-"]')
-  80 |     .filter({ hasText: messageText })
-  81 |     .last()
-  82 |     .getByTestId('message-status')
-  83 | }
-  84 | 
+```yaml
+- generic [ref=e3]:
+  - navigation "辅助跳转":
+    - link "跳到主内容" [ref=e4] [cursor=pointer]:
+      - /url: "#chat-main"
+  - main [ref=e6]:
+    - heading "EchoIM 聊天工作台" [level=1] [ref=e7]
+    - status [ref=e8]: 实时连接已断开，正在尝试恢复。
+    - complementary [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - button "打开工作区菜单" [ref=e12] [cursor=pointer]
+          - generic [ref=e19]:
+            - img [ref=e22]
+            - textbox "搜索会话" [ref=e24]
+        - generic [ref=e25]:
+          - button "收件箱" [ref=e26] [cursor=pointer]
+          - button "未读" [ref=e27] [cursor=pointer]
+          - button "私聊" [ref=e28] [cursor=pointer]
+          - button "群组" [ref=e29] [cursor=pointer]
+          - button "频道" [ref=e30] [cursor=pointer]
+          - button "已归档" [ref=e31] [cursor=pointer]
+      - generic [ref=e32]:
+        - button "不错过新消息" [ref=e33] [cursor=pointer]:
+          - img [ref=e35]
+          - generic [ref=e39]:
+            - strong [ref=e40]: 不错过新消息
+            - paragraph [ref=e41]: 开启桌面通知，切到其他窗口也能及时收到提醒。
+        - button "关闭通知提示" [ref=e42] [cursor=pointer]:
+          - img [ref=e43]
+      - generic [ref=e48]:
+        - button "周 周序 置顶 11:11 pw-1777432305224-a" [ref=e49] [cursor=pointer]:
+          - generic [ref=e51]: 周
+          - generic [ref=e53]:
+            - generic [ref=e54]:
+              - generic [ref=e55]:
+                - strong [ref=e56]: 周序
+                - generic "置顶" [ref=e57]:
+                  - img [ref=e58]
+              - generic [ref=e60]: 11:11
+            - paragraph [ref=e62]: pw-1777432305224-a
+        - button "E EchoIM 工作台 04/27 通知条和空态都可以按这个数据回归。" [ref=e63] [cursor=pointer]:
+          - generic [ref=e65]: E
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - strong [ref=e69]: EchoIM 工作台
+              - generic [ref=e70]: 04/27
+            - paragraph [ref=e72]: 通知条和空态都可以按这个数据回归。
+        - button "宋 宋眠 04/27 浅色主题里这段摘要应该也清楚。" [ref=e73] [cursor=pointer]:
+          - generic [ref=e75]: 宋
+          - generic [ref=e77]:
+            - generic [ref=e78]:
+              - strong [ref=e80]: 宋眠
+              - generic [ref=e81]: 04/27
+            - paragraph [ref=e83]: 浅色主题里这段摘要应该也清楚。
+        - button "裴 裴见 04/27 我下午会继续压测 WebSocket。" [ref=e84] [cursor=pointer]:
+          - generic [ref=e86]: 裴
+          - generic [ref=e88]:
+            - generic [ref=e89]:
+              - strong [ref=e91]: 裴见
+              - generic [ref=e92]: 04/27
+            - paragraph [ref=e94]: 我下午会继续压测 WebSocket。
+        - button "程 程原 消息免打扰 04/26 收到，等你确认后我再发第二版。" [ref=e95] [cursor=pointer]:
+          - generic [ref=e97]: 程
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - strong [ref=e102]: 程原
+                - generic "消息免打扰" [ref=e103]:
+                  - img [ref=e104]
+              - generic [ref=e107]: 04/26
+            - paragraph [ref=e109]: 收到，等你确认后我再发第二版。
+      - button "打开新建菜单" [ref=e110] [cursor=pointer]:
+        - img [ref=e111]
+    - generic [ref=e113]:
+      - generic [ref=e114]:
+        - generic [ref=e116]:
+          - generic [ref=e118]: 周
+          - generic [ref=e119]:
+            - strong [ref=e121]: 周序
+            - paragraph [ref=e122]: E10002 · @echo_demo_02
+        - generic [ref=e123]:
+          - button "搜索当前会话内容" [ref=e124] [cursor=pointer]:
+            - img [ref=e125]
+          - button "打开会话详情" [ref=e127] [cursor=pointer]:
+            - img [ref=e128]
+          - button "发起语音通话" [ref=e130] [cursor=pointer]:
+            - img [ref=e131]
+          - button "更多操作" [ref=e134] [cursor=pointer]:
+            - img [ref=e135]
+      - status [ref=e137]:
+        - generic [ref=e138]: 实时连接已断开，正在尝试恢复。
+        - button "关闭状态提示" [ref=e139] [cursor=pointer]: 关闭
+      - generic [ref=e140]:
+        - region "消息列表" [ref=e142]:
+          - generic [ref=e144]:
+            - paragraph [ref=e146]: 已经到最早的消息了
+            - generic [ref=e148]: 4月25日 15:40
+            - generic [ref=e151]:
+              - paragraph [ref=e152]: 早上好，今天主要看聊天工作台这块。
+              - generic [ref=e153]:
+                - generic [ref=e154]: 15:40
+                - generic "已读" [ref=e155]: ✓✓
+            - generic [ref=e156]:
+              - generic [ref=e158]: 周
+              - generic [ref=e160]:
+                - paragraph [ref=e161]: 我先确认接口返回的中文和未读数。
+                - generic [ref=e163]: 15:42
+            - generic [ref=e166]:
+              - paragraph [ref=e167]: 如果看到乱码，优先按数据库字符集和连接参数排查。
+              - generic [ref=e168]:
+                - generic [ref=e169]: 15:45
+                - generic "已读" [ref=e170]: ✓✓
+            - generic [ref=e171]:
+              - generic [ref=e173]: 周
+              - generic [ref=e175]:
+                - paragraph [ref=e176]: 明白。我会用中文消息、长摘要和通知入口一起测。
+                - generic [ref=e178]: 15:48
+            - generic [ref=e180]: 4月27日 15:58
+            - generic [ref=e183]:
+              - paragraph [ref=e184]: 左侧列表点击后再显示聊天内容，这个行为也要保留。
+              - generic [ref=e185]:
+                - generic [ref=e186]: 15:58
+                - generic "已读" [ref=e187]: ✓✓
+            - generic [ref=e190]:
+              - paragraph [ref=e191]: 收到，我会注意不要自动打开最近会话。
+              - generic [ref=e193]: 16:02
+            - generic [ref=e196]:
+              - paragraph [ref=e197]: 通知授权那块我也会点一下，确认浏览器弹窗能出来。
+              - generic [ref=e199]: 16:09
+            - generic [ref=e200]:
+              - generic [ref=e202]: 周
+              - generic [ref=e204]:
+                - paragraph [ref=e205]: 我刚发了一条新消息，前端应该能显示未读。
+                - generic [ref=e207]: 16:13
+            - generic [ref=e209]: 11:11
+            - generic [ref=e212]:
+              - textbox [ref=e214]: pw-1777432305224-a
+              - generic [ref=e215]:
+                - button "取消" [ref=e216] [cursor=pointer]
+                - button "保存" [ref=e217] [cursor=pointer]
+            - generic [ref=e220]:
+              - textbox [ref=e222]: pw-1777432305224-a
+              - generic [ref=e223]:
+                - button "取消" [ref=e224] [cursor=pointer]
+                - button "保存" [ref=e225] [cursor=pointer]
+        - generic [ref=e227]:
+          - generic [ref=e228]:
+            - button "贴纸面板" [ref=e229] [cursor=pointer]:
+              - img [ref=e230]
+            - textbox "消息输入框" [ref=e234]:
+              - /placeholder: 输入消息，Enter 发送
+            - button "附件" [ref=e235] [cursor=pointer]:
+              - img [ref=e236]
+          - button "发送消息" [disabled] [ref=e238]:
+            - generic:
+              - img
 ```

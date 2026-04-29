@@ -1,6 +1,13 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { ChatPreferences, ConnectionStatus, LeftPanelMode, SettingsSection, ThemeMode } from '@/types/chat'
+import type {
+  ChatPreferences,
+  ConnectionStatus,
+  ConversationFolder,
+  LeftPanelMode,
+  SettingsSection,
+  ThemeMode,
+} from '@/types/chat'
 import { STORAGE_KEYS } from '@/utils/storage'
 
 type MobileView = 'list' | 'chat'
@@ -14,10 +21,12 @@ export const useUiStore = defineStore('ui', () => {
   const globalMenuOpen = ref(false)
   const mobileView = ref<MobileView>('list')
   const leftPanelMode = ref<LeftPanelMode>('conversations')
+  const conversationFolder = ref<ConversationFolder>('inbox')
   const settingsSection = ref<SettingsSection>('appearance')
   const sidebarSearchFocusToken = ref(0)
   const panelScrollTop = ref<Record<LeftPanelMode, number>>({
     conversations: 0,
+    contacts: 0,
     me: 0,
     settings: 0,
   })
@@ -27,7 +36,7 @@ export const useUiStore = defineStore('ui', () => {
   const isMobile = computed(() => viewportWidth.value <= 767)
   const isTablet = computed(() => viewportWidth.value >= 768 && viewportWidth.value <= 1279)
   const isDesktop = computed(() => viewportWidth.value >= 1280)
-  const useOverlayProfile = computed(() => true)
+  const useOverlayProfile = computed(() => !isDesktop.value)
 
   function initializeViewport() {
     if (initialized) return
@@ -98,6 +107,10 @@ export const useUiStore = defineStore('ui', () => {
     leftPanelMode.value = value
   }
 
+  function setConversationFolder(value: ConversationFolder) {
+    conversationFolder.value = value
+  }
+
   function openLeftPanel(value: LeftPanelMode, nextSection?: SettingsSection) {
     leftPanelMode.value = value
     if (nextSection) {
@@ -139,6 +152,7 @@ export const useUiStore = defineStore('ui', () => {
     topbarMenuOpen,
     mobileView,
     leftPanelMode,
+    conversationFolder,
     settingsSection,
     globalMenuOpen,
     sidebarSearchFocusToken,
@@ -158,6 +172,7 @@ export const useUiStore = defineStore('ui', () => {
     closeFloatingUi,
     setMobileView,
     setLeftPanelMode,
+    setConversationFolder,
     openLeftPanel,
     returnToConversationList,
     setSettingsSection,
@@ -169,7 +184,7 @@ export const useUiStore = defineStore('ui', () => {
 
 function readTheme(): ThemeMode {
   const stored = localStorage.getItem(STORAGE_KEYS.theme)
-  return stored === 'light' ? 'light' : 'dark'
+  return stored === 'dark' ? 'dark' : 'light'
 }
 
 function readChatPreferences(): ChatPreferences {

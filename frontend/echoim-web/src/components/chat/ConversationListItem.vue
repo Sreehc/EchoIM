@@ -9,6 +9,10 @@ const props = defineProps<{
   searchQuery?: string
   compact?: boolean
 }>()
+
+function visibleUnreadCount(item: ConversationSummary) {
+  return Math.max(item.unreadCount, item.manualUnread ? 1 : 0)
+}
 </script>
 
 <template>
@@ -75,8 +79,8 @@ const props = defineProps<{
             <span v-else>{{ part.text }}</span>
           </template>
         </p>
-        <div v-if="item.unreadCount" class="conversation-item__meta">
-          <span v-if="item.unreadCount" class="conversation-item__badge">{{ item.unreadCount }}</span>
+        <div v-if="visibleUnreadCount(item)" class="conversation-item__meta">
+          <span class="conversation-item__badge">{{ visibleUnreadCount(item) }}</span>
         </div>
       </div>
     </div>
@@ -89,10 +93,10 @@ const props = defineProps<{
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   gap: 14px;
-  min-height: 76px;
-  padding: 10px 12px;
+  min-height: 80px;
+  padding: 11px 13px;
   border: 1px solid transparent;
-  border-radius: 16px;
+  border-radius: 20px;
   background: transparent;
   text-align: left;
   transition:
@@ -104,7 +108,7 @@ const props = defineProps<{
 }
 
 .conversation-item.is-compact {
-  min-height: 68px;
+  min-height: 70px;
   padding-block: 8px;
 }
 
@@ -113,6 +117,7 @@ const props = defineProps<{
   background: color-mix(in srgb, var(--color-shell-card) 92%, transparent);
   border-color: var(--color-shell-border);
   box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
 }
 
 .conversation-item.is-active {
@@ -171,9 +176,9 @@ const props = defineProps<{
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   line-height: 1.18;
 }
 
@@ -193,8 +198,8 @@ const props = defineProps<{
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--color-text-3);
-  font-size: 0.86rem;
-  line-height: 1.24;
+  font-size: 0.83rem;
+  line-height: 1.28;
 }
 
 .conversation-item__meta {
@@ -224,16 +229,16 @@ const props = defineProps<{
 }
 
 .conversation-item__badge {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-accent) 86%, white);
   color: #fff;
-  font: 700 0.62rem/1 var(--font-mono);
+  font: 700 0.64rem/1 var(--font-mono);
 }
 
 .conversation-item.is-muted .conversation-item__badge {

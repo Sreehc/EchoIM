@@ -44,7 +44,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private static final int CONVERSATION_TYPE_CHANNEL = 3;
     private static final int CONVERSATION_STATUS_NORMAL = 1;
     private static final int MESSAGE_TYPE_TEXT = 1;
+    private static final int MESSAGE_TYPE_STICKER = 2;
     private static final int MESSAGE_TYPE_IMAGE = 3;
+    private static final int MESSAGE_TYPE_GIF = 4;
     private static final int MESSAGE_TYPE_FILE = 5;
     private static final int FILE_BIZ_TYPE_IMAGE = 2;
     private static final int FILE_BIZ_TYPE_FILE = 4;
@@ -55,6 +57,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private static final String ACK_TYPE_DELIVERED = "DELIVERED";
     private static final String CHANGE_TYPE_MESSAGE_NEW = "MESSAGE_NEW";
     private static final String CHANGE_TYPE_READ_UPDATE = "READ_UPDATE";
+    private static final String SAVED_BIZ_KEY_PREFIX = "saved_";
 
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
@@ -107,10 +110,13 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         validateSingleConversation(conversation);
         ImConversationUserEntity senderMember = requireMember(conversation.getId(), loginUser.getUserId());
         ImConversationUserEntity receiverMember = requireMember(conversation.getId(), data.getToUserId());
-        if (senderMember.getUserId().equals(receiverMember.getUserId())) {
+        boolean savedMessagesConversation = isSavedMessagesConversation(conversation);
+        if (!savedMessagesConversation && senderMember.getUserId().equals(receiverMember.getUserId())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "不能给自己发送单聊消息");
         }
-        friendService.validateSingleChatAllowed(loginUser.getUserId(), data.getToUserId());
+        if (!savedMessagesConversation) {
+            friendService.validateSingleChatAllowed(loginUser.getUserId(), data.getToUserId());
+        }
         ImFileEntity messageFile = validateAndLoadMessageFile(loginUser.getUserId(), data);
 
         ImMessageEntity entity = buildMessage(loginUser.getUserId(), data, message.getClientMsgId());
@@ -128,16 +134,18 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         }
 
         imConversationUserMapper.resetDeleted(conversation.getId(), loginUser.getUserId());
-        imConversationUserMapper.incrementUnread(conversation.getId(), data.getToUserId());
         imConversationMapper.updateLastMessage(conversation.getId(), entity.getId(), preview(entity, messageFile));
 
         WsMessageItem senderItem = toWsMessageItem(entity, loginUser.getUserId());
         fileService.enrichWsMessage(loginUser.getUserId(), senderItem);
-        WsMessageItem receiverItem = toWsMessageItem(entity, data.getToUserId());
-        fileService.enrichWsMessage(data.getToUserId(), receiverItem);
-        pushSingleMessage(data.getToUserId(), message, receiverItem);
         pushConversationChange(loginUser.getUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, senderItem);
-        pushConversationChange(data.getToUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, receiverItem);
+        if (!savedMessagesConversation) {
+            imConversationUserMapper.incrementUnread(conversation.getId(), data.getToUserId());
+            WsMessageItem receiverItem = toWsMessageItem(entity, data.getToUserId());
+            fileService.enrichWsMessage(data.getToUserId(), receiverItem);
+            pushSingleMessage(data.getToUserId(), message, receiverItem);
+            pushConversationChange(data.getToUserId(), conversation.getId(), CHANGE_TYPE_MESSAGE_NEW, receiverItem);
+        }
         return sendAckData(senderItem, false);
     }
 
@@ -207,7 +215,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (msgType == MESSAGE_TYPE_TEXT && !StringUtils.hasText(data.getContent())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文本消息内容不能为空");
         }
-        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
+        if ((msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件消息必须传 fileId");
         }
     }
@@ -258,8 +266,14 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (!StringUtils.hasText(msgType) || "TEXT".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_TEXT;
         }
+        if ("STICKER".equalsIgnoreCase(msgType)) {
+            return MESSAGE_TYPE_STICKER;
+        }
         if ("IMAGE".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_IMAGE;
+        }
+        if ("GIF".equalsIgnoreCase(msgType)) {
+            return MESSAGE_TYPE_GIF;
         }
         if ("FILE".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_FILE;
@@ -271,8 +285,14 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (Integer.valueOf(MESSAGE_TYPE_TEXT).equals(msgType)) {
             return "TEXT";
         }
+        if (Integer.valueOf(MESSAGE_TYPE_STICKER).equals(msgType)) {
+            return "STICKER";
+        }
         if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(msgType)) {
             return "IMAGE";
+        }
+        if (Integer.valueOf(MESSAGE_TYPE_GIF).equals(msgType)) {
+            return "GIF";
         }
         if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(msgType)) {
             return "FILE";
@@ -301,7 +321,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
     private ImFileEntity validateAndLoadMessageFile(Long userId, WsChatSingleData data) {
         int msgType = toMessageType(data.getMsgType());
-        if (msgType == MESSAGE_TYPE_IMAGE) {
+        if (msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_IMAGE);
         }
         if (msgType == MESSAGE_TYPE_FILE) {
@@ -312,7 +332,11 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
     private String preview(ImMessageEntity entity, ImFileEntity messageFile) {
         String preview;
-        if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(entity.getMsgType())) {
+        if (Integer.valueOf(MESSAGE_TYPE_STICKER).equals(entity.getMsgType())) {
+            preview = "[贴纸]";
+        } else if (Integer.valueOf(MESSAGE_TYPE_GIF).equals(entity.getMsgType())) {
+            preview = "[GIF]";
+        } else if (Integer.valueOf(MESSAGE_TYPE_IMAGE).equals(entity.getMsgType())) {
             preview = "[图片]";
         } else if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(entity.getMsgType())) {
             preview = "[文件] " + (messageFile == null ? "" : messageFile.getFileName());
@@ -451,5 +475,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (conversation != null) {
             imWsPushService.pushConversationChange(userId, changeType, conversation, message);
         }
+    }
+
+    private boolean isSavedMessagesConversation(ImConversationEntity conversation) {
+        return conversation.getBizKey() != null && conversation.getBizKey().startsWith(SAVED_BIZ_KEY_PREFIX);
     }
 }

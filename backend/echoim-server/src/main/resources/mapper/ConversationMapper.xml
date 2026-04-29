@@ -8,11 +8,13 @@
         SELECT c.id AS conversationId,
                c.conversation_type AS conversationType,
                CASE
+                   WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN c.conversation_name
                    WHEN c.conversation_type = 1 THEN COALESCE(NULLIF(f.remark, ''), other_u.nickname, c.conversation_name)
                    WHEN c.conversation_type IN (2, 3) THEN COALESCE(g.group_name, c.conversation_name)
                    ELSE c.conversation_name
                END AS conversationName,
                CASE
+                   WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN c.avatar_url
                    WHEN c.conversation_type = 1 THEN COALESCE(other_u.avatar_url, c.avatar_url)
                    WHEN c.conversation_type IN (2, 3) THEN COALESCE(g.avatar_url, c.avatar_url)
                    ELSE c.avatar_url
@@ -46,7 +48,10 @@
                cu.unread_count AS unreadCount,
                cu.is_top AS isTop,
                cu.is_mute AS isMute,
+               cu.is_archived AS archived,
+               cu.manual_unread AS manualUnread,
                CASE
+                   WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN NULL
                    WHEN c.conversation_type = 1 THEN other_cu.user_id
                    ELSE NULL
                END AS peerUserId,
@@ -69,7 +74,11 @@
                    WHEN c.conversation_type = 3 THEN COALESCE(current_gm.role = 1, FALSE)
                    ELSE TRUE
                END AS canSend,
-               current_gm.role AS myRole
+               current_gm.role AS myRole,
+               CASE
+                   WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN 'SAVED_MESSAGES'
+                   ELSE NULL
+               END AS specialType
     </sql>
 
     <sql id="ConversationItemJoins">
@@ -98,6 +107,7 @@
         <include refid="ConversationItemJoins"/>
         WHERE cu.user_id = #{userId}
           AND cu.deleted = 0
+          AND cu.is_archived = #{archived}
           AND c.status = 1
         ORDER BY cu.is_top DESC, c.last_message_time DESC, c.id DESC
         LIMIT #{offset}, #{pageSize}
@@ -133,6 +143,7 @@
         JOIN im_conversation c ON c.id = cu.conversation_id
         WHERE cu.user_id = #{userId}
           AND cu.deleted = 0
+          AND cu.is_archived = #{archived}
           AND c.status = 1
     </select>
 
@@ -189,6 +200,25 @@
                updated_at AS updatedAt
         FROM im_conversation
         WHERE conversation_type = 3
+          AND biz_id = #{groupId}
+        LIMIT 1
+    </select>
+
+    <select id="selectCollectiveConversationByGroupId" resultType="com.echoim.server.entity.ImConversationEntity">
+        SELECT id,
+               conversation_type AS conversationType,
+               biz_key AS bizKey,
+               biz_id AS bizId,
+               conversation_name AS conversationName,
+               avatar_url AS avatarUrl,
+               last_message_id AS lastMessageId,
+               last_message_preview AS lastMessagePreview,
+               last_message_time AS lastMessageTime,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_conversation
+        WHERE conversation_type IN (2, 3)
           AND biz_id = #{groupId}
         LIMIT 1
     </select>

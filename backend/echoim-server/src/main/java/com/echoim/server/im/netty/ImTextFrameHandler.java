@@ -9,6 +9,7 @@ import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.service.ImOnlineService;
 import com.echoim.server.im.service.ImGroupChatService;
 import com.echoim.server.im.service.ImSingleChatService;
+import com.echoim.server.service.call.CallService;
 import com.echoim.server.service.token.TokenService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,7 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
     private final ImOnlineService imOnlineService;
     private final ImSingleChatService imSingleChatService;
     private final ImGroupChatService imGroupChatService;
+    private final CallService callService;
     private final com.echoim.server.config.ImProperties imProperties;
 
     public ImTextFrameHandler(ObjectMapper objectMapper,
@@ -39,12 +41,14 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
                               ImOnlineService imOnlineService,
                               ImSingleChatService imSingleChatService,
                               ImGroupChatService imGroupChatService,
+                              CallService callService,
                               com.echoim.server.config.ImProperties imProperties) {
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.imOnlineService = imOnlineService;
         this.imSingleChatService = imSingleChatService;
         this.imGroupChatService = imGroupChatService;
+        this.callService = callService;
         this.imProperties = imProperties;
     }
 
@@ -70,6 +74,7 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
                 case CHAT_GROUP -> writeWsMessage(ctx, WsMessageType.ACK, message, imGroupChatService.sendGroup(loginUser, message));
                 case ACK -> writeWsMessage(ctx, WsMessageType.ACK, message, imSingleChatService.deliveredAck(loginUser, message));
                 case READ -> writeWsMessage(ctx, WsMessageType.READ, message, imSingleChatService.read(loginUser, message));
+                case CALL_OFFER, CALL_ANSWER, CALL_ICE_CANDIDATE -> callService.relaySignal(loginUser, message);
                 default -> writeNotice(ctx, message, ErrorCode.PARAM_ERROR, "不支持的消息类型");
             }
         } catch (BizException ex) {

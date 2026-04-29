@@ -9,6 +9,8 @@ public class ConversationPageQueryDto {
 
     @Min(value = 1, message = "pageSize 最小为 1")
     private Long pageSize = 20L;
+    private Integer archived = 0;
+    private String folder;
 
     public Long getPageNo() {
         return pageNo;
@@ -24,5 +26,21 @@ public class ConversationPageQueryDto {
 
     public void setPageSize(Long pageSize) {
         this.pageSize = pageSize;
+    }
+
+    public Integer getArchived() {
+        return archived;
+    }
+
+    public void setArchived(Integer archived) {
+        this.archived = archived;
+    }
+
+    public String getFolder() {
+        return folder;
+    }
+
+    public void setFolder(String folder) {
+        this.folder = folder;
     }
 }

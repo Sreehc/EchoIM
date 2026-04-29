@@ -15,9 +15,9 @@
                m.group_id AS groupId,
                CASE m.msg_type
                    WHEN 1 THEN 'TEXT'
-                   WHEN 2 THEN 'EMOJI'
+                   WHEN 2 THEN 'STICKER'
                    WHEN 3 THEN 'IMAGE'
-                   WHEN 4 THEN 'VIDEO'
+                   WHEN 4 THEN 'GIF'
                    WHEN 5 THEN 'FILE'
                    WHEN 6 THEN 'SYSTEM'
                    ELSE 'UNKNOWN'
@@ -163,5 +163,76 @@
                   )
           )
         LIMIT 1
+    </select>
+
+    <select id="selectGlobalSearchMessages" resultType="com.echoim.server.vo.search.GlobalSearchMessageItemVo">
+        SELECT m.id AS messageId,
+               m.conversation_id AS conversationId,
+               m.conversation_type AS conversationType,
+               CASE
+                   WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN c.conversation_name
+                   WHEN c.conversation_type = 1 THEN COALESCE(NULLIF(f.remark, ''), other_u.nickname, c.conversation_name)
+                   WHEN c.conversation_type IN (2, 3) THEN COALESCE(g.group_name, c.conversation_name)
+                   ELSE c.conversation_name
+               END AS conversationName,
+               CASE
+                   WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN 'SAVED_MESSAGES'
+                   ELSE NULL
+               END AS specialType,
+               m.from_user_id AS fromUserId,
+               sender.nickname AS senderName,
+               CASE m.msg_type
+                   WHEN 2 THEN 'STICKER'
+                   WHEN 3 THEN 'IMAGE'
+                   WHEN 4 THEN 'GIF'
+                   WHEN 5 THEN 'FILE'
+                   WHEN 6 THEN 'SYSTEM'
+                   ELSE 'TEXT'
+               END AS msgType,
+               CASE
+                   WHEN m.msg_type = 2 THEN '[贴纸]'
+                   WHEN m.msg_type = 3 THEN COALESCE(NULLIF(m.content, ''), '[图片]')
+                   WHEN m.msg_type = 4 THEN COALESCE(NULLIF(m.content, ''), '[GIF]')
+                   WHEN m.msg_type = 5 THEN COALESCE(NULLIF(m.content, ''), '[文件]')
+                   ELSE m.content
+               END AS preview,
+               m.sent_at AS sentAt,
+               cu.is_archived AS archived
+        FROM im_message m
+        JOIN im_conversation c ON c.id = m.conversation_id
+        JOIN im_conversation_user cu
+          ON cu.conversation_id = c.id
+         AND cu.user_id = #{userId}
+         AND cu.deleted = 0
+        LEFT JOIN im_group_member gm
+               ON c.conversation_type IN (2, 3)
+              AND gm.group_id = c.biz_id
+              AND gm.user_id = #{userId}
+        LEFT JOIN im_conversation_user other_cu
+               ON c.conversation_type = 1
+              AND other_cu.conversation_id = c.id
+              AND other_cu.user_id != #{userId}
+        LEFT JOIN im_user other_u ON other_u.id = other_cu.user_id
+        LEFT JOIN im_friend f
+               ON f.user_id = #{userId}
+              AND f.friend_user_id = other_u.id
+        LEFT JOIN im_group g
+               ON c.conversation_type IN (2, 3)
+              AND g.id = c.biz_id
+        LEFT JOIN im_user sender ON sender.id = m.from_user_id
+        WHERE c.status = 1
+          AND m.send_status != 3
+          AND m.content IS NOT NULL
+          AND m.content != ''
+          AND m.content LIKE CONCAT('%', #{keyword}, '%')
+          AND (
+              c.conversation_type NOT IN (2, 3)
+                  OR (
+                      gm.id IS NOT NULL
+                  AND (gm.status = 1 OR m.seq_no &lt;= cu.last_read_seq)
+                  )
+          )
+        ORDER BY m.sent_at DESC, m.id DESC
+        LIMIT #{limit}
     </select>
 </mapper>

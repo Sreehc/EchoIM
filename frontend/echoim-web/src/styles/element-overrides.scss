@@ -25,7 +25,7 @@
 
 .el-input__wrapper,
 .el-textarea__inner {
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--color-shell-inline);
   border: 1px solid var(--color-shell-border);
   color: var(--color-text-1);
@@ -43,7 +43,7 @@
 
 .el-button {
   min-height: var(--control-height-md);
-  border-radius: 16px;
+  border-radius: 18px;
   font-weight: 600;
   border-color: var(--color-shell-border);
   background: var(--color-shell-action);
@@ -60,7 +60,7 @@
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: #fff;
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-primary) 22%, transparent);
+  box-shadow: 0 16px 30px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 .el-button:hover,
@@ -100,13 +100,14 @@
 
 .el-dropdown-menu,
 .el-message-box,
+.el-dialog,
 .el-select-dropdown,
 .el-popover {
   border: 1px solid var(--color-shell-border) !important;
-  border-radius: 20px !important;
+  border-radius: 24px !important;
   background: var(--color-shell-card-strong) !important;
   box-shadow: var(--shadow-panel) !important;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(22px);
 }
 
 .el-dropdown__popper.el-popper {
@@ -123,11 +124,12 @@
 }
 
 .el-dropdown-menu {
-  padding: 6px !important;
+  padding: 8px !important;
 }
 
 .el-dropdown-menu__item {
-  border-radius: 12px;
+  min-height: 40px;
+  border-radius: 14px;
   color: var(--color-text-1);
 }
 
@@ -147,6 +149,23 @@
   color: var(--color-text-1);
 }
 
+.el-dialog__header {
+  padding: 22px 24px 8px;
+}
+
+.el-dialog__body {
+  padding: 12px 24px 24px;
+}
+
+.el-dialog__title {
+  font: var(--font-title-sm);
+  color: var(--color-text-1);
+}
+
+.el-overlay-dialog {
+  backdrop-filter: blur(6px);
+}
+
 .el-message-box__btns {
   padding-top: 8px;
 }
@@ -157,7 +176,7 @@
 }
 
 .el-radio-button__inner {
-  border-radius: 16px !important;
+  border-radius: 18px !important;
   background: var(--color-shell-action);
   border-color: var(--color-shell-border);
   box-shadow: none !important;
@@ -170,4 +189,9 @@
 
 .el-skeleton__item {
   background: color-mix(in srgb, var(--color-shell-inline) 82%, transparent) !important;
+}
+
+.el-scrollbar__bar.is-vertical > div,
+.el-scrollbar__bar.is-horizontal > div {
+  background: color-mix(in srgb, var(--color-text-soft) 30%, transparent) !important;
 }

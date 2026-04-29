@@ -49,6 +49,14 @@ export async function putJson<T>(path: string, body?: unknown, init?: RequestIni
   })
 }
 
+export async function postForm<T>(path: string, body: FormData, init?: RequestInit) {
+  return requestJson<T>(path, {
+    ...init,
+    method: 'POST',
+    body,
+  })
+}
+
 export async function deleteJson<T>(path: string, init?: RequestInit) {
   return requestJson<T>(path, { ...init, method: 'DELETE' })
 }
@@ -63,7 +71,7 @@ export async function requestJson<T>(path: string, init: RequestInit): Promise<T
   const headers = new Headers(init.headers ?? {})
   const token = getToken()
 
-  if (init.body && !headers.has('Content-Type')) {
+  if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 

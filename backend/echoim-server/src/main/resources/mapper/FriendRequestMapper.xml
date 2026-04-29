@@ -5,19 +5,27 @@
 <mapper namespace="com.echoim.server.mapper.ImFriendRequestMapper">
 
     <select id="selectRelatedRequests" resultType="com.echoim.server.vo.friend.FriendRequestItemVo">
-        SELECT id AS requestId,
-               from_user_id AS fromUserId,
-               to_user_id AS toUserId,
-               apply_msg AS applyMsg,
-               status AS status,
+        SELECT r.id AS requestId,
+               r.from_user_id AS fromUserId,
+               r.to_user_id AS toUserId,
+               r.apply_msg AS applyMsg,
+               r.status AS status,
                CASE
-                   WHEN to_user_id = #{userId} THEN 'INBOUND'
+                   WHEN r.to_user_id = #{userId} THEN 'INBOUND'
                    ELSE 'OUTBOUND'
                END AS direction,
-               created_at AS createdAt
-        FROM im_friend_request
-        WHERE from_user_id = #{userId}
-           OR to_user_id = #{userId}
-        ORDER BY created_at DESC, id DESC
+               r.created_at AS createdAt,
+               actor.user_no AS userNo,
+               actor.nickname AS nickname,
+               actor.avatar_url AS avatarUrl
+        FROM im_friend_request r
+        JOIN im_user actor
+          ON actor.id = CASE
+              WHEN r.to_user_id = #{userId} THEN r.from_user_id
+              ELSE r.to_user_id
+          END
+        WHERE r.from_user_id = #{userId}
+           OR r.to_user_id = #{userId}
+        ORDER BY r.created_at DESC, r.id DESC
     </select>
 </mapper>

@@ -1,5 +1,5 @@
 -- EchoIM test data seed
--- Run after sql/数据库设计.sql.
+-- Run after sql/init.sql.
 -- All demo user passwords are: 123456
 
 SET NAMES utf8mb4 COLLATE utf8mb4_general_ci;
@@ -25,7 +25,7 @@ VALUES
   (1, 'file.max-size-mb', '50', '文件上传大小限制', '上传文件最大 50MB', 1, NOW(), NOW()),
   (2, 'message.recall-seconds', '120', '消息撤回时间限制', '发送后 120 秒内可撤回', 1, NOW(), NOW()),
   (3, 'register.enabled', 'true', '是否允许注册', '控制前台注册开关', 1, NOW(), NOW()),
-  (4, 'demo.seed-version', '2026-04-27', '演示数据版本', '用于确认 initdata.sql 是否已经执行', 1, NOW(), NOW())
+  (4, 'demo.seed-version', '2026-04-29', '演示数据版本', '用于确认 initdata.sql 是否已经执行', 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
   config_value = VALUES(config_value),
   config_name = VALUES(config_name),
@@ -56,6 +56,17 @@ ON DUPLICATE KEY UPDATE
   updated_at = NOW();
 
 -- Remove only deterministic seed data so the script can be re-run safely.
+DELETE FROM im_message_reaction
+WHERE id BETWEEN 70001 AND 70020
+   OR message_id BETWEEN 40001 AND 40050
+   OR user_id BETWEEN 10001 AND 10006;
+
+DELETE FROM im_call_session
+WHERE id BETWEEN 71001 AND 71020
+   OR conversation_id BETWEEN 30001 AND 30010
+   OR caller_user_id BETWEEN 10001 AND 10006
+   OR callee_user_id BETWEEN 10001 AND 10006;
+
 DELETE FROM im_message_receipt
 WHERE message_id BETWEEN 40001 AND 40040
    OR conversation_id BETWEEN 30001 AND 30010
@@ -130,10 +141,10 @@ VALUES
   (10, 10006, 10001, 'Echo用户01', 1, TIMESTAMPADD(DAY, -3, NOW()), NOW());
 
 -- Group and members.
-INSERT INTO im_group (id, group_no, group_name, owner_user_id, avatar_url, notice, status, created_at, updated_at)
+INSERT INTO im_group (id, group_no, group_name, owner_user_id, conversation_type, avatar_url, notice, status, created_at, updated_at)
 VALUES
-  (20001, 'G20001', 'EchoIM 工作台', 10001, NULL, '用于测试群聊、未读、通知和长消息展示。', 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (20002, 'G20002', 'EchoIM 发布频道', 10001, NULL, '仅创建者可发送消息，用于测试频道消息样式和查看人数。', 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
+  (20001, 'G20001', 'EchoIM 工作台', 10001, 2, NULL, '用于测试群聊、未读、通知和长消息展示。', 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (20002, 'G20002', 'EchoIM 发布频道', 10001, 3, NULL, '仅创建者可发送消息，用于测试频道消息样式和查看人数。', 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
 
 INSERT INTO im_group_member (id, group_id, user_id, role, nick_name, join_source, join_at, status, updated_at)
 VALUES
@@ -160,28 +171,28 @@ VALUES
   (30005, 1, '10001_10005', NULL, '程原', NULL, 40038, '收到，等你确认后我再发第二版。', TIMESTAMPADD(DAY, -1, NOW()), 1, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
   (30006, 3, 'channel_20002', 20002, 'EchoIM 发布频道', NULL, 40042, '今晚会把新一版消息状态展示合并到主分支。', TIMESTAMPADD(MINUTE, -16, NOW()), 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
 
-INSERT INTO im_conversation_user (id, conversation_id, user_id, unread_count, last_read_seq, is_top, is_mute, deleted, created_at, updated_at)
+INSERT INTO im_conversation_user (id, conversation_id, user_id, unread_count, last_read_seq, is_top, is_mute, is_archived, manual_unread, deleted, created_at, updated_at)
 VALUES
-  (1, 30001, 10001, 2, 6, 1, 0, 0, TIMESTAMPADD(DAY, -7, NOW()), NOW()),
-  (2, 30001, 10002, 0, 8, 0, 0, 0, TIMESTAMPADD(DAY, -7, NOW()), NOW()),
-  (3, 30002, 10001, 4, 8, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (4, 30002, 10002, 0, 12, 1, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (5, 30002, 10003, 1, 11, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (6, 30002, 10004, 2, 10, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (7, 30002, 10005, 0, 12, 0, 1, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (8, 30002, 10006, 0, 12, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (9, 30003, 10001, 0, 6, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (10, 30003, 10003, 0, 6, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (11, 30004, 10001, 1, 5, 0, 0, 0, TIMESTAMPADD(DAY, -5, NOW()), NOW()),
-  (12, 30004, 10004, 0, 6, 0, 0, 0, TIMESTAMPADD(DAY, -5, NOW()), NOW()),
-  (13, 30005, 10001, 0, 4, 0, 1, 0, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
-  (14, 30005, 10005, 0, 4, 0, 0, 0, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
-  (15, 30006, 10001, 0, 4, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
-  (16, 30006, 10002, 0, 4, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
-  (17, 30006, 10003, 1, 3, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
-  (18, 30006, 10004, 0, 4, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
-  (19, 30006, 10005, 2, 2, 0, 1, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
-  (20, 30006, 10006, 3, 1, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW());
+  (1, 30001, 10001, 2, 6, 1, 0, 0, 0, 0, TIMESTAMPADD(DAY, -7, NOW()), NOW()),
+  (2, 30001, 10002, 0, 8, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -7, NOW()), NOW()),
+  (3, 30002, 10001, 4, 8, 0, 0, 0, 1, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (4, 30002, 10002, 0, 12, 1, 0, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (5, 30002, 10003, 1, 11, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (6, 30002, 10004, 2, 10, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (7, 30002, 10005, 0, 12, 0, 1, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (8, 30002, 10006, 0, 12, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (9, 30003, 10001, 0, 6, 0, 0, 1, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (10, 30003, 10003, 0, 6, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (11, 30004, 10001, 1, 5, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -5, NOW()), NOW()),
+  (12, 30004, 10004, 0, 6, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -5, NOW()), NOW()),
+  (13, 30005, 10001, 0, 4, 0, 1, 0, 0, 0, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
+  (14, 30005, 10005, 0, 4, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
+  (15, 30006, 10001, 0, 4, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
+  (16, 30006, 10002, 0, 4, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
+  (17, 30006, 10003, 1, 3, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
+  (18, 30006, 10004, 0, 4, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
+  (19, 30006, 10005, 2, 2, 0, 1, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW()),
+  (20, 30006, 10006, 3, 1, 0, 0, 0, 0, 0, TIMESTAMPADD(DAY, -2, NOW()), NOW());
 
 -- Text-only messages. Avoid file_id here so local OSS/minio config is not required for message loading.
 INSERT INTO im_message (id, conversation_id, conversation_type, seq_no, client_msg_id, from_user_id, to_user_id, group_id, msg_type, content, extra_json, file_id, send_status, sent_at, created_at, updated_at)
@@ -231,6 +242,18 @@ VALUES
   (40040, 30006, 3, 2, 'seed-cmsg-40040', 10001, NULL, 20002, 1, '频道消息旁边会显示真实查看人数，不显示群聊那种双对号。', NULL, NULL, 1, TIMESTAMPADD(HOUR, -3, NOW()), NOW(), NOW()),
   (40041, 30006, 3, 3, 'seed-cmsg-40041', 10001, NULL, 20002, 1, '如果你是创建者，输入区保持可发；普通成员只会看到只读提示。', NULL, NULL, 1, TIMESTAMPADD(HOUR, -2, NOW()), NOW(), NOW()),
   (40042, 30006, 3, 4, 'seed-cmsg-40042', 10001, NULL, 20002, 1, '今晚会把新一版消息状态展示合并到主分支。', NULL, NULL, 1, TIMESTAMPADD(MINUTE, -16, NOW()), NOW(), NOW());
+
+INSERT INTO im_message_reaction (id, message_id, user_id, emoji, created_at, updated_at)
+VALUES
+  (70001, 40008, 10001, '👍', TIMESTAMPADD(MINUTE, -2, NOW()), NOW()),
+  (70002, 40018, 10001, '🔥', TIMESTAMPADD(MINUTE, -30, NOW()), NOW()),
+  (70003, 40022, 10003, '❤️', TIMESTAMPADD(MINUTE, -6, NOW()), NOW()),
+  (70004, 40042, 10002, '👏', TIMESTAMPADD(MINUTE, -10, NOW()), NOW());
+
+INSERT INTO im_call_session (id, conversation_id, call_type, caller_user_id, callee_user_id, status, started_at, answered_at, ended_at, end_reason, created_at, updated_at)
+VALUES
+  (71001, 30001, 'audio', 10001, 10002, 'ended', TIMESTAMPADD(HOUR, -20, NOW()), TIMESTAMPADD(HOUR, -20, TIMESTAMPADD(SECOND, 8, NOW())), TIMESTAMPADD(HOUR, -20, TIMESTAMPADD(MINUTE, 6, NOW())), 'hangup', NOW(), NOW()),
+  (71002, 30004, 'audio', 10004, 10001, 'missed', TIMESTAMPADD(HOUR, -9, NOW()), NULL, TIMESTAMPADD(HOUR, -9, TIMESTAMPADD(SECOND, 30, NOW())), 'timeout', NOW(), NOW());
 
 -- Receipts for single-chat messages sent by echo_demo_01.
 INSERT INTO im_message_receipt (id, message_id, conversation_id, user_id, receipt_type, receipt_at)

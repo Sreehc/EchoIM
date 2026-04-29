@@ -1,4 +1,5 @@
 import type {
+  WsCallSignalPayload,
   WsAckRequestPayload,
   WsEnvelope,
   WsMessageType,
@@ -111,6 +112,18 @@ export class EchoWsClient {
 
   sendRead(conversationId: number, lastReadSeq: number) {
     this.send('READ', { conversationId, lastReadSeq })
+  }
+
+  sendCallOffer(data: WsCallSignalPayload, clientMsgId?: string) {
+    this.send('CALL_OFFER', data, clientMsgId)
+  }
+
+  sendCallAnswer(data: WsCallSignalPayload, clientMsgId?: string) {
+    this.send('CALL_ANSWER', data, clientMsgId)
+  }
+
+  sendCallIceCandidate(data: WsCallSignalPayload, clientMsgId?: string) {
+    this.send('CALL_ICE_CANDIDATE', data, clientMsgId)
   }
 
   private async openSocket(isReconnect: boolean) {

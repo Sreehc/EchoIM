@@ -14,6 +14,13 @@ defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read']
+  'update-group-meta': []
+  'update-group-notice': []
+  'promote-member': [payload: { userId: number; role: 2 | 3 }]
+  'remove-member': [userId: number]
+  'add-members': []
+  'leave-group': []
+  'dissolve-group': []
 }>()
 </script>
 
@@ -35,6 +42,13 @@ const emit = defineEmits<{
       :error-message="errorMessage"
       @close="emit('update:visible', false)"
       @action="emit('action', $event)"
+      @update-group-meta="emit('update-group-meta')"
+      @update-group-notice="emit('update-group-notice')"
+      @promote-member="emit('promote-member', $event)"
+      @remove-member="emit('remove-member', $event)"
+      @add-members="emit('add-members')"
+      @leave-group="emit('leave-group')"
+      @dissolve-group="emit('dissolve-group')"
     />
   </el-drawer>
 
@@ -46,6 +60,13 @@ const emit = defineEmits<{
       :error-message="errorMessage"
       @close="emit('update:visible', false)"
       @action="emit('action', $event)"
+      @update-group-meta="emit('update-group-meta')"
+      @update-group-notice="emit('update-group-notice')"
+      @promote-member="emit('promote-member', $event)"
+      @remove-member="emit('remove-member', $event)"
+      @add-members="emit('add-members')"
+      @leave-group="emit('leave-group')"
+      @dissolve-group="emit('dissolve-group')"
     />
   </aside>
 </template>
@@ -60,7 +81,7 @@ const emit = defineEmits<{
 :global(.conversation-profile-drawer .el-drawer) {
   overflow: hidden;
   box-shadow: none;
-  border-left: 1px solid var(--color-line);
+  border-left: 1px solid var(--color-shell-border);
 }
 
 :global(.conversation-profile-drawer__body),
@@ -73,7 +94,6 @@ const emit = defineEmits<{
 .profile-panel-shell {
   height: 100%;
   min-height: 0;
-  border-left: 1px solid var(--color-line);
   overflow: hidden;
 }
 </style>

@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS im_group (
   group_no VARCHAR(32) NOT NULL COMMENT '群编号',
   group_name VARCHAR(100) NOT NULL COMMENT '群名称',
   owner_user_id BIGINT NOT NULL COMMENT '群主ID',
+  conversation_type TINYINT NOT NULL DEFAULT 2 COMMENT '2群聊 3频道',
   avatar_url VARCHAR(255) DEFAULT NULL COMMENT '群头像',
   notice TEXT DEFAULT NULL COMMENT '群公告',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '1正常 2解散 3禁用',
@@ -108,11 +109,14 @@ CREATE TABLE IF NOT EXISTS im_conversation_user (
   last_read_seq BIGINT NOT NULL DEFAULT 0 COMMENT '最后已读序号',
   is_top TINYINT NOT NULL DEFAULT 0 COMMENT '0否 1是',
   is_mute TINYINT NOT NULL DEFAULT 0 COMMENT '0否 1是',
+  is_archived TINYINT NOT NULL DEFAULT 0 COMMENT '0否 1是',
+  manual_unread TINYINT NOT NULL DEFAULT 0 COMMENT '0否 1是',
   deleted TINYINT NOT NULL DEFAULT 0 COMMENT '0否 1是',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_conversation_user (conversation_id, user_id),
-  KEY idx_user_id_top (user_id, is_top)
+  KEY idx_user_id_top (user_id, is_archived, is_top),
+  KEY idx_user_manual_unread (user_id, manual_unread)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户会话表';
 
 CREATE TABLE IF NOT EXISTS im_file (

@@ -13,6 +13,8 @@ public class CreateGroupRequestDto {
     @NotEmpty(message = "群成员不能为空")
     private List<Long> memberIds;
 
+    private Integer conversationType = 2;
+
     public String getGroupName() {
         return groupName;
     }
@@ -27,5 +29,13 @@ public class CreateGroupRequestDto {
 
     public void setMemberIds(List<Long> memberIds) {
         this.memberIds = memberIds;
+    }
+
+    public Integer getConversationType() {
+        return conversationType;
+    }
+
+    public void setConversationType(Integer conversationType) {
+        this.conversationType = conversationType;
     }
 }

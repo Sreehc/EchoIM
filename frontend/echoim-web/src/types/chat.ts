@@ -1,6 +1,8 @@
 export type ThemeMode = 'light' | 'dark'
-export type LeftPanelMode = 'conversations' | 'me' | 'settings'
+export type LeftPanelMode = 'conversations' | 'contacts' | 'me' | 'settings'
 export type SettingsSection = 'appearance' | 'chat' | 'security'
+export type ConversationFolder = 'inbox' | 'archived' | 'unread' | 'single' | 'group' | 'channel'
+export type SpecialConversationType = 'SAVED_MESSAGES'
 
 export interface UserInfo {
   userId: number
@@ -19,6 +21,7 @@ export interface CurrentUserProfile extends UserInfo {
 }
 
 export interface UpdateCurrentUserProfilePayload {
+  username?: string | null
   nickname: string
   avatarUrl: string | null
   gender: number | null
@@ -43,9 +46,41 @@ export interface AuthSession {
   userInfo: UserInfo
 }
 
+export interface StoredAccount extends AuthSession {
+  lastActiveAt: string
+}
+
 export type ConversationType = 1 | 2 | 3
-export type MessageType = 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM'
+export type MessageType = 'TEXT' | 'STICKER' | 'IMAGE' | 'GIF' | 'FILE' | 'SYSTEM'
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'ready' | 'reconnecting'
+export type CallType = 'audio'
+export type CallSessionStatus = 'ringing' | 'accepted' | 'rejected' | 'cancelled' | 'ended' | 'missed' | 'failed'
+export type CallEndReason = 'hangup' | 'reject' | 'timeout' | 'busy' | 'offline' | 'error'
+export type CallPhase = 'idle' | 'incoming' | 'outgoing' | 'connecting' | 'connected' | 'ended'
+
+export interface CallIceServer {
+  urls: string[]
+  username?: string | null
+  credential?: string | null
+}
+
+export interface CallSessionSummary {
+  callId: number
+  conversationId: number
+  callType: CallType
+  status: CallSessionStatus
+  endReason?: CallEndReason | null
+  callerUserId: number
+  calleeUserId: number
+  peerUserId: number
+  peerDisplayName: string
+  peerAvatarUrl: string | null
+  startedAt: string
+  answeredAt?: string | null
+  endedAt?: string | null
+  durationSeconds: number
+  iceServers: CallIceServer[]
+}
 
 export interface ChatErrorState {
   bootstrapError: string | null
@@ -70,6 +105,10 @@ export interface ConversationSummary {
   latestSeq: number
   canSend: boolean
   myRole: number | null
+  archived: boolean
+  manualUnread: boolean
+  specialType?: SpecialConversationType | null
+  folderHints?: string[] | null
 }
 
 export interface ChatFile {
@@ -110,7 +149,26 @@ export interface ChatMessage {
   readAt?: string | null
   viewCount?: number
   forwardSource?: MessageForwardSource | null
+  replySource?: MessageReplySource | null
+  reactions?: MessageReactionStat[]
+  sticker?: StickerPayload | null
   errorMessage?: string | null
+}
+
+export interface MessageReactionStat {
+  emoji: string
+  count: number
+  reacted: boolean
+}
+
+export interface StickerPayload {
+  stickerId: string
+  title: string
+}
+
+export interface StickerDefinition extends StickerPayload {
+  svg: string
+  accent: string
 }
 
 export interface MessageForwardSource {
@@ -119,6 +177,114 @@ export interface MessageForwardSource {
   sourceSenderId: number
   sourceMsgType: MessageType
   sourcePreview: string | null
+}
+
+export interface MessageReplySource {
+  sourceMessageId: number
+  sourceConversationId: number
+  sourceSenderId: number
+  sourceMsgType: MessageType
+  sourcePreview: string | null
+}
+
+export interface UserSearchItem {
+  userId: number
+  userNo: string
+  username: string
+  nickname: string
+  avatarUrl: string | null
+  gender: number | null
+  signature: string | null
+  friendStatus: string | null
+  pendingRequestId: number | null
+}
+
+export interface FriendListItem {
+  friendUserId: number
+  userNo: string
+  nickname: string
+  avatarUrl: string | null
+  remark: string | null
+  displayName: string
+}
+
+export interface FriendRequestItem {
+  requestId: number
+  fromUserId: number
+  toUserId: number
+  applyMsg: string | null
+  status: number
+  direction: 'INBOUND' | 'OUTBOUND'
+  createdAt: string
+  userNo: string
+  nickname: string
+  avatarUrl: string | null
+}
+
+export interface GlobalSearchMessageItem {
+  messageId: number
+  conversationId: number
+  conversationType: ConversationType
+  conversationName: string
+  specialType?: SpecialConversationType | null
+  fromUserId: number
+  senderName: string
+  msgType: MessageType
+  preview: string
+  sentAt: string
+  archived: boolean
+}
+
+export interface GlobalSearchResult {
+  conversations: ConversationSummary[]
+  users: UserSearchItem[]
+  messages: GlobalSearchMessageItem[]
+}
+
+export interface GroupMemberItem {
+  userId: number
+  userNo: string
+  nickname: string
+  avatarUrl: string | null
+  role: number
+  status: number
+}
+
+export interface GroupUpdatePayload {
+  groupName?: string
+  notice?: string
+}
+
+export interface GroupGovernanceMeta {
+  groupId: number
+  groupNo: string
+  groupName: string
+  ownerUserId: number
+  notice: string | null
+  memberCount: number | null
+  myRole: number | null
+  conversationType: ConversationType | null
+  canSend: boolean | null
+  canEditMeta: boolean
+  canManageMembers: boolean
+  canManageRoles: boolean
+  canDissolve: boolean
+  canLeave: boolean
+}
+
+export interface GroupCreatePayload {
+  groupName: string
+  memberIds: number[]
+  conversationType: 2 | 3
+}
+
+export interface GroupCreateResult {
+  groupId: number
+  groupNo: string
+  groupName: string
+  conversationId: number
+  memberCount: number
+  conversationType: 2 | 3
 }
 
 export interface ProfileAction {
@@ -141,4 +307,7 @@ export interface ConversationProfile {
   notice?: string | null
   fields: ProfileField[]
   actions: ProfileAction[]
+  specialType?: SpecialConversationType | null
+  group?: GroupGovernanceMeta | null
+  members?: GroupMemberItem[]
 }

@@ -15,6 +15,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read']
+  'update-group-meta': []
+  'update-group-notice': []
+  'promote-member': [payload: { userId: number; role: 2 | 3 }]
+  'remove-member': [userId: number]
+  'add-members': []
+  'leave-group': []
+  'dissolve-group': []
 }>()
 
 const spotlightTags = computed(() => {
@@ -165,6 +172,116 @@ const actionCards = computed<
             </li>
           </ul>
         </section>
+
+        <section v-if="profile.group" class="profile-card">
+          <div class="profile-card__header">
+            <span>治理操作</span>
+            <small>group governance</small>
+          </div>
+          <div class="profile-governance">
+            <button
+              v-if="profile.group.canEditMeta"
+              class="profile-action"
+              type="button"
+              @click="emit('update-group-meta')"
+            >
+              <div class="profile-action__copy">
+                <span>基础信息</span>
+                <strong>更新名称</strong>
+                <p>同步群名或频道名到会话资料与列表摘要。</p>
+              </div>
+            </button>
+            <button
+              v-if="profile.group.canEditMeta"
+              class="profile-action"
+              type="button"
+              @click="emit('update-group-notice')"
+            >
+              <div class="profile-action__copy">
+                <span>公告内容</span>
+                <strong>更新公告</strong>
+                <p>群主和管理员可以维护对所有成员可见的公告。</p>
+              </div>
+            </button>
+            <button
+              v-if="profile.group.canManageMembers"
+              class="profile-action"
+              type="button"
+              @click="emit('add-members')"
+            >
+              <div class="profile-action__copy">
+                <span>成员操作</span>
+                <strong>邀请成员</strong>
+                <p>快速把最近搜索到的用户拉入当前群组或频道。</p>
+              </div>
+            </button>
+            <button
+              v-if="profile.group.canLeave"
+              class="profile-action"
+              type="button"
+              @click="emit('leave-group')"
+            >
+              <div class="profile-action__copy">
+                <span>成员状态</span>
+                <strong>退出当前会话</strong>
+                <p>离开后保留会话历史，但不再参与新消息协作。</p>
+              </div>
+            </button>
+            <button
+              v-if="profile.group.canDissolve"
+              class="profile-action"
+              type="button"
+              @click="emit('dissolve-group')"
+            >
+              <div class="profile-action__copy">
+                <span>群主权限</span>
+                <strong>解散会话</strong>
+                <p>仅群主或频道创建者可执行，操作不可撤回。</p>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        <section v-if="profile.members?.length" class="profile-card">
+          <div class="profile-card__header">
+            <span>成员列表</span>
+            <small>{{ profile.members.length }} members</small>
+          </div>
+          <div class="profile-members">
+            <article v-for="member in profile.members" :key="member.userId" class="profile-member">
+              <AvatarBadge
+                :name="member.nickname"
+                :avatar-url="member.avatarUrl"
+                size="md"
+              />
+              <div class="profile-member__copy">
+                <strong>{{ member.nickname }}</strong>
+                <span>#{{ member.userNo }}</span>
+              </div>
+              <div class="profile-member__actions">
+                <span class="profile-member__role">
+                  {{ member.role === 1 ? '群主' : member.role === 3 ? '管理员' : '成员' }}
+                </span>
+                <button
+                  v-if="profile.group?.canManageRoles && member.role !== 1"
+                  class="profile-member__button"
+                  type="button"
+                  @click="emit('promote-member', { userId: member.userId, role: member.role === 3 ? 2 : 3 })"
+                >
+                  {{ member.role === 3 ? '撤销管理员' : '设为管理员' }}
+                </button>
+                <button
+                  v-if="profile.group?.canManageMembers && member.role !== 1"
+                  class="profile-member__button is-danger"
+                  type="button"
+                  @click="emit('remove-member', member.userId)"
+                >
+                  移除
+                </button>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
 
       <ChatStatePanel
@@ -260,7 +377,7 @@ const actionCards = computed<
   position: relative;
   overflow: hidden;
   border: 1px solid var(--color-shell-border);
-  border-radius: 24px;
+  border-radius: 28px;
   background: var(--color-shell-card);
   box-shadow:
     var(--shadow-inset-soft),
@@ -268,7 +385,7 @@ const actionCards = computed<
 }
 
 .profile-hero {
-  padding: 22px;
+  padding: 24px;
 }
 
 .profile-hero__glow {
@@ -330,7 +447,7 @@ const actionCards = computed<
 }
 
 .profile-card {
-  padding: 18px;
+  padding: 20px;
 }
 
 .profile-card--copy p,
@@ -384,8 +501,8 @@ const actionCards = computed<
 }
 
 .profile-grid div {
-  padding: 14px;
-  border-radius: 18px;
+  padding: 16px;
+  border-radius: 20px;
   background: var(--color-shell-card-muted);
   border: 1px solid var(--color-shell-border);
 }
@@ -416,9 +533,9 @@ const actionCards = computed<
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 15px 16px;
+  padding: 16px 17px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--color-shell-card-muted);
   color: inherit;
   text-align: left;
@@ -476,6 +593,65 @@ const actionCards = computed<
   width: 18px;
   height: 18px;
   color: var(--color-shell-eyebrow);
+}
+
+.profile-governance,
+.profile-members {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-member {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--color-shell-border);
+  background: var(--color-shell-card-muted);
+}
+
+.profile-member__copy strong,
+.profile-member__copy span {
+  display: block;
+}
+
+.profile-member__copy strong {
+  font-size: 0.84rem;
+}
+
+.profile-member__copy span {
+  margin-top: 4px;
+  color: var(--color-text-soft);
+  font: 600 0.64rem/1 var(--font-mono);
+}
+
+.profile-member__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.profile-member__role,
+.profile-member__button {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font: 600 0.68rem/1 var(--font-body);
+}
+
+.profile-member__role {
+  background: var(--color-shell-action);
+}
+
+.profile-member__button {
+  border: 1px solid var(--color-shell-border);
+  background: transparent;
+}
+
+.profile-member__button.is-danger {
+  color: var(--color-danger);
 }
 
 @media (max-width: 767px) {

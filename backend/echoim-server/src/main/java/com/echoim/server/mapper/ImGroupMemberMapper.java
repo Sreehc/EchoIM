@@ -2,6 +2,7 @@ package com.echoim.server.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.echoim.server.entity.ImGroupMemberEntity;
+import com.echoim.server.vo.group.GroupMemberItemVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,6 +16,8 @@ public interface ImGroupMemberMapper extends BaseMapper<ImGroupMemberEntity> {
     ImGroupMemberEntity selectActiveByGroupIdAndUserId(@Param("groupId") Long groupId, @Param("userId") Long userId);
 
     List<ImGroupMemberEntity> selectActiveMembersByGroupId(@Param("groupId") Long groupId);
+
+    List<GroupMemberItemVo> selectActiveMemberItemsByGroupId(@Param("groupId") Long groupId);
 
     List<Long> selectActiveUserIdsByGroupId(@Param("groupId") Long groupId);
 

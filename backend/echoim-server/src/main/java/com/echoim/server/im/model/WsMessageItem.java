@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 
 import com.echoim.server.vo.file.FileInfoVo;
 import com.echoim.server.vo.message.MessageForwardSourceVo;
+import com.echoim.server.vo.message.MessageReactionStatVo;
+import com.echoim.server.vo.message.MessageReplySourceVo;
+import com.echoim.server.vo.message.StickerPayloadVo;
 
 public class WsMessageItem {
 
@@ -31,6 +34,9 @@ public class WsMessageItem {
     private LocalDateTime readAt;
     private Integer viewCount;
     private MessageForwardSourceVo forwardSource;
+    private MessageReplySourceVo replySource;
+    private java.util.List<MessageReactionStatVo> reactions;
+    private StickerPayloadVo sticker;
 
     public Long getMessageId() {
         return messageId;
@@ -222,5 +228,29 @@ public class WsMessageItem {
 
     public void setForwardSource(MessageForwardSourceVo forwardSource) {
         this.forwardSource = forwardSource;
+    }
+
+    public MessageReplySourceVo getReplySource() {
+        return replySource;
+    }
+
+    public void setReplySource(MessageReplySourceVo replySource) {
+        this.replySource = replySource;
+    }
+
+    public java.util.List<MessageReactionStatVo> getReactions() {
+        return reactions;
+    }
+
+    public void setReactions(java.util.List<MessageReactionStatVo> reactions) {
+        this.reactions = reactions;
+    }
+
+    public StickerPayloadVo getSticker() {
+        return sticker;
+    }
+
+    public void setSticker(StickerPayloadVo sticker) {
+        this.sticker = sticker;
     }
 }

@@ -19,9 +19,11 @@ const emit = defineEmits<{
   back: []
   openProfile: []
   focusSearch: []
+  openForwardSelection: []
   closeSearch: []
   navigateSearchMatch: [step: -1 | 1]
   action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read' | 'delete']
+  'start-call': []
   'update:menuOpen': [value: boolean]
   'update:messageSearchQuery': [value: string]
 }>()
@@ -117,9 +119,6 @@ watch(
       >
         <Search />
       </button>
-      <button class="chat-topbar__icon" type="button" aria-label="打开会话详情" @click="emit('openProfile')">
-        <Setting />
-      </button>
       <el-dropdown
         :hide-on-click="true"
         trigger="click"
@@ -133,6 +132,12 @@ watch(
         </button>
         <template #dropdown>
           <el-dropdown-menu>
+            <el-dropdown-item
+              v-if="conversation?.conversationType === 1 && conversation?.specialType !== 'SAVED_MESSAGES'"
+              @click="emit('start-call')"
+            >
+              发起语音通话
+            </el-dropdown-item>
             <el-dropdown-item command="toggle-top">
               {{ props.conversation?.isTop ? '取消置顶' : '会话置顶' }}
             </el-dropdown-item>
@@ -142,12 +147,18 @@ watch(
             <el-dropdown-item command="mark-read" :disabled="!props.conversation?.unreadCount">
               标记已读
             </el-dropdown-item>
+            <el-dropdown-item @click="emit('openForwardSelection')">
+              多选转发
+            </el-dropdown-item>
             <el-dropdown-item command="delete" divided>
               删除会话
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <button class="chat-topbar__icon" type="button" aria-label="打开会话详情" @click="emit('openProfile')">
+        <Setting />
+      </button>
     </div>
   </header>
 </template>
@@ -158,12 +169,12 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 72px;
-  height: 72px;
-  padding: 10px 18px;
+  min-height: 76px;
+  height: 76px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--color-shell-border);
   background: color-mix(in srgb, var(--color-shell-toolbar) 92%, transparent);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
 }
 
 .chat-topbar__main,
@@ -185,8 +196,8 @@ watch(
 }
 
 .chat-topbar__icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
 }
 
 .chat-topbar__identity {
@@ -211,22 +222,23 @@ watch(
 
 .chat-topbar__identity strong {
   display: block;
-  font-size: 1.04rem;
+  font-size: 1.02rem;
   line-height: 1.15;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .chat-topbar__identity p {
   margin-top: 3px;
   color: var(--color-text-soft);
-  font-size: 0.82rem;
-  line-height: 1.1;
+  font-size: 0.8rem;
+  line-height: 1.2;
 }
 
 .chat-topbar__icon {
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid var(--color-shell-border);
   background: var(--color-shell-action);
   color: var(--color-text-2);
@@ -257,7 +269,7 @@ watch(
   gap: 10px;
   width: clamp(460px, 52vw, 680px);
   max-width: 100%;
-  min-height: var(--control-height-xl);
+  min-height: 56px;
   padding: 6px;
   border: 1px solid var(--color-shell-border);
   border-radius: 999px;
@@ -271,7 +283,7 @@ watch(
   gap: 10px;
   min-width: 260px;
   flex: 1 1 340px;
-  padding: 0 14px;
+  padding: 0 16px;
   min-height: 100%;
   border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-shell-border));
   border-radius: 999px;
@@ -324,7 +336,7 @@ watch(
   height: 40px;
   padding: 0 14px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--color-shell-action);
   color: var(--color-text-1);
   font: 600 0.76rem/1 var(--font-body);
@@ -366,8 +378,8 @@ watch(
 @media (max-width: 767px) {
   .chat-topbar {
     padding-inline: 16px;
-    min-height: 70px;
-    height: 70px;
+    min-height: 72px;
+    height: 72px;
   }
 
   .chat-topbar__search-shell {

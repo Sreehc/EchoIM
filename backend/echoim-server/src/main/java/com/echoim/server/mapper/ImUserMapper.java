@@ -23,6 +23,9 @@ public interface ImUserMapper extends BaseMapper<ImUserEntity> {
             """)
     ImUserEntity selectByUsername(@Param("username") String username);
 
+    ImUserEntity selectByUsernameExcludingUserId(@Param("username") String username,
+                                                 @Param("excludeUserId") Long excludeUserId);
+
     UserProfileVo selectProfileByUserId(@Param("userId") Long userId);
 
     List<UserSearchItemVo> selectSearchPage(@Param("currentUserId") Long currentUserId,
@@ -35,4 +38,7 @@ public interface ImUserMapper extends BaseMapper<ImUserEntity> {
 
     UserPublicProfileVo selectPublicProfileByUserId(@Param("currentUserId") Long currentUserId,
                                                     @Param("targetUserId") Long targetUserId);
+
+    UserPublicProfileVo selectPublicProfileByUsername(@Param("currentUserId") Long currentUserId,
+                                                      @Param("username") String username);
 }

@@ -32,9 +32,9 @@ const emit = defineEmits<{
   place-content: center;
   gap: 12px;
   justify-items: center;
-  padding: 26px 22px;
+  padding: 30px 24px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 24px;
+  border-radius: 28px;
   background: var(--color-shell-card);
   box-shadow:
     var(--shadow-inset-soft),
@@ -44,7 +44,7 @@ const emit = defineEmits<{
 }
 
 .state-panel--compact {
-  min-height: 240px;
+  min-height: 260px;
 }
 
 .state-panel__eyebrow {

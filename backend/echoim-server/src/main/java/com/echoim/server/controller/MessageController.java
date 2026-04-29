@@ -6,7 +6,9 @@ import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.common.ratelimit.RateLimit;
 import com.echoim.server.dto.message.EditMessageRequestDto;
 import com.echoim.server.dto.message.ForwardMessageRequestDto;
+import com.echoim.server.dto.message.ReactionMessageRequestDto;
 import com.echoim.server.service.message.MessageCommandService;
+import com.echoim.server.vo.conversation.MessageItemVo;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,5 +42,12 @@ public class MessageController {
     @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-forward", permits = 20, windowSeconds = 60, message = "转发过于频繁")
     public ApiResponse<Map<String, Object>> forward(@Valid @RequestBody ForwardMessageRequestDto requestDto) {
         return ApiResponse.success(messageCommandService.forward(LoginUserContext.requireUserId(), requestDto));
+    }
+
+    @PutMapping("/{id}/reaction")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-reaction", permits = 60, windowSeconds = 60, message = "操作过于频繁")
+    public ApiResponse<MessageItemVo> toggleReaction(@PathVariable Long id,
+                                                     @Valid @RequestBody ReactionMessageRequestDto requestDto) {
+        return ApiResponse.success(messageCommandService.toggleReaction(LoginUserContext.requireUserId(), id, requestDto.getEmoji()));
     }
 }

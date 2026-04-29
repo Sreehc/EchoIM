@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImMessageReactionMapper">
+
+    <select id="selectReactionStatsByMessageIds" resultType="com.echoim.server.vo.message.MessageReactionStatVo">
+        SELECT r.message_id AS messageId,
+               r.emoji AS emoji,
+               COUNT(1) AS count,
+               MAX(CASE WHEN r.user_id = #{viewerUserId} THEN 1 ELSE 0 END) = 1 AS reacted
+        FROM im_message_reaction r
+        WHERE r.message_id IN
+        <foreach collection="messageIds" item="messageId" open="(" separator="," close=")">
+            #{messageId}
+        </foreach>
+        GROUP BY r.message_id, r.emoji
+        ORDER BY r.message_id ASC, COUNT(1) DESC, r.emoji ASC
+    </select>
+</mapper>

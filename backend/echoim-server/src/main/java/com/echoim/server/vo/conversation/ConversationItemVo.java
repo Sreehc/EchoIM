@@ -18,6 +18,10 @@ public class ConversationItemVo {
     private Long latestSeq;
     private Boolean canSend;
     private Integer myRole;
+    private Boolean archived;
+    private Boolean manualUnread;
+    private String specialType;
+    private java.util.List<String> folderHints;
 
     public Long getConversationId() {
         return conversationId;
@@ -129,5 +133,37 @@ public class ConversationItemVo {
 
     public void setMyRole(Integer myRole) {
         this.myRole = myRole;
+    }
+
+    public Boolean getArchived() {
+        return archived;
+    }
+
+    public void setArchived(Boolean archived) {
+        this.archived = archived;
+    }
+
+    public Boolean getManualUnread() {
+        return manualUnread;
+    }
+
+    public void setManualUnread(Boolean manualUnread) {
+        this.manualUnread = manualUnread;
+    }
+
+    public String getSpecialType() {
+        return specialType;
+    }
+
+    public void setSpecialType(String specialType) {
+        this.specialType = specialType;
+    }
+
+    public java.util.List<String> getFolderHints() {
+        return folderHints;
+    }
+
+    public void setFolderHints(java.util.List<String> folderHints) {
+        this.folderHints = folderHints;
     }
 }

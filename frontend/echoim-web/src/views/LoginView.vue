@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ChatDotRound, Lock, User } from '@element-plus/icons-vue'
+import { computed, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ChatDotRound, Close, Lock, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
+const route = useRoute()
 
 const form = reactive({
   username: 'echo_demo_01',
   password: '123456',
 })
 const loginError = ref<string | null>(null)
+const showAddAccountForm = computed(() => route.query.add === '1' || !authStore.hasStoredAccounts)
 
 async function submit() {
   loginError.value = null
@@ -25,6 +27,16 @@ async function submit() {
     loginError.value = error instanceof Error ? error.message : '登录失败'
   }
 }
+
+async function activateStoredAccount(userId: number) {
+  loginError.value = null
+  authStore.activateStoredAccount(userId)
+  await router.push('/chat')
+}
+
+function removeStoredAccount(userId: number) {
+  authStore.removeStoredAccount(userId)
+}
 </script>
 
 <template>
@@ -34,7 +46,7 @@ async function submit() {
         <div class="brand-line">
           <ChatDotRound class="brand-line__icon" />
           <strong>EchoIM</strong>
-          <span>随时保持联系</span>
+          <span>Quiet premium messaging</span>
         </div>
         <button class="theme-toggle" type="button" @click="uiStore.toggleTheme">
           {{ uiStore.theme === 'light' ? '深色' : '浅色' }}
@@ -43,31 +55,54 @@ async function submit() {
 
       <section class="login-card">
         <div class="login-card__intro">
-          <span class="login-card__eyebrow">欢迎使用 EchoIM</span>
-          <h1>登录后，继续和重要的人保持沟通</h1>
-          <p>在这里收发消息、查看未读提醒，常用会话会保持同步。演示账号已预填，登录后可以直接体验完整聊天界面。</p>
+          <span class="login-card__eyebrow">WELCOME BACK</span>
+          <h1>安静一点，也可以把沟通做得更高级。</h1>
+          <p>EchoIM 让会话、联系人和个人工作台落在同一块安静的界面里。演示账号已预填，登录后可以直接进入完整三栏聊天体验。</p>
           <div class="login-card__highlights">
             <article>
-              <strong>消息同步</strong>
-              <p>新消息、未读状态和常用会话会自动更新。</p>
+              <strong>Workstation layout</strong>
+              <p>会话、主聊天区和资料侧轨保持同一节奏，信息密度更稳。</p>
             </article>
             <article>
-              <strong>清爽易读</strong>
-              <p>界面更简洁，聊天记录和联系人信息一眼就能看清。</p>
+              <strong>Quiet presence</strong>
+              <p>减少噪音色和彩色按钮，让未读、提醒和重点内容更容易被看见。</p>
             </article>
             <article>
-              <strong>日夜模式</strong>
-              <p>白天和夜晚都保持舒适观感，长时间使用也更轻松。</p>
+              <strong>Light and dark</strong>
+              <p>浅色和深色都单独校准，长时间聊天阅读不会刺眼，也不会发灰。</p>
             </article>
           </div>
         </div>
 
         <div class="login-card__section">
           <div class="login-card__section-head">
-            <span>账号登录</span>
-            <strong>安全登录</strong>
+            <span>{{ authStore.hasStoredAccounts ? '身份切换' : '账号登录' }}</span>
+            <strong>{{ showAddAccountForm ? 'Secure entry' : 'Quick return' }}</strong>
           </div>
-          <el-form label-position="top" @submit.prevent="submit">
+          <div v-if="authStore.storedAccounts.length" class="login-card__accounts">
+            <article
+              v-for="account in authStore.storedAccounts"
+              :key="account.userInfo.userId"
+              class="login-account"
+              role="button"
+              tabindex="0"
+              @click="activateStoredAccount(account.userInfo.userId)"
+              @keydown.enter.prevent="activateStoredAccount(account.userInfo.userId)"
+            >
+              <div class="login-account__copy">
+                <strong>{{ account.userInfo.nickname }}</strong>
+                <span>@{{ account.userInfo.username }}</span>
+              </div>
+              <button class="login-account__remove" type="button" aria-label="移除账号" @click.stop="removeStoredAccount(account.userInfo.userId)">
+                <Close />
+              </button>
+            </article>
+          </div>
+          <div v-if="authStore.hasStoredAccounts && !showAddAccountForm" class="login-card__switch-hint">
+            <p>已保存的账号会以身份卡片展示。可以直接返回，也可以继续添加新的登录身份。</p>
+            <el-button plain @click="router.replace('/login?add=1')">添加其他账号</el-button>
+          </div>
+          <el-form v-if="showAddAccountForm" label-position="top" @submit.prevent="submit">
             <el-form-item label="用户名">
               <el-input
                 v-model="form.username"
@@ -94,13 +129,13 @@ async function submit() {
             {{ loginError }}
           </p>
 
-          <div class="login-card__meta">
+          <div v-if="showAddAccountForm" class="login-card__meta">
             <div>
-              <span class="login-card__meta-label">演示账号</span>
+              <span class="login-card__meta-label">Demo account</span>
               <strong>echo_demo_01</strong>
             </div>
             <div>
-              <span class="login-card__meta-label">演示密码</span>
+              <span class="login-card__meta-label">Demo password</span>
               <strong>123456</strong>
             </div>
           </div>
@@ -115,30 +150,31 @@ async function submit() {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 32px 24px;
+  padding: 40px 24px;
 }
 
 .login-shell {
-  width: min(100%, 880px);
+  width: min(100%, 980px);
 }
 
 .login-shell__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .brand-line {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 16px;
+  gap: 11px;
+  padding: 12px 18px;
   border: 1px solid var(--color-shell-border);
   border-radius: 999px;
-  background: var(--color-shell-toolbar);
+  background: color-mix(in srgb, var(--color-shell-toolbar) 92%, transparent);
   box-shadow: var(--shadow-card);
   font-size: 0.82rem;
+  backdrop-filter: blur(18px);
 }
 
 .brand-line strong {
@@ -147,7 +183,9 @@ async function submit() {
 
 .brand-line span {
   color: var(--color-text-3);
-  font: 500 0.8rem/1 var(--font-body);
+  font: 500 0.76rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .brand-line__icon {
@@ -159,23 +197,25 @@ async function submit() {
 .login-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-  gap: 22px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(330px, 0.82fr);
+  gap: 24px;
   overflow: hidden;
   border: 1px solid var(--color-shell-border);
-  border-radius: 30px;
+  border-radius: 36px;
   background:
-    radial-gradient(circle at bottom right, color-mix(in srgb, var(--color-shell-glow) 52%, transparent), transparent 28%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--color-shell-glow) 72%, transparent), transparent 28%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 24%),
     var(--color-shell-panel);
   box-shadow:
     var(--shadow-panel),
     var(--shadow-inset-soft);
-  padding: 24px;
+  padding: 28px;
+  backdrop-filter: blur(24px);
 }
 
 .theme-toggle {
   min-height: 40px;
-  padding: 0 15px;
+  padding: 0 16px;
   border: 1px solid var(--color-shell-border);
   border-radius: 999px;
   background: var(--color-shell-action);
@@ -194,40 +234,42 @@ async function submit() {
 .login-card__intro {
   display: grid;
   align-content: space-between;
-  gap: 18px;
-  padding: 10px 4px 10px 4px;
+  gap: 22px;
+  padding: 12px 8px 12px 6px;
 }
 
 .login-card__eyebrow {
   display: inline-block;
   color: var(--color-shell-eyebrow);
-  font: 700 0.74rem/1 var(--font-body);
-  letter-spacing: 0.08em;
+  font: var(--font-eyebrow);
+  letter-spacing: 0.14em;
 }
 
 .login-card__intro h1 {
-  max-width: 11ch;
+  max-width: 12ch;
   font: var(--font-title-lg);
-  letter-spacing: -0.05em;
+  letter-spacing: -0.06em;
+  text-wrap: balance;
 }
 
 .login-card__intro p,
 .login-card__meta {
   color: var(--color-text-2);
-  font-size: 0.92rem;
-  line-height: 1.6;
+  font-size: 0.94rem;
+  line-height: 1.68;
 }
 
 .login-card__highlights {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .login-card__highlights article {
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 92%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .login-card__highlights strong {
@@ -238,15 +280,79 @@ async function submit() {
 
 .login-card__highlights p {
   font-size: 0.84rem;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .login-card__section {
-  padding: 20px;
+  padding: 22px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 24px;
-  background: var(--color-shell-card-strong);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, rgba(255, 255, 255, 0.3) 40%, transparent), transparent 22%),
+    var(--color-shell-card-strong);
   box-shadow: var(--shadow-inset-soft);
+  backdrop-filter: blur(18px);
+}
+
+.login-card__accounts {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.login-account {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
+  text-align: left;
+  transition:
+    transform var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.login-account:hover,
+.login-account:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--color-shell-border-strong);
+  background: color-mix(in srgb, var(--color-shell-action-hover) 94%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.login-account__copy strong {
+  display: block;
+  font: var(--font-title-sm);
+}
+
+.login-account__copy span {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-soft);
+  font: 500 0.72rem/1 var(--font-mono);
+}
+
+.login-account__remove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-text-soft);
+}
+
+.login-card__switch-hint {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: var(--color-text-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .login-card__section-head {
@@ -254,7 +360,7 @@ async function submit() {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .login-card__section-head span {
@@ -264,8 +370,9 @@ async function submit() {
 
 .login-card__section-head strong {
   color: var(--color-text-soft);
-  font: 600 0.76rem/1 var(--font-body);
-  letter-spacing: 0.08em;
+  font: 600 0.72rem/1 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .login-card__submit {
@@ -282,9 +389,9 @@ async function submit() {
 }
 
 .login-card__meta > div {
-  padding: 15px 16px;
+  padding: 16px 16px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--color-shell-card-muted);
 }
 
@@ -323,7 +430,7 @@ async function submit() {
     grid-template-columns: 1fr;
     gap: 18px;
     padding: 18px;
-    border-radius: 26px;
+    border-radius: 28px;
   }
 
   .login-card__intro {

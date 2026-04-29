@@ -38,7 +38,8 @@ onMounted(() => {
   inset: 0;
   background:
     radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 22%),
-    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--color-shell-glow) 70%, transparent), transparent 18%),
+    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--color-shell-glow) 88%, transparent), transparent 18%),
+    radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--color-bg-surface) 94%, transparent), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 20%);
   pointer-events: none;
 }
@@ -76,7 +77,7 @@ onMounted(() => {
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 10px;
+  padding: 14px;
 }
 
 @media (max-width: 767px) {

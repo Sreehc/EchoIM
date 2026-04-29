@@ -33,6 +33,18 @@ public class ConversationController {
     }
 
     @RequireLogin
+    @PostMapping("/single")
+    public ApiResponse<ConversationItemVo> createSingle(@Valid @RequestBody ConversationSingleCreateRequest request) {
+        return ApiResponse.success(conversationService.createSingleConversation(LoginUserContext.requireUserId(), request.targetUserId()));
+    }
+
+    @RequireLogin
+    @PostMapping("/saved")
+    public ApiResponse<ConversationItemVo> createSaved() {
+        return ApiResponse.success(conversationService.createSavedConversation(LoginUserContext.requireUserId()));
+    }
+
+    @RequireLogin
     @GetMapping("/{id}/messages")
     public ApiResponse<PageResponse<MessageItemVo>> messages(@PathVariable Long id,
                                                              @Valid MessagePageQueryDto queryDto) {
@@ -70,6 +82,22 @@ public class ConversationController {
         return ApiResponse.success(Map.of("conversationId", id, "lastReadSeq", request.lastReadSeq()));
     }
 
+    @RequireLogin
+    @PutMapping("/{id}/archive")
+    public ApiResponse<Map<String, Object>> archive(@PathVariable Long id,
+                                                    @Valid @RequestBody ConversationArchiveRequest request) {
+        conversationService.updateArchive(LoginUserContext.requireUserId(), id, request.archived());
+        return ApiResponse.success(Map.of("conversationId", id, "archived", request.archived()));
+    }
+
+    @RequireLogin
+    @PutMapping("/{id}/unread")
+    public ApiResponse<Map<String, Object>> unread(@PathVariable Long id,
+                                                   @Valid @RequestBody ConversationUnreadRequest request) {
+        conversationService.markConversationUnread(LoginUserContext.requireUserId(), id, request.unread());
+        return ApiResponse.success(Map.of("conversationId", id, "unread", request.unread()));
+    }
+
     public record ConversationTopRequest(
             @NotNull(message = "置顶状态不能为空") Integer isTop
     ) {
@@ -82,6 +110,21 @@ public class ConversationController {
 
     public record ConversationReadRequest(
             @NotNull(message = "最后已读序号不能为空") Long lastReadSeq
+    ) {
+    }
+
+    public record ConversationArchiveRequest(
+            @NotNull(message = "归档状态不能为空") Boolean archived
+    ) {
+    }
+
+    public record ConversationUnreadRequest(
+            @NotNull(message = "未读状态不能为空") Boolean unread
+    ) {
+    }
+
+    public record ConversationSingleCreateRequest(
+            @NotNull(message = "目标用户不能为空") Long targetUserId
     ) {
     }
 }

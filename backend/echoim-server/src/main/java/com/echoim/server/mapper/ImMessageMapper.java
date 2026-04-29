@@ -3,6 +3,7 @@ package com.echoim.server.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.echoim.server.entity.ImMessageEntity;
 import com.echoim.server.vo.conversation.MessageItemVo;
+import com.echoim.server.vo.search.GlobalSearchMessageItemVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -40,4 +41,8 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
 
     ImMessageEntity selectAccessibleEntityByIdAndUserId(@Param("messageId") Long messageId,
                                                         @Param("userId") Long userId);
+
+    List<GlobalSearchMessageItemVo> selectGlobalSearchMessages(@Param("userId") Long userId,
+                                                               @Param("keyword") String keyword,
+                                                               @Param("limit") long limit);
 }

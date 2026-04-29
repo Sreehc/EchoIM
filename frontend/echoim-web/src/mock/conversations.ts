@@ -16,6 +16,8 @@ export const mockConversations: ConversationSummary[] = [
     latestSeq: 126,
     canSend: true,
     myRole: null,
+    archived: false,
+    manualUnread: false,
   },
   {
     conversationId: 30002,
@@ -32,6 +34,8 @@ export const mockConversations: ConversationSummary[] = [
     latestSeq: 98,
     canSend: true,
     myRole: 1,
+    archived: false,
+    manualUnread: true,
   },
   {
     conversationId: 30003,
@@ -48,6 +52,8 @@ export const mockConversations: ConversationSummary[] = [
     latestSeq: 44,
     canSend: true,
     myRole: null,
+    archived: true,
+    manualUnread: false,
   },
   {
     conversationId: 30004,
@@ -64,6 +70,8 @@ export const mockConversations: ConversationSummary[] = [
     latestSeq: 20,
     canSend: false,
     myRole: 2,
+    archived: false,
+    manualUnread: false,
   },
   {
     conversationId: 30005,
@@ -80,5 +88,7 @@ export const mockConversations: ConversationSummary[] = [
     latestSeq: 0,
     canSend: true,
     myRole: null,
+    archived: false,
+    manualUnread: false,
   },
 ]

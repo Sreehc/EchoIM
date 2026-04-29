@@ -12,7 +12,9 @@ import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.service.config.SystemConfigService;
+import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.impl.MessageCommandServiceImpl;
 import com.echoim.server.service.message.MessageViewService;
 import com.echoim.server.common.audit.AuditLogService;
@@ -35,6 +37,8 @@ class MessageCommandServiceImplTest {
     private ImSingleChatService imSingleChatService;
     private ImGroupChatService imGroupChatService;
     private ImWsPushService imWsPushService;
+    private ImMessageReactionMapper imMessageReactionMapper;
+    private FileService fileService;
     private MessageViewService messageViewService;
     private SystemConfigService systemConfigService;
     private AuditLogService auditLogService;
@@ -48,12 +52,15 @@ class MessageCommandServiceImplTest {
         imSingleChatService = mock(ImSingleChatService.class);
         imGroupChatService = mock(ImGroupChatService.class);
         imWsPushService = mock(ImWsPushService.class);
+        imMessageReactionMapper = mock(ImMessageReactionMapper.class);
+        fileService = mock(FileService.class);
         messageViewService = mock(MessageViewService.class);
         systemConfigService = mock(SystemConfigService.class);
         auditLogService = mock(AuditLogService.class);
         service = new MessageCommandServiceImpl(
-                imMessageMapper, imConversationMapper, imConversationUserMapper,
+                imMessageMapper, imMessageReactionMapper, imConversationMapper, imConversationUserMapper,
                 imSingleChatService, imGroupChatService, imWsPushService,
+                fileService,
                 messageViewService, systemConfigService, auditLogService, new ObjectMapper()
         );
     }

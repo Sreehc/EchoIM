@@ -41,6 +41,20 @@
         ORDER BY role ASC, id ASC
     </select>
 
+    <select id="selectActiveMemberItemsByGroupId" resultType="com.echoim.server.vo.group.GroupMemberItemVo">
+        SELECT gm.user_id AS userId,
+               u.user_no AS userNo,
+               COALESCE(NULLIF(gm.nick_name, ''), u.nickname) AS nickname,
+               u.avatar_url AS avatarUrl,
+               gm.role AS role,
+               gm.status AS status
+        FROM im_group_member gm
+        JOIN im_user u ON u.id = gm.user_id
+        WHERE gm.group_id = #{groupId}
+          AND gm.status = 1
+        ORDER BY gm.role ASC, gm.id ASC
+    </select>
+
     <select id="selectActiveUserIdsByGroupId" resultType="long">
         SELECT user_id
         FROM im_group_member

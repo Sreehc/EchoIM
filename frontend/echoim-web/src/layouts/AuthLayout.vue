@@ -13,8 +13,9 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-shell-glow) 100%, transparent), transparent 30%),
-    linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-shell-mask) 12%, transparent)),
+    radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--color-shell-glow) 120%, transparent), transparent 24%),
+    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 22%),
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-shell-mask) 10%, transparent)),
     var(--color-bg-app);
 }
 
@@ -23,27 +24,29 @@
   inset: 0;
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.03), transparent 22%),
-    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-shell-glow) 48%, transparent), transparent 42%);
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-shell-glow) 54%, transparent), transparent 42%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.015));
   pointer-events: none;
+  opacity: 0.92;
 }
 
 .auth-shell__glow {
   position: absolute;
-  width: 32rem;
-  height: 32rem;
+  width: 38rem;
+  height: 38rem;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(30px);
-  opacity: 0.22;
+  filter: blur(46px);
+  opacity: 0.18;
 }
 
 .auth-shell__glow--left {
-  inset: auto auto -10rem -14rem;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 64%);
+  inset: auto auto -14rem -12rem;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 64%);
 }
 
 .auth-shell__glow--right {
-  inset: -10rem -14rem auto auto;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-shell-glow) 52%, transparent), transparent 64%);
+  inset: -12rem -16rem auto auto;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-shell-glow) 58%, transparent), transparent 64%);
 }
 </style>

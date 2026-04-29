@@ -39,6 +39,14 @@ public interface ImConversationUserMapper extends BaseMapper<ImConversationUserE
                     @Param("userId") Long userId,
                     @Param("isMute") Integer isMute);
 
+    void updateArchive(@Param("conversationId") Long conversationId,
+                       @Param("userId") Long userId,
+                       @Param("isArchived") Integer isArchived);
+
+    void updateManualUnread(@Param("conversationId") Long conversationId,
+                            @Param("userId") Long userId,
+                            @Param("manualUnread") Integer manualUnread);
+
     void hideConversation(@Param("conversationId") Long conversationId,
                           @Param("userId") Long userId);
 }

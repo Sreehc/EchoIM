@@ -47,7 +47,8 @@ test('single chat ui flow and reconnect recovery', async ({ browser }) => {
     await expect(statusForMessage(pageA, messageA)).toHaveAttribute('aria-label', '已读')
 
     const messageRowA = pageA.locator('[data-testid^="message-row-"]').filter({ hasText: messageA }).last()
-    await messageRowA.getByTestId('message-start-edit').click()
+    await messageRowA.click({ button: 'right' })
+    await pageA.getByTestId('message-context-edit').click()
     await messageRowA.getByRole('textbox').fill(editedMessageA)
     await messageRowA.getByTestId('message-save-edit').click()
 
@@ -55,7 +56,8 @@ test('single chat ui flow and reconnect recovery', async ({ browser }) => {
     await expect(pageB.getByTestId('message-pane').getByText(editedMessageA, { exact: true })).toBeVisible()
     await expect(pageA.getByText('已编辑')).toBeVisible()
 
-    await pageA.locator('[data-testid^="message-row-"]').filter({ hasText: editedMessageA }).last().getByTestId('message-recall').click()
+    await pageA.locator('[data-testid^="message-row-"]').filter({ hasText: editedMessageA }).last().click({ button: 'right' })
+    await pageA.getByTestId('message-context-recall').click()
     await pageA.getByRole('button', { name: '撤回' }).click()
 
     await expect(pageA.getByTestId('message-pane').getByText('撤回了一条消息')).toBeVisible()

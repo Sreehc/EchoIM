@@ -8,20 +8,25 @@ import {
   messagePreviewFromMessage,
 } from '@/adapters/chat'
 import {
+  createSavedConversation as createSavedConversationRequest,
+  createSingleConversation as createSingleConversationRequest,
   deleteConversation as deleteConversationRequest,
   fetchConversationMessages,
-  fetchConversations,
+  fetchConversationsByFolder,
   fetchImInfo,
+  markConversationUnreadRequest,
   markConversationReadRequest,
   syncOfflineMessages,
+  updateConversationArchive,
   updateConversationMute,
   updateConversationTop,
 } from '@/services/conversations'
-import { fetchGroupDetail } from '@/services/groups'
+import { createGroup as createGroupRequest, fetchGroupDetail, fetchGroupMembers } from '@/services/groups'
 import { HttpError } from '@/services/http'
-import { editMessage as editMessageRequest, recallMessage as recallMessageRequest } from '@/services/messages'
+import { editMessage as editMessageRequest, reactMessage as reactMessageRequest, recallMessage as recallMessageRequest } from '@/services/messages'
 import { EchoWsClient } from '@/services/ws'
 import { useAuthStore } from '@/stores/auth'
+import { useCallStore } from '@/stores/call'
 import { useUiStore } from '@/stores/ui'
 import { fetchUserPublicProfile } from '@/services/user'
 import { showIncomingMessageNotification } from '@/utils/browserNotifications'
@@ -33,12 +38,24 @@ import type {
   OfflineSyncRequest,
   ApiUserPublicProfile,
   WsAckPayload,
+  WsCallSignalPayload,
+  WsCallSummaryPayload,
   WsConversationChangePayload,
   WsEnvelope,
   WsNoticePayload,
   WsReadPayload,
 } from '@/types/api'
-import type { ChatErrorState, ChatMessage, ConversationProfile, ConversationSummary } from '@/types/chat'
+import type {
+  ChatErrorState,
+  ChatFile,
+  ChatMessage,
+  ConversationFolder,
+  ConversationProfile,
+  ConversationSummary,
+  GroupCreatePayload,
+  GroupGovernanceMeta,
+  MessageReplySource,
+} from '@/types/chat'
 
 interface ConversationRuntimeMeta {
   loaded: boolean
@@ -55,6 +72,7 @@ const DEFAULT_PAGE_SIZE = 50
 
 export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore()
+  const callStore = useCallStore()
   const uiStore = useUiStore()
 
   const conversations = ref<ConversationSummary[]>([])
@@ -64,7 +82,6 @@ export const useChatStore = defineStore('chat', () => {
   const activeConversationId = ref<number | null>(null)
   const lastOpenedConversationId = ref<number | null>(null)
   const searchQuery = ref('')
-  const archivedConversationIds = ref<number[]>([])
   const loading = ref(false)
   const messagesLoading = ref(false)
   const errors = ref<ChatErrorState>({
@@ -85,7 +102,7 @@ export const useChatStore = defineStore('chat', () => {
 
     return [...conversations.value]
       .filter((item) => {
-        if (archivedConversationIds.value.includes(item.conversationId)) return false
+        if (!matchesConversationFolder(item, uiStore.conversationFolder)) return false
         if (!keyword) return true
         return (
           item.conversationName.toLowerCase().includes(keyword) ||
@@ -169,8 +186,27 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function fetchConversationList() {
-    const page = await fetchConversations(1, 100)
+    const page = await fetchConversationsByFolder(uiStore.conversationFolder, 1, 100)
     applyConversationPage(page.list)
+  }
+
+  async function refreshConversationList(force = false) {
+    if (!authStore.isAuthenticated) return
+    if (!initialized.value && !force) {
+      await bootstrap()
+      return
+    }
+
+    loading.value = true
+    errors.value.bootstrapError = null
+    try {
+      await fetchConversationList()
+    } catch (error) {
+      errors.value.bootstrapError = toErrorMessage(error, '会话加载失败')
+      throw error
+    } finally {
+      loading.value = false
+    }
   }
 
   async function openConversation(conversationId: number) {
@@ -294,30 +330,47 @@ export const useChatStore = defineStore('chat', () => {
     searchQuery.value = ''
   }
 
-  function markConversationUnreadLocally(conversationId: number) {
+  async function markConversationUnread(conversationId: number) {
     const conversation = conversations.value.find((item) => item.conversationId === conversationId)
     if (!conversation) return
 
-    conversation.unreadCount = Math.max(conversation.unreadCount, 1)
-    errors.value.noticeMessage = '已标记为未读'
+    const previousManualUnread = conversation.manualUnread
+    conversation.manualUnread = true
+
+    try {
+      await markConversationUnreadRequest(conversationId)
+      errors.value.noticeMessage = '已标记为未读'
+    } catch (error) {
+      conversation.manualUnread = previousManualUnread
+      errors.value.noticeMessage = toErrorMessage(error, '标记未读失败')
+      throw error
+    }
   }
 
-  function archiveConversationLocally(conversationId: number) {
+  async function toggleConversationArchive(conversationId: number) {
     const conversation = conversations.value.find((item) => item.conversationId === conversationId)
     if (!conversation) return
 
-    if (!archivedConversationIds.value.includes(conversationId)) {
-      archivedConversationIds.value = [...archivedConversationIds.value, conversationId]
-    }
+    const nextArchived = !conversation.archived
+    const previousArchived = conversation.archived
+    conversation.archived = nextArchived
 
-    if (activeConversationId.value === conversationId) {
-      clearActiveConversation()
-    }
-    if (lastOpenedConversationId.value === conversationId) {
-      lastOpenedConversationId.value = null
-    }
+    try {
+      await updateConversationArchive(conversationId, nextArchived)
+      conversations.value = conversations.value.filter((item) => item.conversationId !== conversationId)
+      if (activeConversationId.value === conversationId) {
+        clearActiveConversation()
+      }
+      if (lastOpenedConversationId.value === conversationId) {
+        lastOpenedConversationId.value = null
+      }
 
-    errors.value.noticeMessage = '会话已归档，仅在当前页面隐藏'
+      errors.value.noticeMessage = nextArchived ? '会话已归档' : '会话已恢复到收件箱'
+    } catch (error) {
+      conversation.archived = previousArchived
+      errors.value.noticeMessage = toErrorMessage(error, nextArchived ? '归档失败' : '恢复会话失败')
+      throw error
+    }
   }
 
   async function markConversationRead(conversationId: number) {
@@ -327,8 +380,10 @@ export const useChatStore = defineStore('chat', () => {
     const messages = messagesByConversation.value[conversationId] ?? []
     const lastReadSeq = messages[messages.length - 1]?.seqNo ?? conversation.latestSeq ?? 0
     const previousUnread = conversation.unreadCount
+    const previousManualUnread = conversation.manualUnread
 
     conversation.unreadCount = 0
+    conversation.manualUnread = false
     ensureConversationMeta(conversationId).lastReadSeq = lastReadSeq
 
     try {
@@ -341,6 +396,7 @@ export const useChatStore = defineStore('chat', () => {
       markOwnMessagesRead(conversationId, lastReadSeq)
     } catch (error) {
       conversation.unreadCount = previousUnread
+      conversation.manualUnread = previousManualUnread
       errors.value.noticeMessage = toErrorMessage(error, '标记已读失败')
       throw error
     }
@@ -388,7 +444,6 @@ export const useChatStore = defineStore('chat', () => {
     await deleteConversationRequest(conversationId)
 
     conversations.value = conversations.value.filter((item) => item.conversationId !== conversationId)
-    archivedConversationIds.value = archivedConversationIds.value.filter((item) => item !== conversationId)
     messagesByConversation.value = omitRecordKey(messagesByConversation.value, conversationId)
     profiles.value = omitRecordKey(profiles.value, conversationId)
     runtimeMeta.value = omitRecordKey(runtimeMeta.value, conversationId)
@@ -402,9 +457,41 @@ export const useChatStore = defineStore('chat', () => {
     errors.value.noticeMessage = '会话已删除'
   }
 
-  async function sendMessage(payload: { currentUserId: number; content: string }) {
+  async function createSingleConversation(targetUserId: number) {
+    const item = adaptConversationSummary(await createSingleConversationRequest(targetUserId))
+    upsertConversation(item)
+    return item
+  }
+
+  async function createSavedConversation() {
+    const item = adaptConversationSummary(await createSavedConversationRequest())
+    upsertConversation(item)
+    return item
+  }
+
+  async function createGroupConversation(payload: GroupCreatePayload) {
+    const result = await createGroupRequest(payload)
+    await refreshConversationList(true)
+    const item = conversations.value.find((conversation) => conversation.conversationId === result.conversationId) ?? null
+    return { result, item }
+  }
+
+  async function sendMessage(payload: {
+    currentUserId: number
+    content: string | null
+    msgType?: ChatMessage['msgType']
+    fileId?: number | null
+    file?: ChatFile | null
+    replySource?: MessageReplySource | null
+    sticker?: ChatMessage['sticker']
+  }) {
     const conversation = activeConversation.value
-    if (!conversation || !payload.content.trim()) return
+    const nextMsgType = payload.msgType ?? 'TEXT'
+    const nextContent = payload.content?.trim() ?? ''
+
+    if (!conversation) return
+    if (nextMsgType === 'TEXT' && !nextContent) return
+    if ((nextMsgType === 'STICKER' || nextMsgType === 'IMAGE' || nextMsgType === 'GIF' || nextMsgType === 'FILE') && !payload.fileId) return
     if (!conversation.canSend) {
       errors.value.noticeMessage = '当前频道仅创建者可发送消息'
       return
@@ -425,15 +512,18 @@ export const useChatStore = defineStore('chat', () => {
       fromUserId: payload.currentUserId,
       toUserId: conversation.peerUserId,
       groupId: conversation.groupId,
-      msgType: 'TEXT',
-      content: payload.content.trim(),
-      fileId: null,
-      file: null,
+      msgType: nextMsgType,
+      content: nextMsgType === 'TEXT' ? nextContent : payload.file?.fileName ?? (nextContent || null),
+      fileId: payload.fileId ?? null,
+      file: payload.file ?? null,
       sentAt: now,
       sendStatus: 0,
       delivered: false,
       read: false,
       viewCount: 0,
+      replySource: payload.replySource ?? null,
+      reactions: [],
+      sticker: payload.sticker ?? null,
       errorMessage: null,
     }
 
@@ -534,6 +624,19 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function toggleReaction(messageId: number, emoji: string) {
+    const target = findMessageById(messageId)
+    if (!target) return
+
+    try {
+      const nextMessage = adaptChatMessage(await reactMessageRequest(messageId, emoji))
+      applyMessageMutation(target.conversationId, nextMessage)
+    } catch (error) {
+      errors.value.noticeMessage = toErrorMessage(error, '消息反应失败')
+      throw error
+    }
+  }
+
   async function connectRealtime() {
     if (!authStore.session?.token) return
     if (!wsClient) {
@@ -543,6 +646,7 @@ export const useChatStore = defineStore('chat', () => {
         onReconnectReady: handleReconnectReady,
       })
     }
+    callStore.attachRealtime(wsClient)
 
     const info = await fetchImInfo()
     await wsClient.connect({
@@ -554,6 +658,7 @@ export const useChatStore = defineStore('chat', () => {
   function disconnectRealtime() {
     wsClient?.disconnect()
     wsClient = null
+    callStore.attachRealtime(null)
   }
 
   async function handleReconnectReady() {
@@ -587,6 +692,7 @@ export const useChatStore = defineStore('chat', () => {
           ),
         }
       }
+      await callStore.syncActiveCall()
     } catch (error) {
       errors.value.syncError = toErrorMessage(error, '离线消息同步失败')
     }
@@ -672,12 +778,33 @@ export const useChatStore = defineStore('chat', () => {
       const conversation = conversations.value.find((item) => item.conversationId === payload.conversationId)
       if (conversation && payload.readerUserId === authStore.currentUser?.userId) {
         conversation.unreadCount = 0
+        conversation.manualUnread = false
       }
       return
     }
 
     if (envelope.type === 'CONVERSATION_CHANGE') {
       handleConversationChange(envelope.data as WsConversationChangePayload)
+      return
+    }
+
+    if (
+      envelope.type === 'CALL_INVITE' ||
+      envelope.type === 'CALL_ACCEPT' ||
+      envelope.type === 'CALL_REJECT' ||
+      envelope.type === 'CALL_CANCEL' ||
+      envelope.type === 'CALL_END' ||
+      envelope.type === 'CALL_STATE' ||
+      envelope.type === 'CALL_OFFER' ||
+      envelope.type === 'CALL_ANSWER' ||
+      envelope.type === 'CALL_ICE_CANDIDATE'
+    ) {
+      void callStore.handleWsEvent(
+        envelope.type,
+        envelope.data as WsCallSummaryPayload | WsCallSignalPayload,
+      ).catch((error) => {
+        errors.value.noticeMessage = toErrorMessage(error, '通话状态更新失败')
+      })
     }
   }
 
@@ -868,7 +995,11 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (conversation.conversationType === 1) {
-      if (!conversation.peerUserId) {
+      const targetUserId = conversation.specialType === 'SAVED_MESSAGES'
+        ? authStore.currentUser?.userId ?? null
+        : conversation.peerUserId
+
+      if (!targetUserId) {
         throw new Error('当前单聊会话缺少对端用户标识，暂时无法发送')
       }
 
@@ -876,10 +1007,11 @@ export const useChatStore = defineStore('chat', () => {
       wsClient.sendSingleMessage(
         {
           conversationId: conversation.conversationId,
-          toUserId: conversation.peerUserId,
+          toUserId: targetUserId,
           msgType: message.msgType,
           content: message.content,
           fileId: message.fileId,
+          extraJson: buildMessageExtra(message),
         },
         message.clientMsgId,
       )
@@ -902,9 +1034,21 @@ export const useChatStore = defineStore('chat', () => {
         msgType: message.msgType,
         content: message.content,
         fileId: message.fileId,
+        extraJson: buildMessageExtra(message),
       },
       message.clientMsgId,
     )
+  }
+
+  function buildMessageExtra(message: ChatMessage) {
+    const extra: Record<string, unknown> = {}
+    if (message.replySource) {
+      extra.replySource = message.replySource
+    }
+    if (message.sticker) {
+      extra.sticker = message.sticker
+    }
+    return Object.keys(extra).length ? extra : undefined
   }
 
   function findMessageByClientMsgId(clientMsgId: string) {
@@ -972,6 +1116,15 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function matchesConversationFolder(conversation: ConversationSummary, folder: ConversationFolder) {
+    if (folder === 'archived') return conversation.archived
+    if (folder === 'unread') return !conversation.archived && (conversation.unreadCount > 0 || conversation.manualUnread)
+    if (folder === 'single') return !conversation.archived && conversation.conversationType === 1
+    if (folder === 'group') return !conversation.archived && conversation.conversationType === 2
+    if (folder === 'channel') return !conversation.archived && conversation.conversationType === 3
+    return !conversation.archived
+  }
+
   function ensureConversationMeta(conversationId: number) {
     if (!runtimeMeta.value[conversationId]) {
       runtimeMeta.value[conversationId] = {
@@ -1014,6 +1167,25 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function buildSingleConversationProfile(conversation: ConversationSummary): Promise<ConversationProfile> {
+    if (conversation.specialType === 'SAVED_MESSAGES') {
+      const me = authStore.profile ?? authStore.currentUser
+      return {
+        conversationId: conversation.conversationId,
+        conversationType: conversation.conversationType,
+        subtitle: '把消息、文件和灵感都存进自己的工作台',
+        signature: null,
+        notice: 'Saved Messages 会像普通会话一样同步搜索、转发和附件内容。',
+        fields: compactProfileFields([
+          { key: 'saved-scope', label: '会话类型', value: '专属自聊' },
+          { key: 'saved-owner', label: '当前账号', value: me?.nickname ?? '当前用户' },
+        ]),
+        actions: buildProfileActions(conversation),
+        specialType: conversation.specialType,
+        group: null,
+        members: [],
+      }
+    }
+
     if (!conversation.peerUserId) {
       throw new Error('当前单聊会话缺少对端用户标识')
     }
@@ -1032,6 +1204,9 @@ export const useChatStore = defineStore('chat', () => {
         { key: 'friend-status', label: '关系状态', value: formatFriendStatus(profile.friendStatus) },
       ]),
       actions: buildProfileActions(conversation),
+      specialType: conversation.specialType,
+      group: null,
+      members: [],
     }
   }
 
@@ -1041,7 +1216,24 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const group = await fetchGroupDetail(conversation.groupId)
+    const members = await fetchGroupMembers(conversation.groupId)
     const isChannel = conversation.conversationType === 3
+    const groupMeta: GroupGovernanceMeta = {
+      groupId: group.groupId,
+      groupNo: group.groupNo,
+      groupName: group.groupName,
+      ownerUserId: group.ownerUserId,
+      notice: group.notice ?? null,
+      memberCount: group.memberCount ?? null,
+      myRole: group.myRole ?? null,
+      conversationType: group.conversationType,
+      canSend: group.canSend,
+      canEditMeta: group.myRole === 1 || group.myRole === 3,
+      canManageMembers: group.myRole === 1 || group.myRole === 3,
+      canManageRoles: group.myRole === 1,
+      canDissolve: group.myRole === 1,
+      canLeave: group.myRole !== 1,
+    }
 
     return {
       conversationId: conversation.conversationId,
@@ -1057,6 +1249,9 @@ export const useChatStore = defineStore('chat', () => {
         { key: 'owner-user-id', label: isChannel ? '创建者 ID' : '群主 ID', value: group.ownerUserId ? `${group.ownerUserId}` : '' },
       ]),
       actions: buildProfileActions(conversation),
+      specialType: conversation.specialType,
+      group: groupMeta,
+      members,
     }
   }
 
@@ -1112,6 +1307,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function resetState() {
     disconnectRealtime()
+    callStore.resetState()
     uiStore.setConnectionStatus('disconnected')
     conversations.value = []
     messagesByConversation.value = {}
@@ -1120,7 +1316,6 @@ export const useChatStore = defineStore('chat', () => {
     activeConversationId.value = null
     lastOpenedConversationId.value = null
     searchQuery.value = ''
-    archivedConversationIds.value = []
     loading.value = false
     messagesLoading.value = false
     errors.value = {
@@ -1191,19 +1386,24 @@ export const useChatStore = defineStore('chat', () => {
     loadConversationMessages,
     loadOlderMessages,
     fetchConversationProfile,
+    refreshConversationList,
     clearActiveConversation,
     setSearchQuery,
     clearSearchQuery,
-    markConversationUnreadLocally,
-    archiveConversationLocally,
+    markConversationUnread,
+    toggleConversationArchive,
     markConversationRead,
     toggleConversationTop,
     toggleConversationMute,
     deleteConversation,
+    createSingleConversation,
+    createSavedConversation,
+    createGroupConversation,
     sendMessage,
     retryMessage,
     recallMessage,
     editMessage,
+    toggleReaction,
     connectRealtime,
     disconnectRealtime,
     simulateRealtimeDrop,

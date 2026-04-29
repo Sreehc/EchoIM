@@ -17,6 +17,8 @@ public class ImConversationUserEntity {
     private Long lastReadSeq;
     private Integer isTop;
     private Integer isMute;
+    private Integer isArchived;
+    private Integer manualUnread;
     private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -75,6 +77,22 @@ public class ImConversationUserEntity {
 
     public void setIsMute(Integer isMute) {
         this.isMute = isMute;
+    }
+
+    public Integer getIsArchived() {
+        return isArchived;
+    }
+
+    public void setIsArchived(Integer isArchived) {
+        this.isArchived = isArchived;
+    }
+
+    public Integer getManualUnread() {
+        return manualUnread;
+    }
+
+    public void setManualUnread(Integer manualUnread) {
+        this.manualUnread = manualUnread;
     }
 
     public Integer getDeleted() {

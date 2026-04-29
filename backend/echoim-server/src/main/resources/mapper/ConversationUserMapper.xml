@@ -12,6 +12,8 @@
                last_read_seq AS lastReadSeq,
                is_top AS isTop,
                is_mute AS isMute,
+               is_archived AS isArchived,
+               manual_unread AS manualUnread,
                deleted,
                created_at AS createdAt,
                updated_at AS updatedAt
@@ -29,6 +31,8 @@
                last_read_seq AS lastReadSeq,
                is_top AS isTop,
                is_mute AS isMute,
+               is_archived AS isArchived,
+               manual_unread AS manualUnread,
                deleted,
                created_at AS createdAt,
                updated_at AS updatedAt
@@ -75,6 +79,7 @@
     <update id="updateReadState">
         UPDATE im_conversation_user cu
         SET cu.last_read_seq = GREATEST(cu.last_read_seq, #{lastReadSeq}),
+            cu.manual_unread = 0,
             cu.unread_count = (
                 SELECT COUNT(1)
                 FROM im_message m
@@ -96,6 +101,20 @@
     <update id="updateMute">
         UPDATE im_conversation_user
         SET is_mute = #{isMute}
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="updateArchive">
+        UPDATE im_conversation_user
+        SET is_archived = #{isArchived}
+        WHERE conversation_id = #{conversationId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="updateManualUnread">
+        UPDATE im_conversation_user
+        SET manual_unread = #{manualUnread}
         WHERE conversation_id = #{conversationId}
           AND user_id = #{userId}
     </update>

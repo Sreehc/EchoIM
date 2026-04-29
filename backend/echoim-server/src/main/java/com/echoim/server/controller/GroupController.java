@@ -5,11 +5,16 @@ import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.dto.group.AddGroupMembersRequestDto;
 import com.echoim.server.dto.group.CreateGroupRequestDto;
+import com.echoim.server.dto.group.UpdateGroupMemberRoleRequestDto;
+import com.echoim.server.dto.group.UpdateGroupRequestDto;
 import com.echoim.server.service.group.GroupService;
 import com.echoim.server.vo.group.GroupCreateVo;
 import com.echoim.server.vo.group.GroupDetailVo;
+import com.echoim.server.vo.group.GroupMemberItemVo;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/groups")
@@ -31,6 +36,28 @@ public class GroupController {
     @GetMapping("/{groupId}")
     public ApiResponse<GroupDetailVo> detail(@PathVariable Long groupId) {
         return ApiResponse.success(groupService.getGroupDetail(LoginUserContext.requireUserId(), groupId));
+    }
+
+    @RequireLogin
+    @GetMapping("/{groupId}/members")
+    public ApiResponse<List<GroupMemberItemVo>> members(@PathVariable Long groupId) {
+        return ApiResponse.success(groupService.listMembers(LoginUserContext.requireUserId(), groupId));
+    }
+
+    @RequireLogin
+    @PutMapping("/{groupId}")
+    public ApiResponse<GroupDetailVo> update(@PathVariable Long groupId,
+                                             @Valid @RequestBody UpdateGroupRequestDto request) {
+        return ApiResponse.success(groupService.updateGroup(LoginUserContext.requireUserId(), groupId, request));
+    }
+
+    @RequireLogin
+    @PutMapping("/{groupId}/members/{userId}/role")
+    public ApiResponse<Void> updateRole(@PathVariable Long groupId,
+                                        @PathVariable Long userId,
+                                        @Valid @RequestBody UpdateGroupMemberRoleRequestDto request) {
+        groupService.updateMemberRole(LoginUserContext.requireUserId(), groupId, userId, request);
+        return ApiResponse.success();
     }
 
     @RequireLogin

@@ -12,13 +12,16 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AvatarBadge: typeof import('./components/chat/AvatarBadge.vue')['default']
+    CallOverlay: typeof import('./components/chat/CallOverlay.vue')['default']
     ChatStatePanel: typeof import('./components/chat/ChatStatePanel.vue')['default']
     ChatTopbar: typeof import('./components/chat/ChatTopbar.vue')['default']
+    ContactsPanel: typeof import('./components/chat/ContactsPanel.vue')['default']
     ConversationListItem: typeof import('./components/chat/ConversationListItem.vue')['default']
     ConversationProfileDrawer: typeof import('./components/chat/ConversationProfileDrawer.vue')['default']
     ConversationProfilePanelBody: typeof import('./components/chat/ConversationProfilePanelBody.vue')['default']
     ConversationSidebar: typeof import('./components/chat/ConversationSidebar.vue')['default']
     ElButton: typeof import('element-plus/es')['ElButton']
+    ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDrawer: typeof import('element-plus/es')['ElDrawer']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
     ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']

@@ -4,6 +4,7 @@ import com.echoim.server.common.auth.LoginUser;
 import com.echoim.server.common.audit.AuditLogService;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
+import com.echoim.server.common.util.UsernameRules;
 import com.echoim.server.dto.auth.LoginRequestDto;
 import com.echoim.server.dto.auth.RegisterRequestDto;
 import com.echoim.server.entity.ImUserEntity;
@@ -40,14 +41,15 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public RegisterResponseVo register(RegisterRequestDto requestDto) {
-        ImUserEntity existingUser = imUserMapper.selectByUsername(requestDto.getUsername());
+        String normalizedUsername = normalizeAndValidateUsername(requestDto.getUsername());
+        ImUserEntity existingUser = imUserMapper.selectByUsername(normalizedUsername);
         if (existingUser != null) {
             throw new BizException(ErrorCode.USERNAME_EXISTS, "用户名已存在");
         }
 
         ImUserEntity entity = new ImUserEntity();
         entity.setUserNo("TMP_" + System.nanoTime());
-        entity.setUsername(requestDto.getUsername());
+        entity.setUsername(normalizedUsername);
         entity.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
         entity.setNickname(requestDto.getNickname());
         entity.setStatus(USER_STATUS_NORMAL);
@@ -66,7 +68,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponseVo login(LoginRequestDto requestDto) {
-        ImUserEntity userEntity = imUserMapper.selectByUsername(requestDto.getUsername());
+        ImUserEntity userEntity = imUserMapper.selectByUsername(UsernameRules.normalize(requestDto.getUsername()));
         if (userEntity == null) {
             auditLogService.log("AUTH_LOGIN_FAIL", java.util.Map.of("username", requestDto.getUsername(), "reason", "USER_NOT_FOUND"));
             throw new BizException(ErrorCode.USER_NOT_FOUND, "用户不存在");
@@ -132,5 +134,13 @@ public class AuthServiceImpl implements AuthService {
 
     private boolean isUserStatusNormal(Integer status) {
         return status != null && status == USER_STATUS_NORMAL;
+    }
+
+    private String normalizeAndValidateUsername(String username) {
+        String normalizedUsername = UsernameRules.normalize(username);
+        if (!UsernameRules.isValid(normalizedUsername)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "用户名需为 3-24 位字母、数字或下划线，且不能以下划线开头或结尾");
+        }
+        return normalizedUsername;
     }
 }
