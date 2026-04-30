@@ -7,20 +7,38 @@ interface E2EConversation {
   groupId: number | null
   lastMessagePreview: string
   unreadCount: number
+  latestSeq: number
+}
+
+interface E2EMessage {
+  messageId: number
+  clientMsgId: string
+  content: string | null
+  recalled: boolean
+  edited: boolean
+  seqNo: number
 }
 
 export async function login(page: Page, username: string, password: string) {
   await page.goto('/login')
   await page.getByLabel('用户名').fill(username)
   await page.getByLabel('密码').fill(password)
-  await page.getByRole('button', { name: '登录' }).click()
+  await page.getByRole('button', { name: '登录', exact: true }).click()
   await expect(page).toHaveURL(/\/chat/)
   await page.waitForFunction(() => Boolean(window.__ECHOIM_E2E__))
   await page.waitForFunction(() => window.__ECHOIM_E2E__?.getConnectionStatus() === 'ready')
+  await page.waitForFunction(() => Boolean(window.__ECHOIM_E2E__?.getCurrentUserId()))
 }
 
 export async function listConversations(page: Page) {
   return page.evaluate(() => window.__ECHOIM_E2E__?.listConversations() ?? []) as Promise<E2EConversation[]>
+}
+
+export async function listMessages(page: Page, conversationId: number) {
+  return page.evaluate(
+    (targetConversationId) => window.__ECHOIM_E2E__?.listMessages(targetConversationId) ?? [],
+    conversationId,
+  ) as Promise<E2EMessage[]>
 }
 
 export async function waitForSingleConversation(page: Page, peerUserId: number) {
@@ -31,7 +49,9 @@ export async function waitForSingleConversation(page: Page, peerUserId: number) 
   )
 
   const conversations = await listConversations(page)
-  const conversation = conversations.find((item) => item.peerUserId === peerUserId)
+  const conversation = conversations
+    .filter((item) => item.peerUserId === peerUserId)
+    .sort((left, right) => right.latestSeq - left.latestSeq)[0]
   if (!conversation) {
     throw new Error(`Missing conversation for peerUserId=${peerUserId}`)
   }
@@ -45,6 +65,12 @@ export async function openConversation(page: Page, conversationId: number) {
   }, conversationId)
 
   await page.waitForURL(new RegExp(`/chat/${conversationId}$`))
+}
+
+export async function refreshConversationMessages(page: Page, conversationId: number) {
+  await page.evaluate(async (targetConversationId) => {
+    await window.__ECHOIM_E2E__?.refreshConversationMessages(targetConversationId)
+  }, conversationId)
 }
 
 export async function openLeftPanel(page: Page, mode: 'conversations' | 'me' | 'settings') {
@@ -70,8 +96,32 @@ export async function reconnectRealtime(page: Page) {
 }
 
 export async function sendMessage(page: Page, content: string) {
-  await page.getByLabel('消息输入框').fill(content)
-  await page.getByTestId('send-message').click()
+  await page.evaluate(async (nextContent) => {
+    await window.__ECHOIM_E2E__?.sendTextMessage(nextContent)
+  }, content)
+}
+
+export async function findMessageIdByText(page: Page, conversationId: number, content: string) {
+  return page.evaluate(
+    ([targetConversationId, targetContent]) =>
+      window.__ECHOIM_E2E__?.findMessageIdByText(targetConversationId, targetContent) ?? null,
+    [conversationId, content] as const,
+  )
+}
+
+export async function editMessage(page: Page, messageId: number, content: string) {
+  await page.evaluate(
+    async ([targetMessageId, nextContent]) => {
+      await window.__ECHOIM_E2E__?.editMessage(targetMessageId, nextContent)
+    },
+    [messageId, content] as const,
+  )
+}
+
+export async function recallMessage(page: Page, messageId: number) {
+  await page.evaluate(async (targetMessageId) => {
+    await window.__ECHOIM_E2E__?.recallMessage(targetMessageId)
+  }, messageId)
 }
 
 export function statusForMessage(page: Page, messageText: string) {

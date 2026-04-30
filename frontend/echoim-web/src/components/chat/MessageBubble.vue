@@ -351,7 +351,7 @@ onUnmounted(() => {
       size="sm"
       type="user"
     />
-    <div v-else-if="!isSystem && !isSelf" class="message-row__avatar-spacer"></div>
+    <div v-else-if="!isSystem && !isSelf && conversationType !== 1" class="message-row__avatar-spacer"></div>
     <div
       class="message-bubble"
       :class="{
@@ -360,6 +360,7 @@ onUnmounted(() => {
         'is-grouped': groupedWithPrev,
         'is-grouped-next': groupedWithNext,
         'is-compact': compact,
+        'is-search-active': searchActive,
       }"
     >
       <button
@@ -572,13 +573,13 @@ onUnmounted(() => {
 <style scoped>
 .message-row {
   display: flex;
-  gap: 8px;
+  gap: 9px;
   align-items: flex-end;
-  margin-top: 11px;
+  margin-top: 12px;
 }
 
 .message-row.is-compact {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .message-row.is-self {
@@ -586,11 +587,12 @@ onUnmounted(() => {
 }
 
 .message-row.is-grouped {
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .message-row.is-system {
   justify-content: center;
+  margin-top: 14px;
 }
 
 .message-row__avatar {
@@ -604,44 +606,45 @@ onUnmounted(() => {
 
 .message-bubble {
   position: relative;
-  max-width: min(64ch, 76%);
+  max-width: min(62ch, 74%);
   padding: 9px 12px 8px;
   border: 1px solid var(--color-bubble-peer-line);
-  border-radius: 16px 16px 16px 6px;
+  border-radius: 15px 15px 15px 11px;
   background: var(--color-bubble-peer);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
 }
 
 .message-bubble.is-compact {
-  padding: 7px 10px 6px;
+  padding: 8px 10px 7px;
 }
 
 .message-bubble.is-self {
   border-color: var(--color-bubble-self-line);
-  border-radius: 16px 16px 6px 16px;
+  border-radius: 15px 15px 11px 15px;
   background: var(--color-bubble-self);
 }
 
 .message-bubble.is-search-active {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-primary) 28%, transparent),
-    var(--shadow-float);
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 14%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent),
+    0 1px 2px rgba(15, 23, 42, 0.025);
 }
 
 .message-bubble.is-grouped:not(.is-self) {
-  border-top-left-radius: 6px;
+  border-top-left-radius: 9px;
 }
 
 .message-bubble.is-grouped-next:not(.is-self) {
-  border-bottom-left-radius: 6px;
+  border-bottom-left-radius: 9px;
 }
 
 .message-bubble.is-self.is-grouped {
-  border-top-right-radius: 6px;
+  border-top-right-radius: 9px;
 }
 
 .message-bubble.is-self.is-grouped-next {
-  border-bottom-right-radius: 6px;
+  border-bottom-right-radius: 9px;
 }
 
 .message-bubble.is-system {
@@ -650,15 +653,17 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   color: var(--color-text-3);
-  font: 500 0.68rem/1.1 var(--font-mono);
+  font: 500 0.64rem/1.1 var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .message-bubble__sender {
   display: inline-block;
   margin-bottom: 4px;
   color: var(--color-shell-eyebrow);
-  font-size: 0.7rem;
-  font-weight: 600;
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .message-bubble__selector {
@@ -682,8 +687,9 @@ onUnmounted(() => {
 .message-bubble p {
   margin: 0;
   white-space: pre-wrap;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.88rem;
+  line-height: 1.54;
+  letter-spacing: -0.008em;
 }
 
 .message-bubble__text-layout {
@@ -696,9 +702,9 @@ onUnmounted(() => {
 
 .message-bubble__highlight {
   padding: 0 0.08em;
-  border-radius: 0.35rem;
-  background: color-mix(in srgb, #ffe7a2 72%, #fff);
-  color: #342100;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--color-primary) 7%, white);
+  color: var(--color-text-1);
 }
 
 .message-bubble__meta {
@@ -706,43 +712,44 @@ onUnmounted(() => {
   justify-content: flex-end;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
+  gap: 4px;
+  margin-top: 4px;
   color: color-mix(in srgb, var(--color-text-2) 82%, transparent);
-  font: 500 0.64rem/1 var(--font-body);
+  font: 500 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .message-bubble__meta--inline {
   margin-top: 0;
-  margin-left: 8px;
+  margin-left: 7px;
   vertical-align: bottom;
 }
 
 .message-bubble__forward {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   color: var(--color-text-soft);
-  font-size: 0.72rem;
-  line-height: 1.35;
+  font-size: 0.68rem;
+  line-height: 1.34;
 }
 
 .message-bubble__reply {
   width: 100%;
-  margin-bottom: 6px;
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  margin-bottom: 5px;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-shell-inline));
   color: var(--color-text-2);
   text-align: left;
-  font: 500 0.72rem/1.35 var(--font-body);
+  font: 500 0.68rem/1.38 var(--font-body);
 }
 
 .message-bubble__status {
-  min-width: 17px;
+  min-width: 15px;
   display: inline-flex;
   justify-content: flex-end;
   color: color-mix(in srgb, var(--color-text-2) 72%, transparent);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: -0.18em;
 }
@@ -788,8 +795,8 @@ onUnmounted(() => {
 
 .message-bubble__views {
   color: color-mix(in srgb, var(--color-text-2) 84%, transparent);
-  font: 600 0.62rem/1 var(--font-mono);
-  letter-spacing: 0.01em;
+  font: 600 0.6rem/1 var(--font-mono);
+  letter-spacing: 0.03em;
 }
 
 .message-bubble__editor {
@@ -819,16 +826,16 @@ onUnmounted(() => {
 .message-bubble__file {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   min-width: 220px;
-  padding: 2px 1px;
+  padding: 2px 0;
 }
 
 .message-bubble__image {
   width: min(320px, 100%);
   max-height: 280px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 11px;
 }
 
 .message-bubble__preview {
@@ -836,8 +843,8 @@ onUnmounted(() => {
   height: 46px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-bg-panel));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-bg-panel));
   flex-shrink: 0;
 }
 
@@ -857,14 +864,14 @@ onUnmounted(() => {
 
 .message-bubble__file strong {
   display: block;
-  margin-bottom: 3px;
-  font-size: 0.88rem;
+  margin-bottom: 2px;
+  font-size: 0.8rem;
   line-height: 1.2;
 }
 
 .message-bubble__file p {
   color: var(--color-text-2);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .message-bubble__download {
@@ -878,9 +885,9 @@ onUnmounted(() => {
 
 .message-bubble__file--image {
   min-width: 240px;
-  padding: 10px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-bg-panel));
+  padding: 8px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-bg-panel));
   cursor: pointer;
   flex-direction: column;
   align-items: stretch;
@@ -889,8 +896,8 @@ onUnmounted(() => {
 .message-bubble__file--sticker {
   min-width: 180px;
   padding: 8px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 86%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 84%, transparent);
   cursor: pointer;
   flex-direction: column;
   align-items: center;
@@ -906,7 +913,7 @@ onUnmounted(() => {
   align-self: flex-start;
   padding: 4px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-bg-panel));
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-panel));
   color: var(--color-primary-strong);
   font: 700 0.62rem/1 var(--font-mono);
 }
@@ -915,7 +922,7 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 7px;
 }
 
 .message-bubble__reaction,
@@ -929,9 +936,9 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 9px;
+  padding: 4px 8px;
   color: var(--color-text-1);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
 }
 
 .message-bubble__reaction.is-active {
@@ -946,43 +953,43 @@ onUnmounted(() => {
 .message-bubble__reaction-menu {
   display: flex;
   gap: 8px;
-  padding-bottom: 12px;
-  margin-bottom: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
   border-bottom: 1px solid color-mix(in srgb, var(--color-shell-border) 88%, transparent);
 }
 
 .message-bubble__reaction-pick {
-  min-width: 34px;
-  height: 34px;
+  min-width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   padding: 0 10px;
   color: var(--color-text-1);
-  font-size: 1rem;
+  font-size: 0.96rem;
 }
 
 .message-bubble__context-menu {
   position: fixed;
   z-index: 2200;
   min-width: 216px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid color-mix(in srgb, var(--color-shell-border) 92%, transparent);
-  border-radius: 18px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--color-shell-card) 96%, rgba(12, 14, 18, 0.94));
   box-shadow: var(--shadow-float);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(16px);
 }
 
 .message-bubble__context-item {
   width: 100%;
   display: block;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 11px;
   background: transparent;
   color: var(--color-text-1);
   text-align: left;
-  font: 600 0.82rem/1.2 var(--font-body);
+  font: 600 0.78rem/1.2 var(--font-body);
 }
 
 .message-bubble__context-item:hover,

@@ -9,6 +9,10 @@ public class LoginRequestDto {
 
     @NotBlank(message = "密码不能为空")
     private String password;
+    private Boolean rememberMe;
+    private Boolean trustDevice;
+    private String deviceFingerprint;
+    private String deviceName;
 
     public String getUsername() {
         return username;
@@ -24,5 +28,37 @@ public class LoginRequestDto {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Boolean getRememberMe() {
+        return rememberMe;
+    }
+
+    public void setRememberMe(Boolean rememberMe) {
+        this.rememberMe = rememberMe;
+    }
+
+    public Boolean getTrustDevice() {
+        return trustDevice;
+    }
+
+    public void setTrustDevice(Boolean trustDevice) {
+        this.trustDevice = trustDevice;
+    }
+
+    public String getDeviceFingerprint() {
+        return deviceFingerprint;
+    }
+
+    public void setDeviceFingerprint(String deviceFingerprint) {
+        this.deviceFingerprint = deviceFingerprint;
+    }
+
+    public String getDeviceName() {
+        return deviceName;
+    }
+
+    public void setDeviceName(String deviceName) {
+        this.deviceName = deviceName;
     }
 }

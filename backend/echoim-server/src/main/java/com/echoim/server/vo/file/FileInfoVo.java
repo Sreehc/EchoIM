@@ -11,6 +11,7 @@ public class FileInfoVo {
     private Long fileSize;
     private Integer bizType;
     private String objectKey;
+    private String url;
     private String downloadUrl;
     private Integer expiresIn;
     private LocalDateTime expireAt;
@@ -77,6 +78,14 @@ public class FileInfoVo {
 
     public void setDownloadUrl(String downloadUrl) {
         this.downloadUrl = downloadUrl;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
     }
 
     public Integer getExpiresIn() {

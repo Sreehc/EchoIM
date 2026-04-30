@@ -13,6 +13,17 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   servlet:
     multipart:
       max-file-size: ${ECHOIM_MULTIPART_MAX_FILE_SIZE:100MB}
@@ -43,6 +54,12 @@ echoim:
   jwt:
     secret: ${ECHOIM_JWT_SECRET:}
     expire-seconds: 7200
+  auth:
+    mail-from: ${SPRING_MAIL_FROM:${SPRING_MAIL_USERNAME:}}
+    code-expire-seconds: ${ECHOIM_AUTH_CODE_EXPIRE_SECONDS:600}
+    resend-cooldown-seconds: ${ECHOIM_AUTH_RESEND_COOLDOWN_SECONDS:60}
+    max-verify-attempts: ${ECHOIM_AUTH_MAX_VERIFY_ATTEMPTS:5}
+    trusted-device-expire-days: ${ECHOIM_AUTH_TRUSTED_DEVICE_EXPIRE_DAYS:30}
   file:
     storage-type: ${ECHOIM_FILE_STORAGE_TYPE:oss}
     max-size: ${ECHOIM_FILE_MAX_SIZE:104857600}

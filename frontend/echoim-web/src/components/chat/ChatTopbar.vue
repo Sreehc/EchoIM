@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowLeft, Close, MoreFilled, Search, Setting } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, MoreFilled, Search, User } from '@element-plus/icons-vue'
 import type { ConversationProfile, ConversationSummary } from '@/types/chat'
 import AvatarBadge from './AvatarBadge.vue'
 
@@ -110,7 +110,7 @@ watch(
         </button>
       </div>
       <button
-        v-else
+        v-else-if="!isMobile"
         class="chat-topbar__icon"
         :class="{ 'is-active': messageSearchOpen }"
         type="button"
@@ -138,6 +138,12 @@ watch(
             >
               发起语音通话
             </el-dropdown-item>
+            <el-dropdown-item v-if="isMobile" @click="emit('focusSearch')">
+              搜索消息
+            </el-dropdown-item>
+            <el-dropdown-item v-if="isMobile" @click="emit('openProfile')">
+              查看资料
+            </el-dropdown-item>
             <el-dropdown-item command="toggle-top">
               {{ props.conversation?.isTop ? '取消置顶' : '会话置顶' }}
             </el-dropdown-item>
@@ -156,8 +162,8 @@ watch(
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <button class="chat-topbar__icon" type="button" aria-label="打开会话详情" @click="emit('openProfile')">
-        <Setting />
+      <button v-if="!isMobile" class="chat-topbar__icon" type="button" aria-label="打开会话详情" @click="emit('openProfile')">
+        <User />
       </button>
     </div>
   </header>
@@ -169,12 +175,12 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 76px;
-  height: 76px;
-  padding: 12px 20px;
+  min-height: 70px;
+  height: 70px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-toolbar) 92%, transparent);
-  backdrop-filter: blur(20px);
+  background: color-mix(in srgb, var(--color-shell-toolbar) 94%, transparent);
+  backdrop-filter: blur(16px);
 }
 
 .chat-topbar__main,
@@ -196,12 +202,13 @@ watch(
 }
 
 .chat-topbar__icon {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
 }
 
 .chat-topbar__identity {
   min-width: 0;
+  gap: 14px;
 }
 
 .chat-topbar__copy {
@@ -222,30 +229,30 @@ watch(
 
 .chat-topbar__identity strong {
   display: block;
-  font-size: 1.02rem;
+  font-size: 0.92rem;
   line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.014em;
 }
 
 .chat-topbar__identity p {
-  margin-top: 3px;
+  margin-top: 4px;
   color: var(--color-text-soft);
-  font-size: 0.8rem;
-  line-height: 1.2;
+  font-size: 0.72rem;
+  line-height: 1.18;
+  letter-spacing: 0.01em;
 }
 
 .chat-topbar__icon {
   display: grid;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 13px;
   border: 1px solid var(--color-shell-border);
   background: var(--color-shell-action);
   color: var(--color-text-2);
   transition:
     background var(--motion-fast) ease,
     color var(--motion-fast) ease,
-    transform var(--motion-fast) ease,
     border-color var(--motion-fast) ease;
 }
 
@@ -254,7 +261,6 @@ watch(
   background: var(--color-shell-action-hover);
   border-color: var(--color-shell-border);
   color: var(--color-text-1);
-  transform: translateY(-1px);
 }
 
 .chat-topbar__icon.is-active {
@@ -269,12 +275,12 @@ watch(
   gap: 10px;
   width: clamp(460px, 52vw, 680px);
   max-width: 100%;
-  min-height: 56px;
-  padding: 6px;
+  min-height: 48px;
+  padding: 5px;
   border: 1px solid var(--color-shell-border);
   border-radius: 999px;
-  background: var(--color-shell-card-strong);
-  box-shadow: var(--shadow-card);
+  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+  box-shadow: var(--shadow-soft);
 }
 
 .chat-topbar__search-input {
@@ -283,9 +289,9 @@ watch(
   gap: 10px;
   min-width: 260px;
   flex: 1 1 340px;
-  padding: 0 16px;
+  padding: 0 14px;
   min-height: 100%;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-shell-border));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-shell-border));
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-shell-inline) 92%, transparent);
 }
@@ -317,14 +323,14 @@ watch(
 
 .chat-topbar__search-input :deep(.el-input__inner) {
   color: var(--color-text-1);
-  font-size: 0.96rem;
+  font-size: 0.9rem;
 }
 
 .chat-topbar__search-count {
   min-width: 3.75rem;
   color: var(--color-text-2);
   font: 600 0.68rem/1.2 var(--font-mono);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-align: right;
 }
 
@@ -333,15 +339,14 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px;
-  padding: 0 14px;
+  height: 36px;
+  padding: 0 13px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--color-shell-action);
   color: var(--color-text-1);
-  font: 600 0.76rem/1 var(--font-body);
+  font: 600 0.72rem/1 var(--font-body);
   transition:
-    transform var(--motion-fast) ease,
     background var(--motion-fast) ease,
     border-color var(--motion-fast) ease;
 }
@@ -354,7 +359,6 @@ watch(
 .chat-topbar__search-nav:focus-visible:not(:disabled),
 .chat-topbar__search-close:hover,
 .chat-topbar__search-close:focus-visible {
-  transform: translateY(-1px);
   background: var(--color-shell-action-hover);
   border-color: var(--color-shell-border-strong);
 }
@@ -365,8 +369,8 @@ watch(
 }
 
 .chat-topbar__search-close {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   padding: 0;
 }
 
@@ -378,8 +382,8 @@ watch(
 @media (max-width: 767px) {
   .chat-topbar {
     padding-inline: 16px;
-    min-height: 72px;
-    height: 72px;
+    min-height: 66px;
+    height: 66px;
   }
 
   .chat-topbar__search-shell {
@@ -402,6 +406,10 @@ watch(
     min-width: 64px;
     padding-inline: 10px;
     font-size: 0.66rem;
+  }
+
+  .chat-topbar__actions {
+    gap: 8px;
   }
 }
 </style>

@@ -1,6 +1,6 @@
 export type ThemeMode = 'light' | 'dark'
 export type LeftPanelMode = 'conversations' | 'contacts' | 'me' | 'settings'
-export type SettingsSection = 'appearance' | 'chat' | 'security'
+export type SettingsSection = 'appearance' | 'chat' | 'notifications' | 'security'
 export type ConversationFolder = 'inbox' | 'archived' | 'unread' | 'single' | 'group' | 'channel'
 export type SpecialConversationType = 'SAVED_MESSAGES'
 
@@ -46,8 +46,60 @@ export interface AuthSession {
   userInfo: UserInfo
 }
 
-export interface StoredAccount extends AuthSession {
+export interface LoginFlowResponse {
+  status: 'authenticated' | 'challenge_required'
+  token?: string
+  tokenType?: string
+  expiresIn?: number
+  userInfo?: UserInfo
+  challengeTicket?: string
+  maskedEmail?: string
+  resendAfterSeconds?: number
+  trustedDeviceGrantToken?: string | null
+  trustedDeviceExpireAt?: string | null
+}
+
+export interface StoredAccount {
+  userInfo: UserInfo
   lastActiveAt: string
+  authenticatedAt: string | null
+  rememberMe: boolean
+  sessionToken: string | null
+  sessionTokenType: string | null
+  sessionExpireAt: string | null
+  trustedDeviceGrantToken: string | null
+  trustedDeviceExpireAt: string | null
+  deviceFingerprint: string | null
+}
+
+export interface CodeDispatchResult {
+  maskedEmail: string
+  resendAfterSeconds: number
+}
+
+export interface RecoveryAccountSummary extends UserInfo {}
+
+export interface RecoveryVerifyResult {
+  recoveryToken: string
+  accounts: RecoveryAccountSummary[]
+}
+
+export interface TrustedDeviceSummary {
+  deviceId: number
+  deviceName: string
+  deviceFingerprint: string
+  expireAt: string | null
+  lastUsedAt: string | null
+}
+
+export interface SecurityEventSummary {
+  eventId: number
+  eventType: string
+  eventStatus: string
+  ip: string | null
+  userAgent: string | null
+  detail: string | null
+  createdAt: string | null
 }
 
 export type ConversationType = 1 | 2 | 3
@@ -119,6 +171,7 @@ export interface ChatFile {
   fileSize: number | null
   bizType: number | null
   objectKey: string | null
+  url: string | null
   downloadUrl: string | null
   expiresIn: number | null
   expireAt: string | null

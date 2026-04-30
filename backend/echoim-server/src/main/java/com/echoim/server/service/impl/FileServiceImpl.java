@@ -195,6 +195,7 @@ public class FileServiceImpl implements FileService {
         vo.setFileSize(entity.getFileSize());
         vo.setBizType(entity.getBizType());
         vo.setObjectKey(entity.getObjectKey());
+        vo.setUrl(entity.getUrl());
         vo.setDownloadUrl(generateSignedUrl(entity.getObjectKey()));
         vo.setExpiresIn(fileProperties.getSignedUrlExpireSeconds());
         vo.setExpireAt(LocalDateTime.now().plusSeconds(fileProperties.getSignedUrlExpireSeconds()));

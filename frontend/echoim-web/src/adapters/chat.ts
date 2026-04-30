@@ -33,6 +33,7 @@ function adaptFile(file: ChatFile | null | undefined): ChatFile | null {
     fileSize: file.fileSize ?? null,
     bizType: file.bizType ?? null,
     objectKey: file.objectKey ?? null,
+    url: file.url ?? null,
     downloadUrl: file.downloadUrl ?? null,
     expiresIn: file.expiresIn ?? null,
     expireAt: file.expireAt ? normalizeTime(file.expireAt) : null,
@@ -166,22 +167,51 @@ export function messagePreviewFromMessage(message: ChatMessage): string {
 }
 
 export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
-  const merged = new Map<string, ChatMessage>()
+  const merged = [...existing]
+  const messageIdIndex = new Map<number, number>()
+  const clientMsgIdIndex = new Map<string, number>()
+  const seqIndex = new Map<number, number>()
 
-  for (const message of existing) {
-    merged.set(buildMessageKey(message), message)
+  const indexMessage = (message: ChatMessage, index: number) => {
+    if (message.messageId > 0) {
+      messageIdIndex.set(message.messageId, index)
+    }
+    if (message.clientMsgId) {
+      clientMsgIdIndex.set(message.clientMsgId, index)
+    }
+    if (message.seqNo > 0) {
+      seqIndex.set(message.seqNo, index)
+    }
   }
 
-  for (const message of incoming) {
-    const key = buildMessageKey(message)
-    const previous = merged.get(key)
+  const findMessageIndex = (message: ChatMessage) => {
+    if (message.messageId > 0 && messageIdIndex.has(message.messageId)) {
+      return messageIdIndex.get(message.messageId)
+    }
+    if (message.clientMsgId && clientMsgIdIndex.has(message.clientMsgId)) {
+      return clientMsgIdIndex.get(message.clientMsgId)
+    }
+    if (message.seqNo > 0 && seqIndex.has(message.seqNo)) {
+      return seqIndex.get(message.seqNo)
+    }
+    return undefined
+  }
 
-    if (!previous) {
-      merged.set(key, message)
+  existing.forEach((message, index) => {
+    indexMessage(message, index)
+  })
+
+  for (const message of incoming) {
+    const matchedIndex = findMessageIndex(message)
+
+    if (matchedIndex == null) {
+      merged.push(message)
+      indexMessage(message, merged.length - 1)
       continue
     }
 
-    merged.set(key, {
+    const previous = merged[matchedIndex]
+    merged[matchedIndex] = {
       ...previous,
       ...message,
       sendStatus: message.sendStatus,
@@ -189,19 +219,14 @@ export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]):
       read: Boolean(previous.read || message.read),
       viewCount: Math.max(previous.viewCount ?? 0, message.viewCount ?? 0),
       errorMessage: message.errorMessage ?? previous.errorMessage ?? null,
-    })
+    }
+    indexMessage(merged[matchedIndex], matchedIndex)
   }
 
-  return Array.from(merged.values()).sort((left, right) => {
+  return merged.sort((left, right) => {
     if (left.seqNo !== right.seqNo) return left.seqNo - right.seqNo
     return new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime()
   })
-}
-
-export function buildMessageKey(message: Pick<ChatMessage, 'messageId' | 'clientMsgId' | 'seqNo'>): string {
-  if (message.messageId > 0) return `id:${message.messageId}`
-  if (message.clientMsgId) return `client:${message.clientMsgId}`
-  return `seq:${message.seqNo}`
 }
 
 export function mapOfflineConversation(

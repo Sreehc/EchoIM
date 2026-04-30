@@ -121,7 +121,11 @@ const decoratedMessages = computed(() =>
       message,
       isGroupedWithPrev,
       isGroupedWithNext,
-      showAvatar: !currentIsSystem && !isGroupedWithNext && message.fromUserId !== props.currentUserId,
+      showAvatar:
+        props.conversationType !== 1 &&
+        !currentIsSystem &&
+        !isGroupedWithNext &&
+        message.fromUserId !== props.currentUserId,
       showSenderLabel:
         props.conversationType !== 1 &&
         !currentIsSystem &&
@@ -250,7 +254,7 @@ function jumpToMessage(messageId: number) {
     if (flashMessageId.value === messageId) {
       flashMessageId.value = null
     }
-  }, 1800)
+  }, 1200)
 }
 </script>
 
@@ -277,16 +281,19 @@ function jumpToMessage(messageId: number) {
     />
     <div v-else-if="decoratedMessages.length" class="message-pane__stack">
       <div class="message-pane__history">
-        <el-button
-          v-if="hasOlderMessages || olderMessagesLoading"
-          text
-          :loading="olderMessagesLoading"
-          data-testid="message-load-older"
-          @click="requestLoadOlder"
-        >
-          加载更早消息
-        </el-button>
-        <p v-else class="message-pane__history-tip">已经到最早的消息了</p>
+        <div class="message-pane__history-control">
+          <span class="message-pane__history-label">历史消息</span>
+          <el-button
+            v-if="hasOlderMessages || olderMessagesLoading"
+            text
+            :loading="olderMessagesLoading"
+            data-testid="message-load-older"
+            @click="requestLoadOlder"
+          >
+            查看更早消息
+          </el-button>
+          <span v-else class="message-pane__history-end">已经到最早的消息了</span>
+        </div>
         <p v-if="olderMessagesError" class="message-pane__history-error" role="status">{{ olderMessagesError }}</p>
       </div>
       <template v-for="entry in decoratedMessages" :key="entry.message.messageId">
@@ -340,33 +347,67 @@ function jumpToMessage(messageId: number) {
   position: relative;
   z-index: 1;
   min-height: 0;
-  padding: 14px 24px 8px;
+  padding: 12px 22px 6px;
   background: transparent;
 }
 
 .message-pane.is-compact {
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .message-pane__stack,
 .message-pane__skeleton {
   display: grid;
-  gap: 4px;
-  width: min(760px, 100%);
+  gap: 3px;
+  width: min(740px, 100%);
   margin: 0 auto;
 }
 
 .message-pane__history {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.message-pane__history-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 3px;
+}
+
+.message-pane__history-label {
+  color: var(--color-text-soft);
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.message-pane__history-end {
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .message-pane__history-tip,
 .message-pane__history-error {
   color: var(--color-text-soft);
   font-size: 0.76rem;
+}
+
+.message-pane__history :deep(.el-button) {
+  min-height: 28px;
+  padding: 0 2px;
+  color: var(--color-text-2);
+  font: 600 0.72rem/1 var(--font-body);
+  letter-spacing: -0.01em;
+}
+
+.message-pane__history :deep(.el-button:hover),
+.message-pane__history :deep(.el-button:focus-visible) {
+  color: var(--color-text-1);
 }
 
 .message-pane__history-error {
@@ -380,22 +421,22 @@ function jumpToMessage(messageId: number) {
 .message-pane__divider {
   display: flex;
   justify-content: center;
-  margin: 10px 0 12px;
+  margin: 12px 0 10px;
 }
 
 .message-pane__divider span {
-  padding: 7px 14px;
-  border: 1px solid var(--color-shell-border);
+  padding: 5px 11px;
+  border: 1px solid color-mix(in srgb, var(--color-shell-border) 92%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 90%, transparent);
+  background: color-mix(in srgb, var(--color-shell-card-strong) 82%, transparent);
   color: var(--color-text-2);
-  font: 600 0.7rem/1.2 var(--font-body);
-  box-shadow: var(--shadow-soft);
+  font: 600 0.64rem/1 var(--font-mono);
+  letter-spacing: 0.05em;
 }
 
 @media (max-width: 767px) {
   .message-pane {
-    padding: 14px 12px 8px;
+    padding: 12px 12px 6px;
   }
 }
 </style>

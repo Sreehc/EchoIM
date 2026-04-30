@@ -26,7 +26,7 @@ test('chat workspace keeps fixed viewport and supports sidebar mode switches', a
   await expect(page.getByTestId('sidebar-global-menu')).toBeVisible()
   await expect(page.getByRole('menuitem', { name: /添加账号/ })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: /收藏消息/ })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: /更多/ })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: /通知与权限/ })).toBeVisible()
   await page.getByTestId('sidebar-menu-profile-settings').click()
   await expect(page.getByTestId('sidebar-panel-settings')).toBeVisible()
 
@@ -39,12 +39,14 @@ test('chat workspace keeps fixed viewport and supports sidebar mode switches', a
   await expect(page.getByRole('menuitem', { name: '新建群组' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: '新建私聊' })).toBeVisible()
   await page.getByRole('menuitem', { name: '新建私聊' }).click()
-  await expect(page.getByTestId('sidebar-compose-menu')).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: '新建私聊' })).toBeVisible()
+  await page.getByRole('button', { name: '取消' }).click()
 
   await openLeftPanel(page, 'me')
   await expect(page.getByTestId('sidebar-panel-me')).toBeVisible()
 
   await page.getByTestId('profile-edit').click()
+  await expect(page.getByRole('dialog', { name: '编辑资料' })).toBeVisible()
   await page.getByTestId('profile-save').click()
   await expect(page.getByText('个人资料已更新')).toBeVisible()
 
@@ -89,9 +91,10 @@ test('desktop notification prompt requests browser permission when clicked', asy
   })
 
   await login(page, 'echo_demo_01', '123456')
-  await page.getByRole('button', { name: '不错过新消息' }).click()
+  await openLeftPanel(page, 'settings')
+  await page.getByTestId('settings-tab-notifications').click()
+  await page.getByRole('button', { name: '开启桌面通知' }).click()
 
-  await expect(page.getByText('不错过新消息')).toHaveCount(0)
   expect(
     await page.evaluate(
       () => (window as typeof window & { __notificationPermissionRequests?: number }).__notificationPermissionRequests,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
@@ -54,6 +54,7 @@ import type {
   UserSearchItem,
 } from '@/types/chat'
 import { adaptConversationSummary, adaptGlobalSearchMessage } from '@/adapters/chat'
+import { formatConversationTime } from '@/utils/format'
 
 type ConversationActionCommand = 'open-tab' | 'mark-unread' | 'toggle-top' | 'toggle-mute' | 'archive' | 'delete'
 type ComposeAction = 'single' | 'group' | 'channel'
@@ -190,6 +191,7 @@ const forwardDialog = reactive<{
   submitting: false,
   error: null,
 })
+const forwardSearchInput = ref<{ focus?: () => void } | null>(null)
 
 const shouldShowConversationList = computed(() => !uiStore.isMobile || uiStore.mobileView === 'list')
 const shouldShowMainPanel = computed(() => !uiStore.isMobile || uiStore.mobileView === 'chat')
@@ -213,12 +215,36 @@ const selectedForwardMessages = computed(() =>
     .map((messageId) => chatStore.activeMessages.find((message) => message.messageId === messageId) ?? null)
     .filter((message): message is ChatMessage => Boolean(message)),
 )
+const hasForwardKeyword = computed(() => Boolean(forwardDialog.keyword.trim()))
+const forwardTargetCount = computed(
+  () => forwardDialog.selectedConversationIds.length + (forwardDialog.includeSavedMessages ? 1 : 0),
+)
+const forwardEmptyState = computed(() => {
+  if (hasForwardKeyword.value) {
+    return {
+      title: '没有匹配的会话',
+      description: '试试搜索会话名称、最近消息，或直接转发到 Saved Messages。',
+    }
+  }
+
+  return {
+    title: '还没有可用目标',
+    description: '当前没有可转发的会话时，仍可先存入 Saved Messages。',
+  }
+})
 const connectionStatusLabel = computed(() => {
   if (uiStore.connectionStatus === 'ready') return '实时连接已就绪'
   if (uiStore.connectionStatus === 'reconnecting') return '正在重连'
   if (uiStore.connectionStatus === 'connecting') return '正在连接'
   return chatStore.errorMessage ?? '等待建立实时连接'
 })
+const hasGlobalSearchKeyword = computed(() => Boolean(globalSearchState.keyword.trim()))
+const globalSearchTotal = computed(
+  () =>
+    globalSearchState.conversations.length +
+    globalSearchState.users.length +
+    globalSearchState.messages.length,
+)
 const transientBanner = computed(() => {
   if (chatStore.errors.syncError) {
     return { tone: 'warning', message: chatStore.errors.syncError }
@@ -338,6 +364,15 @@ watch(
   () => {
     if (!globalSearchState.visible) return
     void runGlobalSearch()
+  },
+)
+
+watch(
+  () => forwardDialog.visible,
+  async (visible) => {
+    if (!visible) return
+    await nextTick()
+    forwardSearchInput.value?.focus?.()
   },
 )
 
@@ -981,7 +1016,12 @@ function handleAddAccount() {
 }
 
 async function handleSwitchAccount(userId: number) {
-  authStore.activateStoredAccount(userId)
+  try {
+    await authStore.activateStoredAccount(userId)
+  } catch {
+    await router.replace('/login?add=1')
+    return
+  }
   callStore.resetState()
   chatStore.resetState()
   uiStore.setGlobalMenuOpen(false)
@@ -998,6 +1038,30 @@ async function handleSwitchAccount(userId: number) {
 
 function handleRemoveStoredAccount(userId: number) {
   authStore.removeStoredAccount(userId)
+}
+
+async function handleSendEmailBindCode(payload: { email: string; currentPassword: string }) {
+  await authStore.sendEmailBindCode(payload.email, payload.currentPassword)
+}
+
+async function handleBindEmail(payload: { email: string; code: string; currentPassword: string }) {
+  await authStore.bindEmail(payload.email, payload.code, payload.currentPassword)
+}
+
+async function handleRefreshTrustedDevices() {
+  await authStore.loadTrustedDevices(true)
+}
+
+async function handleRevokeTrustedDevice(payload: { deviceId: number; deviceFingerprint: string }) {
+  await authStore.revokeTrustedDevice(payload.deviceId, payload.deviceFingerprint)
+}
+
+async function handleRevokeAllTrustedDevices() {
+  await authStore.revokeAllTrustedDevices()
+}
+
+async function handleRefreshSecurityEvents() {
+  await authStore.loadSecurityEvents(true)
 }
 
 async function handleLoadOlderMessages() {
@@ -1231,6 +1295,7 @@ function registerDebugHooks() {
 
   window.__ECHOIM_E2E__ = {
     getConnectionStatus: () => uiStore.connectionStatus,
+    getCurrentUserId: () => authStore.currentUser?.userId ?? null,
     getActiveConversationId: () => chatStore.activeConversationId,
     getLeftPanelMode: () => uiStore.leftPanelMode,
     listConversations: () =>
@@ -1241,9 +1306,25 @@ function registerDebugHooks() {
         groupId: item.groupId,
         lastMessagePreview: item.lastMessagePreview,
         unreadCount: item.unreadCount,
+        latestSeq: item.latestSeq,
+      })),
+    listMessages: (conversationId: number) =>
+      (chatStore.messagesByConversation[conversationId] ?? []).map((message) => ({
+        messageId: message.messageId,
+        clientMsgId: message.clientMsgId,
+        content: message.content,
+        recalled: Boolean(message.recalled),
+        edited: Boolean(message.edited),
+        seqNo: message.seqNo,
       })),
     openConversation: async (conversationId: number) => {
       await selectConversation(conversationId)
+    },
+    refreshConversationMessages: async (conversationId: number) => {
+      await chatStore.loadConversationMessages(conversationId, true)
+    },
+    sendTextMessage: async (content: string) => {
+      await handleSendTextMessage(content)
     },
     openLeftPanel: (mode: LeftPanelMode) => {
       openLeftPanel(mode)
@@ -1254,6 +1335,19 @@ function registerDebugHooks() {
     reconnectRealtime: async () => {
       await chatStore.reconnectRealtimeNow()
     },
+    findMessageIdByText: (conversationId: number, content: string) => {
+      const targetContent = content.trim()
+      const matches = (chatStore.messagesByConversation[conversationId] ?? []).filter(
+        (message) => !message.recalled && (message.content ?? '') === targetContent,
+      )
+      return matches[matches.length - 1]?.messageId ?? null
+    },
+    editMessage: async (messageId: number, content: string) => {
+      await chatStore.editMessage(messageId, content)
+    },
+    recallMessage: async (messageId: number) => {
+      await chatStore.recallMessage(messageId)
+    },
     getErrors: () => ({ ...chatStore.errors }),
     getWsEvents: () => [...chatStore.debugEvents],
   }
@@ -1261,7 +1355,7 @@ function registerDebugHooks() {
 </script>
 
 <template>
-  <main class="chat-page" :class="{ 'has-profile': uiStore.profileOpen && uiStore.isDesktop }">
+  <main class="chat-page">
     <h1 class="chat-page__sr-only">EchoIM 聊天工作台</h1>
     <p class="chat-page__sr-only" role="status" aria-live="polite">{{ liveStatusMessage }}</p>
 
@@ -1310,6 +1404,11 @@ function registerDebugHooks() {
       :profile-loading="authStore.profileLoading"
       :profile-saving="authStore.profileSaving"
       :password-saving="authStore.passwordSaving"
+      :email-binding-loading="authStore.emailBindingLoading"
+      :trusted-devices-loading="authStore.trustedDevicesLoading"
+      :security-events-loading="authStore.securityEventsLoading"
+      :trusted-devices="authStore.trustedDevices"
+      :security-events="authStore.securityEvents"
       :profile-error="authStore.profileError"
       :profile-notice="authStore.profileNotice"
       :username-checking="usernameCheck.checking"
@@ -1329,6 +1428,12 @@ function registerDebugHooks() {
       @save-profile="saveProfile"
       @check-username="handleCheckUsername"
       @change-password="changePassword"
+      @send-email-bind-code="handleSendEmailBindCode"
+      @bind-email="handleBindEmail"
+      @refresh-trusted-devices="handleRefreshTrustedDevices"
+      @revoke-trusted-device="handleRevokeTrustedDevice"
+      @revoke-all-trusted-devices="handleRevokeAllTrustedDevices"
+      @refresh-security-events="handleRefreshSecurityEvents"
       @clear-profile-error="authStore.clearProfileError"
       @clear-profile-notice="authStore.clearProfileNotice"
       @conversation-action="handleConversationContextAction"
@@ -1442,13 +1547,7 @@ function registerDebugHooks() {
         </div>
       </template>
 
-      <div v-else class="chat-page__empty" data-testid="chat-empty-state">
-        <div class="chat-page__empty-card">
-          <span class="chat-page__empty-eyebrow">EchoIM Workspace</span>
-          <strong>从左侧选择一个会话，或者开始一段新的聊天。</strong>
-          <p>主舞台会在这里展示消息、搜索结果、回复状态和当前资料侧轨，保持一屏内完成沟通。</p>
-        </div>
-      </div>
+      <div v-else class="chat-page__empty" data-testid="chat-empty-state"></div>
     </section>
 
     <CallOverlay
@@ -1559,39 +1658,83 @@ function registerDebugHooks() {
       </div>
     </el-dialog>
 
-    <el-dialog v-model="globalSearchState.visible" title="全局搜索" width="760px" destroy-on-close>
+    <el-dialog v-model="globalSearchState.visible" title="全局搜索" width="860px" destroy-on-close class="global-search-dialog">
       <div class="search-sheet">
-        <el-input v-model="globalSearchState.keyword" placeholder="搜索会话、用户或消息内容，支持 Cmd/Ctrl + K" clearable />
+        <div class="search-sheet__hero">
+          <div class="search-sheet__hero-copy">
+            <strong>搜索你的会话、联系人和消息</strong>
+            <p>结果只来自你当前可访问的内容，不会跨出你的工作区。</p>
+          </div>
+          <span class="search-sheet__hero-shortcut">Cmd/Ctrl + K</span>
+        </div>
+        <el-input v-model="globalSearchState.keyword" placeholder="输入关键词，搜索会话、用户或消息内容" clearable />
         <div v-if="globalSearchState.error" class="compose-dialog__error">{{ globalSearchState.error }}</div>
-        <div class="search-sheet__results">
-          <section class="search-sheet__section">
-            <header><span>会话</span></header>
-            <button
-              v-for="conversation in globalSearchState.conversations"
-              :key="conversation.conversationId"
-              class="search-sheet__row"
-              type="button"
-              @click="handleGlobalConversationSelect(conversation)"
-            >
-              <strong>{{ conversation.conversationName }}</strong>
-              <span>{{ conversation.archived ? '已归档' : '收件箱' }}</span>
-            </button>
-          </section>
-          <section class="search-sheet__section">
-            <header><span>用户</span></header>
-            <button
-              v-for="user in globalSearchState.users"
-              :key="user.userId"
-              class="search-sheet__row"
-              type="button"
-              @click="handleGlobalUserSelect(user)"
-            >
-              <strong>{{ user.nickname }}</strong>
-              <span>@{{ user.username }}</span>
-            </button>
-          </section>
-          <section class="search-sheet__section">
-            <header><span>消息</span></header>
+        <div class="search-sheet__summary">
+          <span v-if="globalSearchState.loading">正在搜索…</span>
+          <span v-else-if="hasGlobalSearchKeyword">共找到 {{ globalSearchTotal }} 条结果</span>
+          <span v-else>输入关键词后开始搜索</span>
+        </div>
+        <div v-if="!hasGlobalSearchKeyword" class="search-sheet__blank">
+          <strong>支持统一搜索</strong>
+          <p>你可以直接查找会话标题、联系人昵称、用户名以及消息内容。</p>
+        </div>
+        <div v-else class="search-sheet__results">
+          <div class="search-sheet__rail">
+            <section class="search-sheet__section search-sheet__section--side">
+              <header class="search-sheet__section-head">
+                <strong>会话</strong>
+                <span>{{ globalSearchState.conversations.length }}</span>
+              </header>
+              <div v-if="globalSearchState.loading" class="search-sheet__empty">正在搜索会话…</div>
+              <button
+                v-for="conversation in globalSearchState.conversations"
+                :key="conversation.conversationId"
+                class="search-sheet__row"
+                type="button"
+                @click="handleGlobalConversationSelect(conversation)"
+              >
+                <AvatarBadge :name="conversation.conversationName" :avatar-url="conversation.avatarUrl" size="md" />
+                <div class="search-sheet__row-copy">
+                  <strong>{{ conversation.conversationName }}</strong>
+                  <span>{{ conversation.archived ? '已归档会话' : '收件箱会话' }}</span>
+                  <p>{{ conversation.lastMessagePreview || '还没有消息' }}</p>
+                </div>
+              </button>
+              <div v-if="!globalSearchState.loading && !globalSearchState.conversations.length" class="search-sheet__empty">
+                没有匹配的会话
+              </div>
+            </section>
+            <section class="search-sheet__section search-sheet__section--side">
+              <header class="search-sheet__section-head">
+                <strong>用户</strong>
+                <span>{{ globalSearchState.users.length }}</span>
+              </header>
+              <div v-if="globalSearchState.loading" class="search-sheet__empty">正在搜索用户…</div>
+              <button
+                v-for="user in globalSearchState.users"
+                :key="user.userId"
+                class="search-sheet__row"
+                type="button"
+                @click="handleGlobalUserSelect(user)"
+              >
+                <AvatarBadge :name="user.nickname" :avatar-url="user.avatarUrl" size="md" />
+                <div class="search-sheet__row-copy">
+                  <strong>{{ user.nickname }}</strong>
+                  <span>@{{ user.username }}</span>
+                  <p>{{ user.signature || user.userNo }}</p>
+                </div>
+              </button>
+              <div v-if="!globalSearchState.loading && !globalSearchState.users.length" class="search-sheet__empty">
+                没有匹配的用户
+              </div>
+            </section>
+          </div>
+          <section class="search-sheet__section search-sheet__section--messages">
+            <header class="search-sheet__section-head">
+              <strong>消息</strong>
+              <span>{{ globalSearchState.messages.length }}</span>
+            </header>
+            <div v-if="globalSearchState.loading" class="search-sheet__empty">正在搜索消息…</div>
             <button
               v-for="message in globalSearchState.messages"
               :key="message.messageId"
@@ -1599,35 +1742,58 @@ function registerDebugHooks() {
               type="button"
               @click="handleGlobalMessageSelect(message)"
             >
-              <strong>{{ message.conversationName }}</strong>
-              <p>{{ message.preview }}</p>
+              <AvatarBadge :name="message.conversationName" size="md" />
+              <div class="search-sheet__row-copy search-sheet__row-copy--message">
+                <div class="search-sheet__headline">
+                  <strong>{{ message.conversationName }}</strong>
+                  <time class="search-sheet__time">{{ formatConversationTime(message.sentAt) }}</time>
+                </div>
+                <span class="search-sheet__meta">{{ message.senderName }}</span>
+                <p>{{ message.preview }}</p>
+              </div>
             </button>
+            <div v-if="!globalSearchState.loading && !globalSearchState.messages.length" class="search-sheet__empty">
+              没有匹配的消息
+            </div>
           </section>
         </div>
       </div>
     </el-dialog>
 
-    <el-dialog v-model="forwardDialog.visible" title="转发消息" width="620px" destroy-on-close>
-      <div class="search-sheet">
-        <el-input v-model="forwardDialog.keyword" placeholder="搜索目标会话" clearable />
-        <div v-if="forwardDialog.error" class="compose-dialog__error">{{ forwardDialog.error }}</div>
+    <el-dialog v-model="forwardDialog.visible" class="forward-dialog" title="转发消息" width="620px" destroy-on-close>
+      <div class="forward-sheet">
+        <el-input ref="forwardSearchInput" v-model="forwardDialog.keyword" class="forward-sheet__search" placeholder="搜索目标会话" clearable />
+        <div class="forward-sheet__summary">
+          <span>选择目标会话</span>
+          <strong>
+            {{ forwardDialog.sourceMessageIds.length }} 条消息 ·
+            {{ forwardTargetCount }} 个目标
+          </strong>
+        </div>
+        <div v-if="forwardDialog.error" class="compose-dialog__error forward-sheet__error">{{ forwardDialog.error }}</div>
         <div class="forward-sheet__saved">
           <button
             class="forward-sheet__saved-button"
             :class="{ 'is-active': forwardDialog.includeSavedMessages }"
             type="button"
+            :aria-pressed="forwardDialog.includeSavedMessages"
             @click="forwardDialog.includeSavedMessages = !forwardDialog.includeSavedMessages"
           >
-            Saved Messages
+            <div class="forward-sheet__saved-copy">
+              <strong>Saved Messages</strong>
+              <span>转发到自己的消息收藏</span>
+            </div>
+            <span class="forward-sheet__pill">{{ forwardDialog.includeSavedMessages ? '已选' : '可选' }}</span>
           </button>
         </div>
-        <div class="compose-dialog__users">
+        <div class="compose-dialog__users" role="list" aria-label="可转发目标会话">
           <button
             v-for="conversation in forwardCandidateConversations"
             :key="conversation.conversationId"
-            class="compose-dialog__user"
+            class="compose-dialog__user forward-sheet__conversation"
             :class="{ 'is-selected': forwardDialog.selectedConversationIds.includes(conversation.conversationId) }"
             type="button"
+            :aria-pressed="forwardDialog.selectedConversationIds.includes(conversation.conversationId)"
             @click="
               forwardDialog.selectedConversationIds = forwardDialog.selectedConversationIds.includes(conversation.conversationId)
                 ? forwardDialog.selectedConversationIds.filter((id) => id !== conversation.conversationId)
@@ -1635,17 +1801,26 @@ function registerDebugHooks() {
             "
           >
             <AvatarBadge :name="conversation.conversationName" :avatar-url="conversation.avatarUrl" size="lg" />
-            <div class="compose-dialog__user-copy">
-              <strong>{{ conversation.conversationName }}</strong>
+            <div class="compose-dialog__user-copy forward-sheet__conversation-copy">
+              <div class="forward-sheet__conversation-head">
+                <strong>{{ conversation.conversationName }}</strong>
+                <span class="forward-sheet__conversation-state">
+                  {{ forwardDialog.selectedConversationIds.includes(conversation.conversationId) ? '已选' : conversation.archived ? '归档' : '会话' }}
+                </span>
+              </div>
               <span>{{ conversation.specialType === 'SAVED_MESSAGES' ? '专属自聊' : conversation.archived ? '已归档会话' : '会话' }}</span>
               <p>{{ conversation.lastMessagePreview || '还没有消息' }}</p>
             </div>
           </button>
+          <div v-if="!forwardCandidateConversations.length" class="compose-dialog__empty forward-sheet__empty">
+            <strong>{{ forwardEmptyState.title }}</strong>
+            <p>{{ forwardEmptyState.description }}</p>
+          </div>
         </div>
       </div>
       <template #footer>
         <el-button @click="forwardDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="forwardDialog.submitting" @click="submitForwardDialog">确认转发</el-button>
+        <el-button type="primary" :disabled="!forwardTargetCount || !forwardDialog.sourceMessageIds.length" :loading="forwardDialog.submitting" @click="submitForwardDialog">确认转发</el-button>
       </template>
     </el-dialog>
   </main>
@@ -1654,15 +1829,16 @@ function registerDebugHooks() {
 <style scoped>
 .chat-page {
   display: grid;
-  grid-template-columns: 388px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 332px minmax(0, 1fr);
+  gap: 0;
   height: 100%;
   min-height: 0;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 32px;
+  background: var(--color-shell-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(18px);
   overflow: hidden;
-}
-
-.chat-page.has-profile {
-  grid-template-columns: 368px minmax(0, 1fr) 360px;
 }
 
 .chat-page__sidebar,
@@ -1672,16 +1848,16 @@ function registerDebugHooks() {
   overflow: hidden;
 }
 
+.chat-page__sidebar {
+  border-right: 1px solid var(--color-shell-border);
+}
+
 .chat-page__main {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 32px;
-  background: var(--color-shell-panel);
-  box-shadow: var(--shadow-panel);
+  background: transparent;
   overflow: hidden;
-  backdrop-filter: blur(24px);
 }
 
 .chat-page__stage {
@@ -1712,9 +1888,9 @@ function registerDebugHooks() {
 
 .chat-page__stage::after {
   background:
-    linear-gradient(180deg, var(--color-chat-stage-top), transparent 18%),
-    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 26%),
-    radial-gradient(circle at top right, var(--color-chat-stage-glow), transparent 38%);
+    linear-gradient(180deg, var(--color-chat-stage-top), transparent 16%),
+    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 22%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-chat-stage-glow) 74%, transparent), transparent 42%);
 }
 
 .chat-page__banner {
@@ -1724,12 +1900,12 @@ function registerDebugHooks() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 18px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--color-shell-border);
   color: var(--color-text-2);
-  font-size: 0.78rem;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
-  backdrop-filter: blur(16px);
+  font: 500 0.73rem/1.45 var(--font-body);
+  background: color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent);
+  backdrop-filter: blur(14px);
 }
 
 .chat-page__banner.is-warning {
@@ -1755,10 +1931,8 @@ function registerDebugHooks() {
   flex: 1;
   min-height: 0;
   position: relative;
-  display: grid;
-  place-items: center;
   background:
-    linear-gradient(180deg, rgba(10, 10, 16, 0.18), transparent 16%),
+    linear-gradient(180deg, rgba(10, 10, 16, 0.1), transparent 14%),
     var(--color-chat-stage-base);
 }
 
@@ -1780,43 +1954,8 @@ function registerDebugHooks() {
 
 .chat-page__empty::after {
   background:
-    linear-gradient(180deg, var(--color-chat-stage-top), transparent 18%),
-    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 24%);
-}
-
-.chat-page__empty-card {
-  position: relative;
-  z-index: 1;
-  width: min(420px, calc(100% - 40px));
-  display: grid;
-  gap: 12px;
-  padding: 28px 30px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 30px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
-  box-shadow: var(--shadow-panel);
-  text-align: center;
-  backdrop-filter: blur(20px);
-}
-
-.chat-page__empty-eyebrow {
-  color: var(--color-shell-eyebrow);
-  font: var(--font-eyebrow);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.chat-page__empty-card strong {
-  color: var(--color-text-1);
-  font: 700 1.22rem/1.14 var(--font-display);
-  letter-spacing: -0.03em;
-  text-wrap: balance;
-}
-
-.chat-page__empty-card p {
-  color: var(--color-text-2);
-  font-size: 0.9rem;
-  line-height: 1.65;
+    linear-gradient(180deg, var(--color-chat-stage-top), transparent 16%),
+    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 20%);
 }
 
 .chat-page__sr-only {
@@ -1838,10 +1977,10 @@ function registerDebugHooks() {
   gap: 12px;
   width: min(760px, 100%);
   margin: 0 auto 12px;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-shell-border));
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-card));
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-shell-card));
 }
 
 .chat-page__forward-bar span,
@@ -1851,11 +1990,15 @@ function registerDebugHooks() {
 
 .chat-page__forward-bar span {
   color: var(--color-shell-eyebrow);
-  font: var(--font-eyebrow);
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .chat-page__forward-bar strong {
-  margin-top: 6px;
+  margin-top: 5px;
+  font-size: 0.84rem;
+  font-weight: 600;
 }
 
 .chat-page__forward-actions {
@@ -1865,20 +2008,17 @@ function registerDebugHooks() {
 
 .chat-page__forward-actions button,
 .compose-dialog__inline-action,
-.forward-sheet__saved-button,
 .search-sheet__row {
   transition:
-    transform var(--motion-fast) ease,
     border-color var(--motion-fast) ease,
     background var(--motion-fast) ease;
 }
 
 .chat-page__forward-actions button,
-.compose-dialog__inline-action,
-.forward-sheet__saved-button {
-  padding: 10px 12px;
+.compose-dialog__inline-action {
+  padding: 9px 11px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--color-shell-action);
 }
 
@@ -1892,69 +2032,326 @@ function registerDebugHooks() {
 
 .search-sheet {
   display: grid;
+  gap: 10px;
+}
+
+.search-sheet__hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 14px;
+  padding: 0 2px;
+}
+
+.search-sheet__hero-copy strong {
+  display: block;
+  font: 620 0.9rem/1.12 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.search-sheet__hero-copy p {
+  margin-top: 4px;
+  color: var(--color-text-soft);
+  font-size: 0.75rem;
+  line-height: 1.48;
+}
+
+.search-sheet__hero-shortcut {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 90%, transparent);
+  color: var(--color-text-soft);
+  font: 600 0.64rem/1 var(--font-mono);
+}
+
+.search-sheet__summary {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-soft);
+  font-size: 0.74rem;
+  line-height: 1.42;
+}
+
+.search-sheet__blank {
+  display: grid;
+  gap: 6px;
+  padding: 17px 17px 18px;
+  border: 1px dashed var(--color-shell-border-strong);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 84%, transparent);
+}
+
+.search-sheet__blank strong {
+  font: 620 0.88rem/1.16 var(--font-display);
+}
+
+.search-sheet__blank p {
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .search-sheet__results {
   display: grid;
-  gap: 16px;
+  grid-template-columns: minmax(220px, 0.78fr) minmax(0, 1.22fr);
+  gap: 14px;
   max-height: 56vh;
   overflow: auto;
   padding-right: 4px;
 }
 
+.search-sheet__rail {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
 .search-sheet__section {
   display: grid;
+  gap: 9px;
+  align-content: start;
+  padding: 12px;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+}
+
+.search-sheet__section--messages {
+  min-width: 0;
+}
+
+.search-sheet__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
-.search-sheet__section header span {
-  color: var(--color-shell-eyebrow);
-  font: var(--font-eyebrow);
+.search-sheet__section-head strong {
+  font: 620 0.83rem/1.12 var(--font-display);
+}
+
+.search-sheet__section-head span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--color-shell-inline);
+  color: var(--color-text-soft);
+  font: 700 0.64rem/1 var(--font-mono);
 }
 
 .search-sheet__row {
   display: grid;
-  gap: 5px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
   width: 100%;
-  padding: 16px;
+  padding: 10px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 92%, transparent);
   text-align: left;
+  transition:
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
-.search-sheet__row strong,
-.search-sheet__row span,
-.search-sheet__row p {
+.search-sheet__row:hover,
+.search-sheet__row:focus-visible {
+  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-shell-border-strong));
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-shell-card-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 4%, transparent);
+}
+
+.search-sheet__row-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.search-sheet__row-copy strong,
+.search-sheet__row-copy span,
+.search-sheet__row-copy p {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.search-sheet__row span,
-.search-sheet__row p {
-  color: var(--color-text-soft);
+.search-sheet__row-copy strong {
   font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.28;
+}
+
+.search-sheet__row-copy span,
+.search-sheet__row-copy p {
+  color: var(--color-text-soft);
+  font-size: 0.71rem;
+  line-height: 1.38;
+}
+
+.search-sheet__row--message {
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 11px;
+}
+
+.search-sheet__row-copy--message {
+  gap: 4px;
+}
+
+.search-sheet__headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.search-sheet__meta,
+.search-sheet__time {
+  color: var(--color-text-soft);
+  font: 600 0.64rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.search-sheet__meta {
+  text-transform: uppercase;
+}
+
+.search-sheet__empty {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  padding: 13px;
+  border: 1px dashed var(--color-shell-border);
+  border-radius: 15px;
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+:deep(.global-search-dialog .el-dialog) {
+  border-radius: 24px;
+}
+
+:deep(.global-search-dialog .el-dialog__body) {
+  padding-top: 16px;
+}
+
+.forward-sheet {
+  display: grid;
+  gap: 10px;
+}
+
+.forward-sheet__search {
+  margin-bottom: 2px;
+}
+
+.forward-sheet__summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.forward-sheet__summary span,
+.forward-sheet__summary strong {
+  display: block;
+}
+
+.forward-sheet__summary span {
+  color: var(--color-text-soft);
+  font: 600 0.6rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forward-sheet__summary strong {
+  color: var(--color-text-1);
+  font: 600 0.76rem/1.2 var(--font-body);
 }
 
 .forward-sheet__saved {
   display: flex;
 }
 
+.forward-sheet__saved-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 66%, transparent);
+  text-align: left;
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.forward-sheet__saved-button:hover,
+.forward-sheet__saved-button:focus-visible {
+  border-color: var(--color-shell-border-strong);
+  background: var(--color-shell-action-hover);
+}
+
+.forward-sheet__saved-button:focus-visible {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent);
+}
+
+.forward-sheet__saved-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.forward-sheet__saved-copy strong {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.22;
+}
+
+.forward-sheet__saved-copy span {
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  line-height: 1.42;
+}
+
+.forward-sheet__pill {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-shell-border);
+  background: color-mix(in srgb, var(--color-shell-action) 70%, transparent);
+  color: var(--color-text-1);
+  font: 600 0.6rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
 .forward-sheet__saved-button.is-active {
   border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-shell-action));
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-shell-card-muted));
+}
+
+.forward-sheet__saved-button.is-active .forward-sheet__pill {
+  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action));
+  color: color-mix(in srgb, var(--color-primary) 82%, var(--color-text-1));
 }
 
 .compose-dialog {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .compose-dialog__users {
   display: grid;
-  gap: 10px;
+  gap: 9px;
   max-height: 360px;
   overflow: auto;
 }
@@ -1964,14 +2361,14 @@ function registerDebugHooks() {
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
-  padding: 14px;
+  padding: 13px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
   text-align: left;
 }
 
-.compose-dialog__user.is-selected {
+.compose-dialog__user:not(.forward-sheet__conversation).is-selected {
   border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-shell-border));
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-card-strong));
 }
@@ -1993,39 +2390,261 @@ function registerDebugHooks() {
 .compose-dialog__user-copy span,
 .compose-dialog__user-copy p {
   color: var(--color-text-soft);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .compose-dialog__empty,
 .compose-dialog__error {
   color: var(--color-text-soft);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
 }
 
 .compose-dialog__error {
   color: var(--color-danger);
 }
 
+:deep(.forward-dialog .el-dialog) {
+  border: 1px solid var(--color-shell-border);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-shell-panel) 96%, transparent);
+  box-shadow: var(--shadow-floating);
+}
+
+:deep(.forward-dialog .el-dialog__header) {
+  padding-bottom: 4px;
+}
+
+:deep(.forward-dialog .el-dialog__headerbtn) {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--color-text-soft);
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+:deep(.forward-dialog .el-dialog__headerbtn:hover),
+:deep(.forward-dialog .el-dialog__headerbtn:focus-visible) {
+  border-color: var(--color-shell-border);
+  background: var(--color-shell-action-hover);
+  color: var(--color-text-1);
+}
+
+:deep(.forward-dialog .el-dialog__title) {
+  font: 620 1rem/1.08 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+:deep(.forward-dialog .el-dialog__body) {
+  padding-top: 12px;
+}
+
+:deep(.forward-dialog .el-dialog__footer) {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--color-shell-border) 76%, transparent);
+}
+
+:deep(.forward-dialog .el-dialog__footer .el-button) {
+  min-height: 38px;
+  padding-inline: 14px;
+  border-radius: 12px;
+  border-color: var(--color-shell-border);
+  background: color-mix(in srgb, var(--color-shell-card-strong) 90%, transparent);
+  color: var(--color-text-1);
+  box-shadow: none;
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    opacity var(--motion-fast) ease;
+}
+
+:deep(.forward-dialog .el-dialog__footer .el-button:hover),
+:deep(.forward-dialog .el-dialog__footer .el-button:focus-visible) {
+  border-color: var(--color-shell-border-strong);
+  background: var(--color-shell-action-hover);
+}
+
+:deep(.forward-dialog .el-dialog__footer .el-button--primary) {
+  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-card));
+  color: color-mix(in srgb, var(--color-primary) 84%, var(--color-text-1));
+}
+
+:deep(.forward-dialog .el-dialog__footer .el-button--primary:hover),
+:deep(.forward-dialog .el-dialog__footer .el-button--primary:focus-visible) {
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action-hover));
+}
+
+:deep(.forward-dialog .el-dialog__footer .el-button.is-loading) {
+  opacity: 0.92;
+}
+
+:deep(.forward-dialog .el-input__wrapper) {
+  min-height: 42px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--color-shell-border) 82%, transparent);
+}
+
+:deep(.forward-dialog .el-input__wrapper.is-focus) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 24%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent);
+}
+
+:deep(.forward-dialog .el-input__inner) {
+  color: var(--color-text-1);
+}
+
+:deep(.forward-dialog .el-input__prefix),
+:deep(.forward-dialog .el-input__suffix) {
+  color: var(--color-text-soft);
+}
+
+.forward-sheet .compose-dialog__users {
+  gap: 7px;
+  max-height: 344px;
+  padding-right: 2px;
+}
+
+.forward-sheet__conversation {
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+  padding: 12px 13px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.forward-sheet__conversation:hover,
+.forward-sheet__conversation:focus-visible {
+  border-color: var(--color-shell-border-strong);
+  background: var(--color-shell-action-hover);
+}
+
+.forward-sheet__conversation:focus-visible {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent);
+  outline: none;
+}
+
+.forward-sheet__conversation.is-selected {
+  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-shell-card-strong));
+}
+
+.forward-sheet__conversation-copy {
+  gap: 4px;
+}
+
+.forward-sheet__conversation-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forward-sheet__conversation-state {
+  flex-shrink: 0;
+  color: var(--color-text-soft);
+  font: 600 0.58rem/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forward-sheet__conversation.is-selected .forward-sheet__conversation-state {
+  color: color-mix(in srgb, var(--color-primary) 82%, var(--color-text-1));
+}
+
+.forward-sheet__conversation-copy p {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.forward-sheet__empty,
+.forward-sheet__error {
+  display: grid;
+  gap: 5px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1px dashed var(--color-shell-border);
+  background: color-mix(in srgb, var(--color-shell-card) 74%, transparent);
+}
+
+.forward-sheet__empty strong,
+.forward-sheet__empty p {
+  display: block;
+  margin: 0;
+}
+
+.forward-sheet__empty strong {
+  color: var(--color-text-1);
+  font: 600 0.78rem/1.2 var(--font-body);
+}
+
+.forward-sheet__empty p {
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.forward-sheet__error {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-danger) 16%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--color-danger) 4%, var(--color-shell-card));
+}
+
 @media (max-width: 1279px) {
   .chat-page {
-    grid-template-columns: 348px minmax(0, 1fr);
-  }
-
-  .chat-page.has-profile {
-    grid-template-columns: 348px minmax(0, 1fr);
+    grid-template-columns: 332px minmax(0, 1fr);
   }
 }
 
 @media (max-width: 767px) {
+  .search-sheet__hero {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .search-sheet__hero-shortcut {
+    justify-self: start;
+  }
+
+  .search-sheet__results {
+    grid-template-columns: 1fr;
+  }
+
   .chat-page {
     grid-template-columns: 1fr;
     gap: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .chat-page__sidebar,
   .chat-page__main {
     border-inline: 0;
     border-radius: 0;
+  }
+
+  .chat-page__profile {
+    border-left: 0;
   }
 
   .chat-page__forward-bar {

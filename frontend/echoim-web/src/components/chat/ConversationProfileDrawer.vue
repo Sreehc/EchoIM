@@ -32,7 +32,7 @@ const emit = defineEmits<{
     :model-value="visible"
     :with-header="false"
     direction="rtl"
-    size="420px"
+    size="392px"
     @close="emit('update:visible', false)"
   >
     <ConversationProfilePanelBody
@@ -82,6 +82,8 @@ const emit = defineEmits<{
   overflow: hidden;
   box-shadow: none;
   border-left: 1px solid var(--color-shell-border);
+  background: color-mix(in srgb, var(--color-shell-panel) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(108%);
 }
 
 :global(.conversation-profile-drawer__body),
@@ -95,5 +97,7 @@ const emit = defineEmits<{
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  background: color-mix(in srgb, var(--color-shell-panel) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(108%);
 }
 </style>

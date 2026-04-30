@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ArrowLeft, CirclePlus, Lock, MessageBox, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowLeft, CirclePlus, Lock, MessageBox, MoreFilled, SwitchButton } from '@element-plus/icons-vue'
 import type { FriendListItem, FriendRequestItem } from '@/types/chat'
 import AvatarBadge from './AvatarBadge.vue'
 import ChatStatePanel from './ChatStatePanel.vue'
@@ -71,7 +71,6 @@ function requestCountBadge(item: FriendRequestItem) {
         <ArrowLeft />
       </button>
       <div class="contacts-panel__copy">
-        <span>Relationship desk</span>
         <strong>联系人</strong>
         <p>好友、申请与黑名单都集中在同一条侧轨里处理。</p>
       </div>
@@ -139,10 +138,6 @@ function requestCountBadge(item: FriendRequestItem) {
           </div>
 
           <div v-if="'requestId' in item" class="contacts-card__actions">
-            <button class="contacts-card__action" type="button" @click="emit('open-chat', item.direction === 'INBOUND' ? item.fromUserId : item.toUserId)">
-              <MessageBox />
-              发起聊天
-            </button>
             <button
               v-if="item.direction === 'INBOUND' && item.status === 0"
               class="contacts-card__action is-primary"
@@ -152,13 +147,29 @@ function requestCountBadge(item: FriendRequestItem) {
               通过
             </button>
             <button
-              v-if="item.direction === 'INBOUND' && item.status === 0"
-              class="contacts-card__action is-danger"
+              v-else
+              class="contacts-card__action"
               type="button"
-              @click="emit('reject-request', item.requestId)"
+              @click="emit('open-chat', item.direction === 'INBOUND' ? item.fromUserId : item.toUserId)"
             >
-              拒绝
+              <MessageBox />
+              发起聊天
             </button>
+            <el-dropdown v-if="item.direction === 'INBOUND' && item.status === 0" trigger="click" placement="bottom-end">
+              <button class="contacts-card__more" type="button" aria-label="更多操作">
+                <MoreFilled />
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="emit('open-chat', item.fromUserId)">
+                    发起聊天
+                  </el-dropdown-item>
+                  <el-dropdown-item class="is-danger" @click="emit('reject-request', item.requestId)">
+                    拒绝申请
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
 
           <div v-else class="contacts-card__actions">
@@ -166,32 +177,26 @@ function requestCountBadge(item: FriendRequestItem) {
               <MessageBox />
               聊天
             </button>
-            <button
-              v-if="activeTab === 'friends'"
-              class="contacts-card__action"
-              type="button"
-              @click="emit('update-remark', item)"
-            >
-              <SwitchButton />
-              备注
-            </button>
-            <button
-              v-if="activeTab === 'friends'"
-              class="contacts-card__action is-danger"
-              type="button"
-              @click="emit('block-friend', item.friendUserId)"
-            >
-              <Lock />
-              拉黑
-            </button>
-            <button
-              v-if="activeTab === 'friends'"
-              class="contacts-card__action is-danger"
-              type="button"
-              @click="emit('delete-friend', item.friendUserId)"
-            >
-              删除
-            </button>
+            <el-dropdown v-if="activeTab === 'friends'" trigger="click" placement="bottom-end">
+              <button class="contacts-card__more" type="button" aria-label="更多操作">
+                <MoreFilled />
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="emit('update-remark', item)">
+                    <SwitchButton />
+                    备注
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="emit('block-friend', item.friendUserId)">
+                    <Lock />
+                    拉黑
+                  </el-dropdown-item>
+                  <el-dropdown-item class="is-danger" @click="emit('delete-friend', item.friendUserId)">
+                    删除好友
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <button
               v-if="activeTab === 'blocked'"
               class="contacts-card__action is-primary"
@@ -220,14 +225,10 @@ function requestCountBadge(item: FriendRequestItem) {
   gap: 12px;
   height: 100%;
   min-height: 0;
-  padding: 20px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 32px;
+  padding: 22px 20px 20px;
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-shell-glow) 60%, transparent), transparent 30%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card) 96%, transparent), var(--color-shell-panel));
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(24px);
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-shell-glow) 46%, transparent), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card) 96%, transparent), transparent);
 }
 
 .contacts-panel__hero {
@@ -237,25 +238,16 @@ function requestCountBadge(item: FriendRequestItem) {
   align-items: start;
 }
 
-.contacts-panel__copy span {
-  display: block;
-  color: var(--color-shell-eyebrow);
-  font: var(--font-eyebrow);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .contacts-panel__copy strong {
   display: block;
-  margin-top: 4px;
   font: var(--font-title-md);
 }
 
 .contacts-panel__copy p {
-  margin-top: 6px;
+  margin-top: 4px;
   color: var(--color-text-2);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 0.78rem;
+  line-height: 1.46;
 }
 
 .contacts-panel__back,
@@ -280,7 +272,7 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-panel__back {
   width: 44px;
   height: 44px;
-  border-radius: 16px;
+  border-radius: 13px;
 }
 
 .contacts-panel__add {
@@ -291,8 +283,8 @@ function requestCountBadge(item: FriendRequestItem) {
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-action));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action));
   color: var(--color-text-1);
 }
 
@@ -304,7 +296,7 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-panel__switch:focus-visible,
 .contacts-card__action:hover,
 .contacts-card__action:focus-visible {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .contacts-panel__switcher {
@@ -313,9 +305,10 @@ function requestCountBadge(item: FriendRequestItem) {
 }
 
 .contacts-panel__switch {
-  padding: 10px 15px;
+  padding: 10px 14px;
   border-radius: 999px;
-  font: 600 0.72rem/1 var(--font-body);
+  font: 600 0.68rem/1 var(--font-body);
+  letter-spacing: 0.01em;
 }
 
 .contacts-panel__switch.is-active {
@@ -337,17 +330,22 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-card {
   display: grid;
   gap: 12px;
-  padding: 18px;
+  padding: 15px 16px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 26px;
-  background: color-mix(in srgb, var(--color-shell-card) 90%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent);
+  box-shadow: none;
 }
 
 .contacts-card__main {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: flex-start;
+}
+
+.contacts-card__main :deep(.avatar-badge) {
+  width: 54px;
+  height: 54px;
 }
 
 .contacts-card__copy {
@@ -363,7 +361,8 @@ function requestCountBadge(item: FriendRequestItem) {
 }
 
 .contacts-card__title strong {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
+  line-height: 1.2;
 }
 
 .contacts-card__title span {
@@ -371,29 +370,52 @@ function requestCountBadge(item: FriendRequestItem) {
   border-radius: 999px;
   background: var(--color-shell-action);
   color: var(--color-text-soft);
-  font: 600 0.66rem/1 var(--font-mono);
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .contacts-card__copy p {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--color-text-2);
-  font-size: 0.78rem;
-  line-height: 1.5;
+  font-size: 0.74rem;
+  line-height: 1.46;
 }
 
 .contacts-card__actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
 }
 
 .contacts-card__action {
+  width: 100%;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  font: 600 0.74rem/1 var(--font-body);
+  padding: 0 12px;
+  border-radius: 12px;
+  font: 600 0.72rem/1 var(--font-body);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.contacts-card__more {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-shell-border);
+  border-radius: 12px;
+  background: var(--color-shell-action);
+  color: var(--color-text-2);
+}
+
+.contacts-card__action :deep(svg) {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
 }
 
 .contacts-card__action.is-primary {
@@ -419,6 +441,10 @@ function requestCountBadge(item: FriendRequestItem) {
   .contacts-panel__add {
     grid-column: 1 / -1;
     justify-content: center;
+  }
+
+  .contacts-card__actions {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 </style>

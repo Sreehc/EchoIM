@@ -23,6 +23,15 @@ public interface ImUserMapper extends BaseMapper<ImUserEntity> {
             """)
     ImUserEntity selectByUsername(@Param("username") String username);
 
+    @Select("""
+            SELECT id, user_no, username, password_hash, nickname, avatar_url, gender, phone, email, signature,
+                   status, last_login_at, created_at, updated_at
+            FROM im_user
+            WHERE email = #{email}
+            LIMIT 1
+            """)
+    ImUserEntity selectByEmail(@Param("email") String email);
+
     ImUserEntity selectByUsernameExcludingUserId(@Param("username") String username,
                                                  @Param("excludeUserId") Long excludeUserId);
 

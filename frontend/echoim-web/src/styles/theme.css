@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Urbanist:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Libre+Bodoni:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap');
 
 *,
 *::before,
@@ -27,10 +27,10 @@ body {
   overflow: hidden;
   background: var(--color-bg-app);
   color: var(--color-text-1);
-  font: 400 16px/1.55 var(--font-body);
+  font: 400 16px/1.58 var(--font-body);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.008em;
 }
 
 body::before {
@@ -39,11 +39,11 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--color-shell-glow) 140%, transparent), transparent 24%),
-    radial-gradient(circle at 84% 4%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 18%),
-    radial-gradient(circle at 52% 100%, color-mix(in srgb, var(--color-bg-surface) 96%, transparent), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 28%);
-  opacity: 0.9;
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--color-shell-glow) 100%, transparent), transparent 18%),
+    radial-gradient(circle at 82% 2%, color-mix(in srgb, var(--color-primary) 4%, transparent), transparent 14%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--color-bg-surface) 94%, transparent), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
+  opacity: 0.56;
 }
 
 body::after {
@@ -52,9 +52,9 @@ body::after {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-mask) 24%, transparent), transparent 22%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.015), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.015));
-  opacity: 0.38;
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-mask) 14%, transparent), transparent 18%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.012), transparent 26%, transparent 74%, rgba(255, 255, 255, 0.012));
+  opacity: 0.14;
 }
 
 button,
@@ -87,7 +87,7 @@ ul {
 }
 
 :focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 72%, white);
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 68%, white);
   outline-offset: 3px;
 }
 

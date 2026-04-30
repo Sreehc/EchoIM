@@ -5,22 +5,26 @@ import type {
   CallType,
   ChatFile,
   ConversationType,
+  CodeDispatchResult,
   CurrentUserProfile,
   FriendRequestItem,
+  LoginFlowResponse,
   MessageForwardSource,
   MessageReplySource,
   MessageType,
+  RecoveryVerifyResult,
   GroupMemberItem,
   GroupCreatePayload,
   GroupCreateResult,
+  SecurityEventSummary,
   GroupUpdatePayload,
   FriendListItem,
   MessageReactionStat,
   StickerPayload,
   SpecialConversationType,
+  TrustedDeviceSummary,
   UpdateCurrentUserProfilePayload,
   UserSearchItem,
-  UserInfo,
 } from './chat'
 
 export interface ApiResponse<T> {
@@ -37,12 +41,11 @@ export interface PageResponse<T> {
   total: number
 }
 
-export interface ApiLoginResponse {
-  token: string
-  tokenType: string
-  expiresIn: number
-  userInfo: UserInfo
-}
+export type ApiLoginResponse = LoginFlowResponse
+export type ApiCodeDispatchResult = CodeDispatchResult
+export type ApiRecoveryVerifyResult = RecoveryVerifyResult
+export type ApiTrustedDeviceSummary = TrustedDeviceSummary
+export type ApiSecurityEventSummary = SecurityEventSummary
 
 export type ApiCurrentUserProfile = CurrentUserProfile
 export type ApiUpdateCurrentUserProfilePayload = UpdateCurrentUserProfilePayload

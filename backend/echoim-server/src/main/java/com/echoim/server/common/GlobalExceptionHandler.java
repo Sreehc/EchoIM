@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -49,10 +50,17 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(40000, ex.getMessage());
     }
 
+    @ExceptionHandler(DataAccessException.class)
+    public ApiResponse<Void> handleDataAccessException(DataAccessException ex, HttpServletRequest request) {
+        log.error("traceId={} path={} userId={} code={} message={}",
+                TraceContext.get(), request.getRequestURI(), currentUserId(), 50000, ex.getMessage(), ex);
+        return ApiResponse.fail(50000, "服务暂时不可用，请稍后再试");
+    }
+
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception ex, HttpServletRequest request) {
         log.error("traceId={} path={} userId={} code={} message={}",
                 TraceContext.get(), request.getRequestURI(), currentUserId(), 50000, ex.getMessage(), ex);
-        return ApiResponse.fail(50000, ex.getMessage());
+        return ApiResponse.fail(50000, "服务暂时不可用，请稍后再试");
     }
 }

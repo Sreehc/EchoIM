@@ -1,147 +1,588 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, Close, Lock, User } from '@element-plus/icons-vue'
+import { ChatDotRound, Close, Lock, Moon, Sunny, User } from '@element-plus/icons-vue'
+import { registerRequest } from '@/services/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { getDeviceFingerprint, getDeviceName } from '@/utils/device'
+
+type ViewMode = 'accounts' | 'login' | 'register' | 'challenge' | 'recovery-email' | 'recovery-code' | 'recovery-reset'
+type StatusTone = 'error' | 'info' | 'success'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
 const route = useRoute()
 
+const deviceFingerprint = getDeviceFingerprint()
+const deviceName = getDeviceName()
+
+const viewMode = ref<ViewMode>(route.query.add === '1' || !authStore.hasStoredAccounts ? 'login' : 'accounts')
+const statusMessage = ref('')
+const statusTone = ref<StatusTone>('info')
+const challengeTicket = ref('')
+const challengeMaskedEmail = ref('')
+const recoveryToken = ref('')
+const recoveryAccounts = ref<{ userId: number; username: string; nickname: string; avatarUrl: string | null }[]>([])
+const capsLockVisible = ref(false)
+const registerLoading = ref(false)
+
 const form = reactive({
-  username: 'echo_demo_01',
-  password: '123456',
+  username: '',
+  password: '',
+  rememberMe: true,
+  trustDevice: false,
 })
-const loginError = ref<string | null>(null)
-const showAddAccountForm = computed(() => route.query.add === '1' || !authStore.hasStoredAccounts)
+
+const registerForm = reactive({
+  username: '',
+  nickname: '',
+  password: '',
+  confirmPassword: '',
+})
+
+const challengeForm = reactive({
+  code: '',
+})
+
+const recoveryForm = reactive({
+  email: '',
+  code: '',
+  newPassword: '',
+  confirmPassword: '',
+})
+
+const currentTitle = computed(() => {
+  if (viewMode.value === 'accounts') return '选择账号'
+  if (viewMode.value === 'register') return '注册账号'
+  if (viewMode.value === 'challenge') return '邮箱验证'
+  if (viewMode.value === 'recovery-email') return '找回账号或密码'
+  if (viewMode.value === 'recovery-code') return '输入验证码'
+  if (viewMode.value === 'recovery-reset') return '重置密码'
+  return '账号登录'
+})
+
+function setStatus(message: string, tone: StatusTone = 'info') {
+  statusMessage.value = message
+  statusTone.value = tone
+}
+
+function clearStatus() {
+  statusMessage.value = ''
+}
+
+function openLoginForm(username = '') {
+  form.username = username
+  form.password = ''
+  challengeForm.code = ''
+  capsLockVisible.value = false
+  viewMode.value = 'login'
+  clearStatus()
+}
+
+function openRecoveryEmail() {
+  recoveryForm.email = ''
+  recoveryForm.code = ''
+  recoveryForm.newPassword = ''
+  recoveryForm.confirmPassword = ''
+  recoveryToken.value = ''
+  recoveryAccounts.value = []
+  viewMode.value = 'recovery-email'
+  clearStatus()
+}
+
+function openRegisterForm() {
+  registerForm.username = ''
+  registerForm.nickname = ''
+  registerForm.password = ''
+  registerForm.confirmPassword = ''
+  viewMode.value = 'register'
+  clearStatus()
+}
+
+function toggleRememberMe() {
+  form.rememberMe = !form.rememberMe
+  if (!form.rememberMe) {
+    form.trustDevice = false
+  }
+}
+
+function toggleTrustDevice() {
+  if (!form.rememberMe) return
+  form.trustDevice = !form.trustDevice
+}
 
 async function submit() {
-  loginError.value = null
+  clearStatus()
 
   try {
-    await authStore.login(form.username, form.password)
-    router.push('/chat')
+    const response = await authStore.login({
+      username: form.username.trim(),
+      password: form.password,
+      rememberMe: form.rememberMe,
+      trustDevice: form.rememberMe && form.trustDevice,
+      deviceFingerprint,
+      deviceName,
+    })
+
+    if (response.status === 'challenge_required') {
+      challengeTicket.value = response.challengeTicket ?? ''
+      challengeMaskedEmail.value = response.maskedEmail ?? ''
+      challengeForm.code = ''
+      viewMode.value = 'challenge'
+      setStatus('验证码已发送', 'info')
+      return
+    }
+
+    await router.push('/chat')
   } catch (error) {
-    loginError.value = error instanceof Error ? error.message : '登录失败'
+    setStatus(error instanceof Error ? error.message : '登录失败', 'error')
+  }
+}
+
+async function verifyChallenge() {
+  clearStatus()
+
+  try {
+    await authStore.verifyLoginChallenge({
+      challengeTicket: challengeTicket.value,
+      code: challengeForm.code.trim(),
+      rememberMe: form.rememberMe,
+      deviceFingerprint,
+    })
+    await router.push('/chat')
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '验证失败', 'error')
+  }
+}
+
+async function resendChallenge() {
+  clearStatus()
+
+  try {
+    const result = await authStore.resendLoginChallenge(challengeTicket.value)
+    challengeMaskedEmail.value = result.maskedEmail
+    setStatus(`验证码已重新发送`, 'info')
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '发送失败', 'error')
   }
 }
 
 async function activateStoredAccount(userId: number) {
-  loginError.value = null
-  authStore.activateStoredAccount(userId)
-  await router.push('/chat')
+  clearStatus()
+  const account = authStore.storedAccounts.find((item) => item.userInfo.userId === userId) ?? null
+
+  try {
+    await authStore.activateStoredAccount(userId)
+    await router.push('/chat')
+  } catch (error) {
+    openLoginForm(account?.userInfo.username ?? '')
+    setStatus(error instanceof Error ? error.message : '该账号需要重新登录', 'error')
+  }
 }
 
 function removeStoredAccount(userId: number) {
   authStore.removeStoredAccount(userId)
+  if (!authStore.storedAccounts.length) {
+    openLoginForm()
+  }
+}
+
+async function submitRecoveryEmail() {
+  clearStatus()
+
+  try {
+    await authStore.sendRecoveryCode(recoveryForm.email.trim())
+    viewMode.value = 'recovery-code'
+    setStatus('验证码已发送', 'info')
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '发送失败', 'error')
+  }
+}
+
+async function submitRegister() {
+  clearStatus()
+
+  if (registerForm.username.trim().length < 3) {
+    setStatus('用户名至少需要 3 位', 'error')
+    return
+  }
+
+  if (registerForm.nickname.trim().length < 2) {
+    setStatus('昵称至少需要 2 位', 'error')
+    return
+  }
+
+  if (registerForm.password.trim().length < 6) {
+    setStatus('密码至少需要 6 位', 'error')
+    return
+  }
+
+  if (registerForm.password !== registerForm.confirmPassword) {
+    setStatus('两次输入的密码不一致', 'error')
+    return
+  }
+
+  registerLoading.value = true
+
+  try {
+    await registerRequest({
+      username: registerForm.username.trim(),
+      nickname: registerForm.nickname.trim(),
+      password: registerForm.password,
+    })
+    openLoginForm(registerForm.username.trim())
+    setStatus('注册成功，请登录', 'success')
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '注册失败', 'error')
+  } finally {
+    registerLoading.value = false
+  }
+}
+
+async function verifyRecoveryCode() {
+  clearStatus()
+
+  try {
+    const result = await authStore.verifyRecoveryCode(recoveryForm.email.trim(), recoveryForm.code.trim())
+    recoveryToken.value = result.recoveryToken
+    recoveryAccounts.value = result.accounts
+    viewMode.value = 'recovery-reset'
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '验证失败', 'error')
+  }
+}
+
+async function submitRecoveryPassword() {
+  clearStatus()
+
+  if (recoveryForm.newPassword.trim().length < 6) {
+    setStatus('新密码至少需要 6 位', 'error')
+    return
+  }
+
+  if (recoveryForm.newPassword !== recoveryForm.confirmPassword) {
+    setStatus('两次输入的密码不一致', 'error')
+    return
+  }
+
+  try {
+    await authStore.resetRecoveryPassword(recoveryToken.value, recoveryForm.newPassword.trim())
+    openLoginForm(recoveryAccounts.value[0]?.username ?? '')
+    setStatus('密码已重置', 'success')
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '重置失败', 'error')
+  }
+}
+
+function handlePasswordEvent(event: Event) {
+  if ('getModifierState' in event && typeof event.getModifierState === 'function') {
+    capsLockVisible.value = event.getModifierState('CapsLock')
+    return
+  }
+
+  capsLockVisible.value = false
 }
 </script>
 
 <template>
   <main class="login-page">
-    <div class="login-shell">
-      <header class="login-shell__header">
-        <div class="brand-line">
-          <ChatDotRound class="brand-line__icon" />
-          <strong>EchoIM</strong>
-          <span>Quiet premium messaging</span>
+    <section class="login-card">
+      <h1 class="login-card__sr-only">EchoIM {{ currentTitle }}</h1>
+      <div class="login-card__topbar">
+        <div class="login-card__logo-wrap">
+          <div class="login-card__logo">
+            <ChatDotRound class="login-card__logo-icon" />
+          </div>
+          <div class="login-card__brand">
+            <strong>EchoIM</strong>
+            <span>{{ currentTitle }}</span>
+          </div>
         </div>
-        <button class="theme-toggle" type="button" @click="uiStore.toggleTheme">
-          {{ uiStore.theme === 'light' ? '深色' : '浅色' }}
+        <button class="theme-toggle" type="button" aria-label="切换主题" @click="uiStore.toggleTheme">
+          <Sunny v-if="uiStore.theme === 'light'" />
+          <Moon v-else />
         </button>
-      </header>
+      </div>
 
-      <section class="login-card">
-        <div class="login-card__intro">
-          <span class="login-card__eyebrow">WELCOME BACK</span>
-          <h1>安静一点，也可以把沟通做得更高级。</h1>
-          <p>EchoIM 让会话、联系人和个人工作台落在同一块安静的界面里。演示账号已预填，登录后可以直接进入完整三栏聊天体验。</p>
-          <div class="login-card__highlights">
-            <article>
-              <strong>Workstation layout</strong>
-              <p>会话、主聊天区和资料侧轨保持同一节奏，信息密度更稳。</p>
-            </article>
-            <article>
-              <strong>Quiet presence</strong>
-              <p>减少噪音色和彩色按钮，让未读、提醒和重点内容更容易被看见。</p>
-            </article>
-            <article>
-              <strong>Light and dark</strong>
-              <p>浅色和深色都单独校准，长时间聊天阅读不会刺眼，也不会发灰。</p>
-            </article>
+      <p v-if="viewMode === 'login'" class="login-card__intro">
+        更轻、更专注的团队聊天空间。
+      </p>
+
+      <div v-if="viewMode === 'accounts'" class="login-card__accounts">
+        <article
+          v-for="account in authStore.storedAccounts"
+          :key="account.userInfo.userId"
+          class="login-account"
+          role="button"
+          tabindex="0"
+          @click="activateStoredAccount(account.userInfo.userId)"
+          @keydown.enter.prevent="activateStoredAccount(account.userInfo.userId)"
+        >
+          <div class="login-account__copy">
+            <strong>{{ account.userInfo.nickname }}</strong>
+            <span>@{{ account.userInfo.username }}</span>
           </div>
+          <button class="login-account__remove" type="button" aria-label="移除账号" @click.stop="removeStoredAccount(account.userInfo.userId)">
+            <Close />
+          </button>
+        </article>
+      </div>
+
+      <el-form v-else-if="viewMode === 'login'" class="login-card__form" @submit.prevent="submit">
+        <el-form-item>
+          <el-input
+            v-model="form.username"
+            :prefix-icon="User"
+            placeholder="用户名"
+            aria-label="用户名"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-input
+            v-model="form.password"
+            :prefix-icon="Lock"
+            placeholder="密码"
+            show-password
+            type="password"
+            aria-label="密码"
+            @keyup="handlePasswordEvent"
+            @keydown="handlePasswordEvent"
+            @focus="handlePasswordEvent"
+            @blur="capsLockVisible = false"
+          />
+        </el-form-item>
+
+        <p v-if="capsLockVisible" class="login-card__hint">Caps Lock 已开启</p>
+
+        <div class="login-card__checks">
+          <button
+            class="login-check"
+            :class="{ 'is-active': form.rememberMe }"
+            type="button"
+            @click="toggleRememberMe()"
+          >
+            <span class="login-check__box" aria-hidden="true">
+              <span class="login-check__mark" />
+            </span>
+            <span class="login-check__copy">记住登录状态</span>
+          </button>
+          <button
+            class="login-check"
+            :class="{ 'is-active': form.trustDevice, 'is-disabled': !form.rememberMe }"
+            type="button"
+            :disabled="!form.rememberMe"
+            @click="toggleTrustDevice()"
+          >
+            <span class="login-check__box" aria-hidden="true">
+              <span class="login-check__mark" />
+            </span>
+            <span class="login-check__copy">信任此设备 30 天</span>
+          </button>
         </div>
 
-        <div class="login-card__section">
-          <div class="login-card__section-head">
-            <span>{{ authStore.hasStoredAccounts ? '身份切换' : '账号登录' }}</span>
-            <strong>{{ showAddAccountForm ? 'Secure entry' : 'Quick return' }}</strong>
-          </div>
-          <div v-if="authStore.storedAccounts.length" class="login-card__accounts">
-            <article
-              v-for="account in authStore.storedAccounts"
-              :key="account.userInfo.userId"
-              class="login-account"
-              role="button"
-              tabindex="0"
-              @click="activateStoredAccount(account.userInfo.userId)"
-              @keydown.enter.prevent="activateStoredAccount(account.userInfo.userId)"
-            >
-              <div class="login-account__copy">
-                <strong>{{ account.userInfo.nickname }}</strong>
-                <span>@{{ account.userInfo.username }}</span>
-              </div>
-              <button class="login-account__remove" type="button" aria-label="移除账号" @click.stop="removeStoredAccount(account.userInfo.userId)">
-                <Close />
-              </button>
-            </article>
-          </div>
-          <div v-if="authStore.hasStoredAccounts && !showAddAccountForm" class="login-card__switch-hint">
-            <p>已保存的账号会以身份卡片展示。可以直接返回，也可以继续添加新的登录身份。</p>
-            <el-button plain @click="router.replace('/login?add=1')">添加其他账号</el-button>
-          </div>
-          <el-form v-if="showAddAccountForm" label-position="top" @submit.prevent="submit">
-            <el-form-item label="用户名">
-              <el-input
-                v-model="form.username"
-                :prefix-icon="User"
-                placeholder="echo_demo_01"
-                aria-label="用户名"
-              />
-            </el-form-item>
-            <el-form-item label="密码">
-              <el-input
-                v-model="form.password"
-                :prefix-icon="Lock"
-                placeholder="请输入密码"
-                show-password
-                type="password"
-                aria-label="密码"
-              />
-            </el-form-item>
-            <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
-              登录
-            </el-button>
-          </el-form>
-          <p v-if="loginError" class="login-card__error" role="alert" aria-live="assertive">
-            {{ loginError }}
-          </p>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
+          登录
+        </el-button>
+      </el-form>
 
-          <div v-if="showAddAccountForm" class="login-card__meta">
-            <div>
-              <span class="login-card__meta-label">Demo account</span>
-              <strong>echo_demo_01</strong>
-            </div>
-            <div>
-              <span class="login-card__meta-label">Demo password</span>
-              <strong>123456</strong>
-            </div>
-          </div>
+      <el-form v-else-if="viewMode === 'register'" class="login-card__form" @submit.prevent="submitRegister">
+        <el-form-item>
+          <el-input
+            v-model="registerForm.username"
+            :prefix-icon="User"
+            placeholder="用户名"
+            aria-label="注册用户名"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-input
+            v-model="registerForm.nickname"
+            placeholder="昵称"
+            aria-label="注册昵称"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-input
+            v-model="registerForm.password"
+            :prefix-icon="Lock"
+            placeholder="密码"
+            show-password
+            type="password"
+            aria-label="注册密码"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-input
+            v-model="registerForm.confirmPassword"
+            :prefix-icon="Lock"
+            placeholder="确认密码"
+            show-password
+            type="password"
+            aria-label="确认注册密码"
+          />
+        </el-form-item>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="registerLoading">
+          注册
+        </el-button>
+      </el-form>
+
+      <el-form v-else-if="viewMode === 'challenge'" class="login-card__form" @submit.prevent="verifyChallenge">
+        <el-form-item>
+          <el-input
+            v-model="challengeForm.code"
+            placeholder="6 位验证码"
+            aria-label="邮箱验证码"
+          />
+        </el-form-item>
+        <p class="login-card__hint">{{ challengeMaskedEmail }}</p>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
+          验证并登录
+        </el-button>
+      </el-form>
+
+      <el-form v-else-if="viewMode === 'recovery-email'" class="login-card__form" @submit.prevent="submitRecoveryEmail">
+        <el-form-item>
+          <el-input
+            v-model="recoveryForm.email"
+            placeholder="邮箱"
+            aria-label="恢复邮箱"
+          />
+        </el-form-item>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
+          发送验证码
+        </el-button>
+      </el-form>
+
+      <el-form v-else-if="viewMode === 'recovery-code'" class="login-card__form" @submit.prevent="verifyRecoveryCode">
+        <el-form-item>
+          <el-input
+            v-model="recoveryForm.code"
+            placeholder="6 位验证码"
+            aria-label="恢复验证码"
+          />
+        </el-form-item>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
+          下一步
+        </el-button>
+      </el-form>
+
+      <el-form v-else class="login-card__form" @submit.prevent="submitRecoveryPassword">
+        <div v-if="recoveryAccounts[0]" class="login-card__account-preview">
+          <strong>{{ recoveryAccounts[0].nickname }}</strong>
+          <span>@{{ recoveryAccounts[0].username }}</span>
         </div>
-      </section>
-    </div>
+        <el-form-item>
+          <el-input
+            v-model="recoveryForm.newPassword"
+            placeholder="新密码"
+            show-password
+            type="password"
+            aria-label="新密码"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-input
+            v-model="recoveryForm.confirmPassword"
+            placeholder="确认新密码"
+            show-password
+            type="password"
+            aria-label="确认新密码"
+          />
+        </el-form-item>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
+          重置密码
+        </el-button>
+      </el-form>
+
+      <div class="login-card__links">
+        <button
+          v-if="viewMode === 'accounts'"
+          class="login-card__link"
+          type="button"
+          @click="openLoginForm()"
+        >
+          使用其他账号
+        </button>
+        <button
+          v-if="viewMode === 'login'"
+          class="login-card__link"
+          type="button"
+          @click="openRecoveryEmail()"
+        >
+          找回账号或密码
+        </button>
+        <button
+          v-if="viewMode === 'accounts' || viewMode === 'login'"
+          class="login-card__link"
+          type="button"
+          @click="openRegisterForm()"
+        >
+          注册
+        </button>
+        <button
+          v-if="viewMode === 'register'"
+          class="login-card__link"
+          type="button"
+          @click="openLoginForm(registerForm.username)"
+        >
+          已有账号，去登录
+        </button>
+        <button
+          v-if="viewMode === 'challenge'"
+          class="login-card__link"
+          type="button"
+          @click="openLoginForm(form.username)"
+        >
+          改用密码登录
+        </button>
+        <button
+          v-if="viewMode === 'challenge'"
+          class="login-card__link"
+          type="button"
+          @click="resendChallenge()"
+        >
+          重新发送验证码
+        </button>
+        <button
+          v-if="viewMode === 'recovery-code'"
+          class="login-card__link"
+          type="button"
+          @click="submitRecoveryEmail()"
+        >
+          重新发送验证码
+        </button>
+        <button
+          v-if="viewMode === 'recovery-email'"
+          class="login-card__link"
+          type="button"
+          @click="openLoginForm(form.username)"
+        >
+          回到登录
+        </button>
+        <button
+          v-if="viewMode === 'recovery-code'"
+          class="login-card__link"
+          type="button"
+          @click="openRecoveryEmail()"
+        >
+          重新输入邮箱
+        </button>
+        <button
+          v-if="viewMode === 'recovery-reset'"
+          class="login-card__link"
+          type="button"
+          @click="openLoginForm(recoveryAccounts[0]?.username ?? '')"
+        >
+          回到登录
+        </button>
+      </div>
+
+      <p v-if="statusMessage" class="login-card__status" :class="`is-${statusTone}`" role="alert" aria-live="polite">
+        {{ statusMessage }}
+      </p>
+    </section>
   </main>
 </template>
 
@@ -150,191 +591,169 @@ function removeStoredAccount(userId: number) {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 40px 24px;
+  padding: 20px;
 }
 
-.login-shell {
-  width: min(100%, 980px);
-}
-
-.login-shell__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.brand-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 11px;
-  padding: 12px 18px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-toolbar) 92%, transparent);
-  box-shadow: var(--shadow-card);
-  font-size: 0.82rem;
-  backdrop-filter: blur(18px);
-}
-
-.brand-line strong {
-  font: var(--font-title-sm);
-}
-
-.brand-line span {
-  color: var(--color-text-3);
-  font: 500 0.76rem/1 var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.brand-line__icon {
-  width: 16px;
-  height: 16px;
-  color: var(--color-shell-eyebrow);
+.login-card__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .login-card {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(330px, 0.82fr);
-  gap: 24px;
-  overflow: hidden;
+  width: min(100%, 436px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 30px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 36px;
+  border-radius: 26px;
   background:
-    radial-gradient(circle at bottom right, color-mix(in srgb, var(--color-shell-glow) 72%, transparent), transparent 28%),
-    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 24%),
-    var(--color-shell-panel);
-  box-shadow:
-    var(--shadow-panel),
-    var(--shadow-inset-soft);
-  padding: 28px;
-  backdrop-filter: blur(24px);
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), transparent 120%),
+    color-mix(in srgb, var(--color-shell-card-strong) 98%, transparent);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, white 24%, transparent);
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.login-card__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.login-card__logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.login-card__logo {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: var(--color-shell-inline);
+  border: 1px solid var(--color-shell-border);
+}
+
+.login-card__logo-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--color-shell-eyebrow);
+}
+
+.login-card__brand {
+  min-width: 0;
+}
+
+.login-card__brand strong,
+.login-card__brand span {
+  display: block;
+}
+
+.login-card__brand strong {
+  font: 620 1.42rem/0.96 var(--font-display);
+  letter-spacing: -0.04em;
+}
+
+.login-card__brand span {
+  margin-top: 5px;
+  color: var(--color-text-2);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-card__intro {
+  margin-top: -2px;
+  color: var(--color-text-2);
+  font-size: 0.83rem;
+  line-height: 1.58;
+  max-width: 24rem;
 }
 
 .theme-toggle {
-  min-height: 40px;
-  padding: 0 16px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
   border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
+  border-radius: 13px;
   background: var(--color-shell-action);
   color: var(--color-text-2);
-  font-size: 0.82rem;
-  font-weight: 600;
+  transition:
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
 .theme-toggle:hover,
 .theme-toggle:focus-visible {
-  border-color: var(--color-shell-border-strong);
   background: var(--color-shell-action-hover);
   color: var(--color-text-1);
-}
-
-.login-card__intro {
-  display: grid;
-  align-content: space-between;
-  gap: 22px;
-  padding: 12px 8px 12px 6px;
-}
-
-.login-card__eyebrow {
-  display: inline-block;
-  color: var(--color-shell-eyebrow);
-  font: var(--font-eyebrow);
-  letter-spacing: 0.14em;
-}
-
-.login-card__intro h1 {
-  max-width: 12ch;
-  font: var(--font-title-lg);
-  letter-spacing: -0.06em;
-  text-wrap: balance;
-}
-
-.login-card__intro p,
-.login-card__meta {
-  color: var(--color-text-2);
-  font-size: 0.94rem;
-  line-height: 1.68;
-}
-
-.login-card__highlights {
-  display: grid;
-  gap: 12px;
-}
-
-.login-card__highlights article {
-  padding: 16px 18px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-}
-
-.login-card__highlights strong {
-  display: block;
-  margin-bottom: 6px;
-  font: var(--font-title-sm);
-}
-
-.login-card__highlights p {
-  font-size: 0.84rem;
-  line-height: 1.6;
-}
-
-.login-card__section {
-  padding: 22px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, rgba(255, 255, 255, 0.3) 40%, transparent), transparent 22%),
-    var(--color-shell-card-strong);
-  box-shadow: var(--shadow-inset-soft);
-  backdrop-filter: blur(18px);
+  border-color: var(--color-shell-border-strong);
 }
 
 .login-card__accounts {
   display: grid;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 9px;
 }
 
 .login-account {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px;
-  align-items: center;
   gap: 10px;
-  padding: 16px 18px;
+  align-items: center;
+  padding: 14px 15px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 22px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
   text-align: left;
   transition:
-    transform var(--motion-fast) ease,
-    background var(--motion-fast) ease,
     border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    background var(--motion-fast) ease;
 }
 
 .login-account:hover,
 .login-account:focus-visible {
-  transform: translateY(-1px);
   border-color: var(--color-shell-border-strong);
   background: color-mix(in srgb, var(--color-shell-action-hover) 94%, transparent);
-  box-shadow: var(--shadow-card);
 }
 
 .login-account__copy strong {
   display: block;
-  font: var(--font-title-sm);
+  font-size: 0.89rem;
+  font-weight: 600;
+  line-height: 1.24;
 }
 
 .login-account__copy span {
   display: block;
   margin-top: 4px;
   color: var(--color-text-soft);
-  font: 500 0.72rem/1 var(--font-mono);
+  font: 500 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.06em;
 }
 
 .login-account__remove {
@@ -346,103 +765,183 @@ function removeStoredAccount(userId: number) {
   color: var(--color-text-soft);
 }
 
-.login-card__switch-hint {
+.login-card__form {
   display: grid;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 0;
+}
+
+.login-card__hint {
+  margin-top: -2px;
   color: var(--color-text-2);
-  font-size: 0.88rem;
-  line-height: 1.55;
+  font-size: 0.78rem;
+  line-height: 1.46;
 }
 
-.login-card__section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.login-card__section-head span {
-  color: var(--color-text-1);
-  font: var(--font-title-sm);
-}
-
-.login-card__section-head strong {
-  color: var(--color-text-soft);
-  font: 600 0.72rem/1 var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.login-card__checks {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 12px;
 }
 
 .login-card__submit {
   width: 100%;
-  margin-top: 6px;
-  min-height: var(--control-height-lg);
+  min-height: 48px;
+  border-radius: 15px;
+  letter-spacing: -0.01em;
 }
 
-.login-card__meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.login-card__meta > div {
-  padding: 16px 16px;
+.login-card__account-preview {
+  padding: 13px 14px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 20px;
-  background: var(--color-shell-card-muted);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
 }
 
-.login-card__meta-label {
+.login-card__account-preview strong,
+.login-card__account-preview span {
   display: block;
-  margin-bottom: 4px;
+}
+
+.login-card__account-preview span {
+  margin-top: 4px;
   color: var(--color-text-soft);
-  font: var(--font-eyebrow);
-  text-transform: uppercase;
+  font: 500 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.06em;
 }
 
-.login-card__meta strong {
-  font: 600 0.92rem/1.2 var(--font-body);
+.login-card__links {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding-top: 2px;
 }
 
-.login-card__error {
-  margin-top: 14px;
+.login-card__link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: color var(--motion-fast) ease;
+}
+
+.login-card__link:hover,
+.login-card__link:focus-visible {
+  color: var(--color-text-1);
+}
+
+.login-check {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-2);
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.login-check:hover,
+.login-check:focus-visible {
+  color: var(--color-text-1);
+}
+
+.login-check.is-active {
+  color: var(--color-text-1);
+}
+
+.login-check.is-disabled {
+  opacity: 0.52;
+}
+
+.login-check__box {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-shell-border-strong) 88%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-shell-panel) 92%, transparent);
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+  order: 2;
+}
+
+.login-check.is-active .login-check__box {
+  border-color: color-mix(in srgb, var(--color-primary) 48%, transparent);
+  background: var(--color-primary);
+}
+
+.login-check__mark {
+  width: 7px;
+  height: 3px;
+  border-left: 1.6px solid transparent;
+  border-bottom: 1.6px solid transparent;
+  transform: rotate(-45deg) translateY(-1px);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.login-check.is-active .login-check__mark {
+  border-color: white;
+  opacity: 1;
+}
+
+.login-check__copy {
+  font-size: 0.79rem;
+  line-height: 1.24;
+  flex: 1;
+}
+
+.login-card__status {
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 12px;
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+
+.login-card__status.is-error {
   background: color-mix(in srgb, var(--color-danger) 9%, var(--color-shell-card-muted));
   color: var(--color-danger);
-  font-size: 0.84rem;
-  line-height: 1.45;
 }
 
-@media (max-width: 640px) {
-  .login-page {
-    padding: 16px;
-  }
+.login-card__status.is-info,
+.login-card__status.is-success {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-shell-card-muted));
+  color: var(--color-text-1);
+}
 
-  .login-shell {
-    width: min(100%, 520px);
-  }
+:deep(.login-card__form .el-form-item) {
+  margin-bottom: 11px;
+}
 
-  .login-card {
-    grid-template-columns: 1fr;
-    gap: 18px;
-    padding: 18px;
-    border-radius: 28px;
-  }
+:deep(.login-card__form .el-input__wrapper) {
+  min-height: 46px;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px color-mix(in srgb, var(--color-shell-border) 84%, transparent);
+}
 
-  .login-card__intro {
-    padding: 2px 0 0;
-  }
-
-  .login-card__intro h1 {
-    max-width: none;
-  }
-
-  .login-card__meta {
-    grid-template-columns: 1fr;
-  }
+:deep(.login-card__form .el-input__wrapper.is-focus) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 34%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-primary) 7%, transparent);
 }
 </style>

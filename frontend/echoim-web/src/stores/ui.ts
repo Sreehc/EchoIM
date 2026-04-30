@@ -36,7 +36,7 @@ export const useUiStore = defineStore('ui', () => {
   const isMobile = computed(() => viewportWidth.value <= 767)
   const isTablet = computed(() => viewportWidth.value >= 768 && viewportWidth.value <= 1279)
   const isDesktop = computed(() => viewportWidth.value >= 1280)
-  const useOverlayProfile = computed(() => !isDesktop.value)
+  const useOverlayProfile = computed(() => true)
 
   function initializeViewport() {
     if (initialized) return

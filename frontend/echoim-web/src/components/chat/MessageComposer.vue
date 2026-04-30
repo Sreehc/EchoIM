@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChatDotRound, Microphone, Paperclip, Promotion } from '@element-plus/icons-vue'
+import { ChatDotRound, Paperclip, Promotion } from '@element-plus/icons-vue'
 import type { StickerDefinition } from '@/types/chat'
 
 const props = withDefaults(
@@ -122,21 +122,20 @@ function sendSticker(sticker: StickerDefinition) {
           aria-label="消息输入框"
           @keydown="onKeydown"
         />
+        <el-button
+          type="primary"
+          circle
+          class="composer__action"
+          :loading="attachmentUploading"
+          :disabled="!canSend || !hasText"
+          aria-label="发送消息"
+          data-testid="send-message"
+          @click="submit"
+        >
+          <Promotion />
+        </el-button>
         <input ref="fileInput" class="composer__file-input" type="file" @change="onSelectFile" />
       </div>
-      <el-button
-        type="primary"
-        circle
-        class="composer__action"
-        :loading="attachmentUploading"
-        :disabled="!canSend || (!hasText && !attachmentUploading)"
-        aria-label="发送消息"
-        data-testid="send-message"
-        @click="submit"
-      >
-        <Promotion v-if="hasText" />
-        <Microphone v-else />
-      </el-button>
     </div>
   </footer>
 </template>
@@ -145,16 +144,14 @@ function sendSticker(sticker: StickerDefinition) {
 .composer {
   position: relative;
   z-index: 1;
-  padding: 14px 24px 22px;
+  padding: 14px 24px 20px;
 }
 
 .composer__inner {
   width: min(760px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px;
-  align-items: end;
-  gap: 14px;
+  gap: 10px;
 }
 
 .composer__status {
@@ -168,22 +165,22 @@ function sendSticker(sticker: StickerDefinition) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  padding: 12px;
+  padding: 11px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 26px;
+  border-radius: 22px;
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--color-shell-glow) 18%, transparent), transparent 44%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-shell-glow) 14%, transparent), transparent 42%),
     var(--color-shell-card-strong);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
 
 .composer__sticker {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--sticker-accent, var(--color-primary)) 28%, var(--color-shell-border));
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--sticker-accent, var(--color-primary)) 8%, var(--color-shell-card));
+  border: 1px solid color-mix(in srgb, var(--sticker-accent, var(--color-primary)) 22%, var(--color-shell-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--sticker-accent, var(--color-primary)) 6%, var(--color-shell-card));
   text-align: left;
 }
 
@@ -210,11 +207,11 @@ function sendSticker(sticker: StickerDefinition) {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
   border: 1px solid var(--color-shell-border);
   color: var(--color-text-2);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .composer__reply button {
@@ -231,16 +228,16 @@ function sendSticker(sticker: StickerDefinition) {
 
 .composer__bar {
   display: grid;
-  grid-template-columns: 42px 42px minmax(0, 1fr);
+  grid-template-columns: 42px 42px minmax(0, 1fr) 46px;
   align-items: end;
-  gap: 8px;
-  min-height: 62px;
-  padding: 8px 12px;
+  gap: 6px;
+  min-height: 58px;
+  padding: 7px 8px 7px 9px;
   border: 1px solid var(--color-shell-border);
-  border-radius: 26px;
+  border-radius: 20px;
   background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
 }
 
 .composer__icon {
@@ -251,13 +248,14 @@ function sendSticker(sticker: StickerDefinition) {
   align-self: end;
   border: 0;
   border: 1px solid transparent;
-  border-radius: 16px;
-  background: var(--color-shell-action);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-shell-action) 96%, transparent);
   color: var(--color-text-soft);
   transition:
     background var(--motion-fast) ease,
     color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease;
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 }
 
 .composer__icon:disabled {
@@ -269,6 +267,7 @@ function sendSticker(sticker: StickerDefinition) {
   background: var(--color-shell-action-hover);
   border-color: var(--color-shell-border);
   color: var(--color-text-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .composer__bar :deep(.el-textarea) {
@@ -281,14 +280,15 @@ function sendSticker(sticker: StickerDefinition) {
 }
 
 .composer__bar :deep(.el-textarea__inner) {
-  min-height: 44px !important;
+  min-height: 42px !important;
   max-height: 112px;
-  padding: 11px 8px 10px;
+  padding: 10px 8px 9px;
   border: 0;
   background: transparent;
   color: var(--color-text-1);
-  line-height: 1.48;
-  font-size: 0.98rem;
+  line-height: 1.5;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
   resize: none;
 }
 
@@ -297,18 +297,19 @@ function sendSticker(sticker: StickerDefinition) {
 }
 
 .composer__action {
-  width: 58px;
-  min-width: 58px;
-  height: 58px;
+  width: 40px;
+  min-width: 40px;
+  height: 44px;
   padding: 0;
-  border: 0;
-  background: var(--color-primary);
-  box-shadow: 0 18px 30px color-mix(in srgb, var(--color-primary) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary) 96%, white);
+  box-shadow: none;
 }
 
 .composer__action:disabled {
-  background: color-mix(in srgb, var(--color-primary) 76%, rgba(255, 255, 255, 0.18));
-  opacity: 1;
+  background: color-mix(in srgb, var(--color-primary) 72%, rgba(255, 255, 255, 0.18));
+  opacity: 0.72;
 }
 
 @media (max-width: 767px) {
@@ -316,15 +317,10 @@ function sendSticker(sticker: StickerDefinition) {
     padding: 10px 12px 14px;
   }
 
-  .composer__inner {
-    gap: 10px;
-    grid-template-columns: minmax(0, 1fr) 54px;
-  }
-
   .composer__action {
-    width: 54px;
-    min-width: 54px;
-    height: 54px;
+    width: 40px;
+    min-width: 40px;
+    height: 42px;
   }
 }
 </style>

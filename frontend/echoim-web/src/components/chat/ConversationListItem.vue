@@ -33,13 +33,13 @@ function visibleUnreadCount(item: ConversationSummary) {
     />
     <div class="conversation-item__body">
       <div class="conversation-item__head">
-        <div class="conversation-item__title">
-          <strong>
-            <template v-for="(part, index) in highlightText(item.conversationName, props.searchQuery ?? '')" :key="index">
-              <mark v-if="part.matched" class="conversation-item__highlight">{{ part.text }}</mark>
-              <span v-else>{{ part.text }}</span>
-            </template>
-          </strong>
+        <strong class="conversation-item__name">
+          <template v-for="(part, index) in highlightText(item.conversationName, props.searchQuery ?? '')" :key="index">
+            <mark v-if="part.matched" class="conversation-item__highlight">{{ part.text }}</mark>
+            <span v-else>{{ part.text }}</span>
+          </template>
+        </strong>
+        <div class="conversation-item__head-meta">
           <span v-if="item.isMute" class="conversation-item__state" aria-label="消息免打扰" title="消息免打扰">
             <svg viewBox="0 0 16 16" class="conversation-item__state-icon" aria-hidden="true">
               <path
@@ -55,7 +55,7 @@ function visibleUnreadCount(item: ConversationSummary) {
               />
             </svg>
           </span>
-          <span v-if="item.isTop" class="conversation-item__state conversation-item__state--pin" aria-label="置顶" title="置顶">
+          <span v-if="item.isTop" class="conversation-item__state" aria-label="置顶" title="置顶">
             <svg viewBox="0 0 16 16" class="conversation-item__state-icon" aria-hidden="true">
               <path
                 d="M4.45 2.45c0-.52.43-.95.95-.95h5.2c.52 0 .95.43.95.95 0 .28-.12.55-.34.73L9.9 4.28v3.14l1.34 1.22c.2.18.31.44.31.71 0 .53-.42.95-.95.95H8.72v3.6a.72.72 0 1 1-1.44 0v-3.6H5.4a.95.95 0 0 1-.64-1.66L6.1 7.42V4.28L4.79 3.18a.98.98 0 0 1-.34-.73Z"
@@ -66,8 +66,8 @@ function visibleUnreadCount(item: ConversationSummary) {
               />
             </svg>
           </span>
+          <span class="conversation-item__time">{{ formatConversationTime(item.lastMessageTime) }}</span>
         </div>
-        <span class="conversation-item__time">{{ formatConversationTime(item.lastMessageTime) }}</span>
       </div>
       <div class="conversation-item__foot">
         <p>
@@ -89,50 +89,60 @@ function visibleUnreadCount(item: ConversationSummary) {
 
 <style scoped>
 .conversation-item {
+  position: relative;
   width: 100%;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 14px;
-  min-height: 80px;
-  padding: 11px 13px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 70px;
+  padding: 8px 12px 8px 14px;
   border: 1px solid transparent;
-  border-radius: 20px;
+  border-radius: 14px;
   background: transparent;
   text-align: left;
   transition:
     background var(--motion-base) ease,
     color var(--motion-base) ease,
-    transform var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    border-color var(--motion-fast) ease;
+}
+
+.conversation-item::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 4px;
+  width: 2px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-primary) 72%, transparent);
+  opacity: 0;
+  transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
+  transform: scaleY(0.72);
 }
 
 .conversation-item.is-compact {
-  min-height: 70px;
-  padding-block: 8px;
+  min-height: 64px;
+  padding-block: 7px;
 }
 
 .conversation-item:hover,
 .conversation-item:focus-visible {
-  background: color-mix(in srgb, var(--color-shell-card) 92%, transparent);
+  background: color-mix(in srgb, var(--color-shell-card) 88%, transparent);
   border-color: var(--color-shell-border);
-  box-shadow: var(--shadow-card);
-  transform: translateY(-1px);
+}
+
+.conversation-item:hover::before,
+.conversation-item:focus-visible::before,
+.conversation-item.is-active::before {
+  opacity: 1;
+  transform: scaleY(1);
 }
 
 .conversation-item.is-active {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--color-shell-glow) 34%, transparent), transparent 72%),
-    color-mix(in srgb, var(--color-selected) 88%, var(--color-shell-card-strong));
+  background: color-mix(in srgb, var(--color-selected) 80%, var(--color-shell-card-strong));
   color: var(--color-text-1);
-  border-color: var(--color-shell-border-strong);
-  box-shadow:
-    var(--shadow-card),
-    inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.conversation-item:active {
-  transform: scale(0.992);
+  border-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-border));
 }
 
 .conversation-item__avatar {
@@ -149,7 +159,7 @@ function visibleUnreadCount(item: ConversationSummary) {
 .conversation-item__head,
 .conversation-item__foot {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
@@ -162,33 +172,33 @@ function visibleUnreadCount(item: ConversationSummary) {
   min-width: 0;
 }
 
-.conversation-item__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.conversation-item__name {
   min-width: 0;
   flex: 1 1 auto;
-}
-
-.conversation-item__head strong {
-  flex: 1 1 auto;
-  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 0.98rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
   line-height: 1.18;
+}
+
+.conversation-item__head-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .conversation-item__time {
   color: var(--color-text-soft);
   flex-shrink: 0;
-  align-self: flex-start;
-  padding-top: 1px;
-  font: 500 0.76rem/1 var(--font-mono);
+  font: 500 0.68rem/1 var(--font-mono);
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .conversation-item__foot p {
@@ -198,7 +208,7 @@ function visibleUnreadCount(item: ConversationSummary) {
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--color-text-3);
-  font-size: 0.83rem;
+  font-size: 0.78rem;
   line-height: 1.28;
 }
 
@@ -224,21 +234,18 @@ function visibleUnreadCount(item: ConversationSummary) {
   height: 14px;
 }
 
-.conversation-item__state--pin {
-  margin-left: -1px;
-}
-
 .conversation-item__badge {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-accent) 86%, white);
   color: #fff;
-  font: 700 0.64rem/1 var(--font-mono);
+  font: 700 0.58rem/1 var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .conversation-item.is-muted .conversation-item__badge {
