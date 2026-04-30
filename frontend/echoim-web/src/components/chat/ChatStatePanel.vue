@@ -36,7 +36,7 @@ const emit = defineEmits<{
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 8%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--interactive-focus-ring) 18%, transparent), transparent 30%),
     var(--surface-card);
   box-shadow: var(--shadow-sm);
   text-align: center;

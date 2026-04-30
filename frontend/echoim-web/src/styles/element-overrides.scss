@@ -14,7 +14,7 @@
   --el-text-color-secondary: var(--text-tertiary);
   --el-fill-color-light: color-mix(in srgb, var(--surface-panel) 72%, transparent);
   --el-bg-color-overlay: var(--surface-overlay);
-  --el-mask-color: var(--color-shell-mask);
+  --el-mask-color: color-mix(in srgb, var(--surface-inverse) 22%, transparent);
 }
 
 .el-input__wrapper,

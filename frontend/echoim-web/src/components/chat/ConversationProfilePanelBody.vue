@@ -322,7 +322,7 @@ const actionCards = computed<
   flex-direction: column;
   padding: 14px;
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-shell-glow) 44%, transparent), transparent 30%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent), transparent 30%),
     transparent;
   overflow: hidden;
 }
@@ -351,21 +351,21 @@ const actionCards = computed<
   height: 34px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-shell-card) 82%, transparent);
-  color: var(--color-text-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 82%, transparent);
+  color: var(--text-secondary);
   transition:
-    background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .profile-panel__close:hover,
 .profile-panel__close:focus-visible {
-  background: var(--color-shell-action-hover);
-  border-color: var(--color-shell-border-strong);
-  color: var(--color-text-1);
+  background: var(--interactive-secondary-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .profile-content {
@@ -377,16 +377,16 @@ const actionCards = computed<
 .profile-reading-panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
-  background: var(--color-shell-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-card);
 }
 
 .profile-hero {
   padding: 20px 18px 18px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 78%, transparent), transparent 100%),
-    var(--color-shell-card);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 78%, transparent), transparent 100%),
+    var(--surface-card);
 }
 
 .profile-hero__glow {
@@ -395,7 +395,7 @@ const actionCards = computed<
   width: 132px;
   height: 132px;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-shell-glow) 42%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--interactive-focus-ring) 42%, transparent), transparent 70%);
   pointer-events: none;
 }
 
@@ -417,7 +417,7 @@ const actionCards = computed<
 .profile-hero__copy p {
   margin-top: 6px;
   max-width: 22rem;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.79rem;
   line-height: 1.48;
 }
@@ -433,10 +433,10 @@ const actionCards = computed<
 
 .profile-hero__tags span {
   padding: 6px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-action) 72%, transparent);
-  color: var(--color-text-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 72%, transparent);
+  color: var(--text-primary);
   font: 600 0.62rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
@@ -444,8 +444,8 @@ const actionCards = computed<
 .profile-reading-panel {
   display: grid;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 52%, transparent), transparent 22%),
-    var(--color-shell-card);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 52%, transparent), transparent 22%),
+    var(--surface-card);
 }
 
 .profile-reading-panel > .profile-card {
@@ -455,7 +455,7 @@ const actionCards = computed<
 }
 
 .profile-reading-panel > .profile-card + .profile-card {
-  border-top: 1px solid color-mix(in srgb, var(--color-shell-border) 84%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border-default) 84%, transparent);
 }
 
 .profile-card {
@@ -465,7 +465,7 @@ const actionCards = computed<
 .profile-card--copy p,
 .profile-card--notice p {
   white-space: pre-wrap;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.79rem;
   line-height: 1.56;
 }
@@ -473,14 +473,14 @@ const actionCards = computed<
 .profile-card--copy p,
 .profile-card--notice p {
   padding: 12px 13px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--color-shell-border) 74%, transparent);
-  background: color-mix(in srgb, var(--color-shell-card-muted) 58%, transparent);
+  border-radius: var(--radius-control);
+  border: 1px solid color-mix(in srgb, var(--border-default) 74%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 58%, transparent);
 }
 
 .profile-card--notice {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 7%, transparent), transparent 88%),
+    linear-gradient(180deg, color-mix(in srgb, var(--interactive-focus-ring) 12%, transparent), transparent 88%),
     transparent;
 }
 
@@ -502,13 +502,13 @@ const actionCards = computed<
 }
 
 .profile-card__header span {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font: 620 0.79rem/1.08 var(--font-display);
   letter-spacing: -0.01em;
 }
 
 .profile-card__header small {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.58rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -532,14 +532,14 @@ const actionCards = computed<
 
 .profile-grid div {
   padding: 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 70%, transparent);
-  border: 1px solid var(--color-shell-border);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 70%, transparent);
+  border: 1px solid var(--border-default);
 }
 
 .profile-grid dt {
   margin-bottom: 5px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.58rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -547,7 +547,7 @@ const actionCards = computed<
 
 .profile-grid dd {
   margin: 0;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -568,36 +568,36 @@ const actionCards = computed<
   justify-content: space-between;
   gap: 12px;
   padding: 12px 13px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 66%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 66%, transparent);
   color: inherit;
   text-align: left;
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out);
 }
 
 .profile-action:hover,
 .profile-action:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 .profile-action.is-danger {
-  border-color: color-mix(in srgb, var(--color-danger) 10%, var(--color-shell-border));
+  border-color: color-mix(in srgb, var(--status-danger) 10%, var(--border-default));
 }
 
 .profile-action.is-danger:hover,
 .profile-action.is-danger:focus-visible {
-  border-color: color-mix(in srgb, var(--color-danger) 18%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-danger) 4%, var(--color-shell-action-hover));
+  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 4%, var(--interactive-secondary-bg-hover));
 }
 
 .profile-action__copy span {
   display: block;
   margin-bottom: 4px;
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
   font: 600 0.58rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -612,7 +612,7 @@ const actionCards = computed<
 
 .profile-action__copy p {
   margin-top: 4px;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.72rem;
   line-height: 1.42;
 }
@@ -627,10 +627,10 @@ const actionCards = computed<
 
 .profile-action__meta span {
   padding: 5px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-action) 72%, transparent);
-  color: var(--color-text-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 72%, transparent);
+  color: var(--text-primary);
   font: 600 0.6rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
@@ -638,7 +638,7 @@ const actionCards = computed<
 .profile-action__meta svg {
   width: 15px;
   height: 15px;
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
 }
 
 .profile-governance,
@@ -653,9 +653,9 @@ const actionCards = computed<
   gap: 10px;
   align-items: center;
   padding: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-card-muted) 66%, transparent);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--surface-panel) 66%, transparent);
 }
 
 .profile-member__copy strong,
@@ -670,7 +670,7 @@ const actionCards = computed<
 
 .profile-member__copy span {
   margin-top: 3px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.58rem/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
@@ -685,42 +685,42 @@ const actionCards = computed<
 .profile-member__role,
 .profile-member__button {
   padding: 5px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font: 600 0.6rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
 .profile-member__role {
-  border: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-action) 68%, transparent);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 68%, transparent);
 }
 
 .profile-member__button {
-  border: 1px solid var(--color-shell-border);
+  border: 1px solid var(--border-default);
   background: transparent;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .profile-member__button:hover,
 .profile-member__button:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
-  color: var(--color-text-1);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
 }
 
 .profile-member__button.is-danger {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .profile-member__button.is-danger:hover,
 .profile-member__button.is-danger:focus-visible {
-  border-color: color-mix(in srgb, var(--color-danger) 18%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-danger) 4%, var(--color-shell-action-hover));
-  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 4%, var(--interactive-secondary-bg-hover));
+  color: var(--status-danger);
 }
 
 @media (max-width: 767px) {

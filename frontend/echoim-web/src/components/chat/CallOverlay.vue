@@ -173,12 +173,12 @@ function formatDuration(durationSeconds: number) {
   display: grid;
   gap: 14px;
   padding: 20px;
-  border: 1px solid color-mix(in srgb, var(--color-shell-border) 82%, rgba(255, 255, 255, 0.25));
-  border-radius: 30px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 82%, rgba(255, 255, 255, 0.25));
+  border-radius: var(--radius-card);
   background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--color-shell-card) 94%, #d5ede7 6%), transparent 72%),
-    color-mix(in srgb, var(--color-shell-card-strong) 94%, rgba(7, 17, 24, 0.05));
-  box-shadow: 0 30px 84px rgba(6, 15, 27, 0.18);
+    radial-gradient(circle at top, color-mix(in srgb, var(--surface-card) 92%, var(--interactive-focus-ring) 8%), transparent 72%),
+    color-mix(in srgb, var(--surface-overlay) 94%, rgba(7, 17, 24, 0.05));
+  box-shadow: var(--shadow-overlay);
   backdrop-filter: blur(28px);
 }
 
@@ -196,7 +196,7 @@ function formatDuration(durationSeconds: number) {
 }
 
 .call-overlay__eyebrow {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.74rem/1 var(--font-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -204,16 +204,21 @@ function formatDuration(durationSeconds: number) {
 
 .call-overlay__ghost,
 .call-overlay__action {
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-action) 88%, transparent);
-  color: var(--color-text-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 88%, transparent);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 10px 15px;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .call-overlay__ghost {
@@ -237,12 +242,12 @@ function formatDuration(durationSeconds: number) {
 .call-overlay__copy p,
 .call-overlay__mini p {
   margin: 4px 0 0;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .call-overlay__error {
   margin: 0;
-  color: var(--color-danger);
+  color: var(--status-danger);
   font-size: 0.82rem;
 }
 
@@ -252,17 +257,42 @@ function formatDuration(durationSeconds: number) {
 }
 
 .call-overlay__action.is-active {
-  background: color-mix(in srgb, var(--color-shell-card-strong) 65%, #ffc5be 35%);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, var(--interactive-secondary-bg));
+  color: var(--interactive-selected-fg);
 }
 
 .call-overlay__action.is-accept {
-  background: color-mix(in srgb, #d7f6eb 70%, var(--color-shell-card) 30%);
-  color: #0f7b74;
+  border-color: color-mix(in srgb, var(--status-success) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--status-success) 12%, var(--interactive-secondary-bg));
+  color: color-mix(in srgb, var(--status-success) 82%, var(--text-primary));
 }
 
 .call-overlay__action.is-danger {
-  background: color-mix(in srgb, #ffd8d2 72%, var(--color-shell-card) 28%);
-  color: #bd3e2f;
+  border-color: color-mix(in srgb, var(--status-danger) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 10%, var(--interactive-secondary-bg));
+  color: color-mix(in srgb, var(--status-danger) 82%, var(--text-primary));
+}
+
+.call-overlay__ghost:hover,
+.call-overlay__ghost:focus-visible,
+.call-overlay__action:hover,
+.call-overlay__action:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+}
+
+.call-overlay__action.is-accept:hover,
+.call-overlay__action.is-accept:focus-visible {
+  border-color: color-mix(in srgb, var(--status-success) 34%, var(--border-default));
+  background: color-mix(in srgb, var(--status-success) 16%, var(--interactive-secondary-bg-hover));
+}
+
+.call-overlay__action.is-danger:hover,
+.call-overlay__action.is-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--status-danger) 34%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 14%, var(--interactive-secondary-bg-hover));
 }
 
 .call-overlay-enter-active,

@@ -60,7 +60,7 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--color-line) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
   color: #fff;
   font-family: var(--font-display);
   font-weight: 700;

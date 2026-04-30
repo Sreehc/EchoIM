@@ -207,8 +207,8 @@ onMounted(() => {
   padding: 32px 16px;
   background:
     radial-gradient(circle at 14% 14%, color-mix(in srgb, var(--interactive-primary-bg) 6%, transparent), transparent 22%),
-    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--color-shell-glow) 88%, transparent), transparent 20%),
-    linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-shell-mask) 8%, transparent)),
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent), transparent 20%),
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-inverse) 8%, transparent)),
     var(--surface-canvas);
 }
 
@@ -223,7 +223,7 @@ onMounted(() => {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-shell-glow) 24%, transparent), transparent 34%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--interactive-focus-ring) 20%, transparent), transparent 34%),
     var(--surface-card);
 }
 

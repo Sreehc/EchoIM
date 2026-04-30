@@ -227,7 +227,7 @@ function requestCountBadge(item: FriendRequestItem) {
   min-height: 0;
   padding: 22px 20px 20px;
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-shell-glow) 46%, transparent), transparent 28%),
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--interactive-focus-ring) 52%, transparent), transparent 28%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 96%, transparent), transparent);
 }
 

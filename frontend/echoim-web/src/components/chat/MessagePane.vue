@@ -379,39 +379,39 @@ function jumpToMessage(messageId: number) {
 }
 
 .message-pane__history-label {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.62rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .message-pane__history-end {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font-size: 0.72rem;
   line-height: 1.4;
 }
 
 .message-pane__history-tip,
 .message-pane__history-error {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font-size: 0.76rem;
 }
 
 .message-pane__history :deep(.el-button) {
   min-height: 28px;
   padding: 0 2px;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font: 600 0.72rem/1 var(--font-body);
   letter-spacing: -0.01em;
 }
 
 .message-pane__history :deep(.el-button:hover),
 .message-pane__history :deep(.el-button:focus-visible) {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .message-pane__history-error {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .message-pane.is-compact .message-pane__stack {
@@ -426,10 +426,10 @@ function jumpToMessage(messageId: number) {
 
 .message-pane__divider span {
   padding: 5px 11px;
-  border: 1px solid color-mix(in srgb, var(--color-shell-border) 92%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 82%, transparent);
-  color: var(--color-text-2);
+  border: 1px solid color-mix(in srgb, var(--border-default) 92%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 82%, transparent);
+  color: var(--text-secondary);
   font: 600 0.64rem/1 var(--font-mono);
   letter-spacing: 0.05em;
 }

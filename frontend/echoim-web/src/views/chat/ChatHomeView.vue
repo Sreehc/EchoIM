@@ -1831,7 +1831,11 @@ function registerDebugHooks() {
   min-height: 0;
   border: 1px solid var(--border-default);
   border-radius: 32px;
-  background: var(--color-shell-panel);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-panel) 96%, transparent),
+    color-mix(in srgb, var(--surface-card) 98%, transparent)
+  );
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px);
   overflow: hidden;
@@ -1863,7 +1867,7 @@ function registerDebugHooks() {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-chat-stage-base);
+  background: var(--chat-stage-base);
 }
 
 .chat-page__stage::before,
@@ -1884,9 +1888,9 @@ function registerDebugHooks() {
 
 .chat-page__stage::after {
   background:
-    linear-gradient(180deg, var(--color-chat-stage-top), transparent 16%),
-    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 22%),
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-chat-stage-glow) 74%, transparent), transparent 42%);
+    linear-gradient(180deg, var(--chat-stage-top), transparent 16%),
+    linear-gradient(0deg, var(--chat-stage-bottom), transparent 22%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--chat-stage-glow) 74%, transparent), transparent 42%);
 }
 
 .chat-page__banner {
@@ -1905,15 +1909,15 @@ function registerDebugHooks() {
 }
 
 .chat-page__banner.is-warning {
-  background: color-mix(in srgb, var(--color-warning) 9%, var(--color-shell-card));
+  background: color-mix(in srgb, var(--status-warning) 10%, var(--surface-card));
 }
 
 .chat-page__banner.is-error {
-  background: color-mix(in srgb, var(--color-danger) 9%, var(--color-shell-card));
+  background: color-mix(in srgb, var(--status-danger) 10%, var(--surface-card));
 }
 
 .chat-page__banner.is-muted {
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-shell-card));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 8%, var(--surface-card));
 }
 
 .chat-page__banner button {
@@ -1929,7 +1933,7 @@ function registerDebugHooks() {
   position: relative;
   background:
     linear-gradient(180deg, rgba(10, 10, 16, 0.1), transparent 14%),
-    var(--color-chat-stage-base);
+    var(--chat-stage-base);
 }
 
 .chat-page__empty::before,
@@ -1950,8 +1954,8 @@ function registerDebugHooks() {
 
 .chat-page__empty::after {
   background:
-    linear-gradient(180deg, var(--color-chat-stage-top), transparent 16%),
-    linear-gradient(0deg, var(--color-chat-stage-bottom), transparent 20%);
+    linear-gradient(180deg, var(--chat-stage-top), transparent 16%),
+    linear-gradient(0deg, var(--chat-stage-bottom), transparent 20%);
 }
 
 .chat-page__sr-only {

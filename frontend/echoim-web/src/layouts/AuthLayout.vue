@@ -13,9 +13,9 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--color-shell-glow) 120%, transparent), transparent 24%),
+    radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--interactive-focus-ring) 64%, transparent), transparent 24%),
     radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--interactive-primary-bg) 10%, transparent), transparent 22%),
-    linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-shell-mask) 10%, transparent)),
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-inverse) 10%, transparent)),
     var(--surface-canvas);
 }
 
@@ -24,7 +24,7 @@
   inset: 0;
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.03), transparent 22%),
-    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-shell-glow) 54%, transparent), transparent 42%),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--interactive-focus-ring) 40%, transparent), transparent 42%),
     linear-gradient(90deg, rgba(255, 255, 255, 0.015), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.015));
   pointer-events: none;
   opacity: 0.76;
@@ -47,6 +47,6 @@
 
 .auth-shell__glow--right {
   inset: -12rem -16rem auto auto;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-shell-glow) 58%, transparent), transparent 64%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--interactive-focus-ring) 42%, transparent), transparent 64%);
 }
 </style>

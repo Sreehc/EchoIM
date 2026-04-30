@@ -169,7 +169,7 @@ function sendSticker(sticker: StickerDefinition) {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--color-shell-glow) 14%, transparent), transparent 42%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-focus-ring) 18%, transparent), transparent 42%),
     var(--surface-card);
   box-shadow: var(--shadow-sm);
 }

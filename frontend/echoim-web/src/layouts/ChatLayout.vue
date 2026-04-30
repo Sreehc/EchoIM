@@ -38,7 +38,7 @@ onMounted(() => {
   inset: 0;
   background:
     radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent), transparent 22%),
-    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--color-shell-glow) 88%, transparent), transparent 18%),
+    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent), transparent 18%),
     radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--surface-subtle) 94%, transparent), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 20%);
   pointer-events: none;

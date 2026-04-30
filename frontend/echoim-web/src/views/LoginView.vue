@@ -591,7 +591,7 @@ function handlePasswordEvent(event: Event) {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .login-card__sr-only {
@@ -613,12 +613,12 @@ function handlePasswordEvent(event: Event) {
   flex-direction: column;
   gap: 18px;
   padding: 30px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 26px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), transparent 120%),
-    color-mix(in srgb, var(--color-shell-card-strong) 98%, transparent);
-  box-shadow: var(--shadow-panel);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 96%, transparent), transparent 120%),
+    color-mix(in srgb, var(--surface-overlay) 98%, transparent);
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(16px);
 }
 
@@ -651,15 +651,15 @@ function handlePasswordEvent(event: Event) {
   height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 15px;
-  background: var(--color-shell-inline);
-  border: 1px solid var(--color-shell-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
 }
 
 .login-card__logo-icon {
   width: 22px;
   height: 22px;
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
 }
 
 .login-card__brand {
@@ -678,7 +678,7 @@ function handlePasswordEvent(event: Event) {
 
 .login-card__brand span {
   margin-top: 5px;
-  color: var(--color-text-2);
+  color: var(--text-tertiary);
   font-size: 0.76rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -687,7 +687,7 @@ function handlePasswordEvent(event: Event) {
 
 .login-card__intro {
   margin-top: -2px;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.83rem;
   line-height: 1.58;
   max-width: 24rem;
@@ -698,21 +698,21 @@ function handlePasswordEvent(event: Event) {
   height: 36px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 13px;
-  background: var(--color-shell-action);
-  color: var(--color-text-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-secondary);
   transition:
-    background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .theme-toggle:hover,
 .theme-toggle:focus-visible {
-  background: var(--color-shell-action-hover);
-  color: var(--color-text-1);
-  border-color: var(--color-shell-border-strong);
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .login-card__accounts {
@@ -726,19 +726,19 @@ function handlePasswordEvent(event: Event) {
   gap: 10px;
   align-items: center;
   padding: 14px 15px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
   text-align: left;
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out);
 }
 
 .login-account:hover,
 .login-account:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: color-mix(in srgb, var(--color-shell-action-hover) 94%, transparent);
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--interactive-secondary-bg-hover) 94%, transparent);
 }
 
 .login-account__copy strong {
@@ -751,7 +751,7 @@ function handlePasswordEvent(event: Event) {
 .login-account__copy span {
   display: block;
   margin-top: 4px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 500 0.68rem/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
@@ -760,9 +760,9 @@ function handlePasswordEvent(event: Event) {
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: transparent;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .login-card__form {
@@ -772,7 +772,7 @@ function handlePasswordEvent(event: Event) {
 
 .login-card__hint {
   margin-top: -2px;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   line-height: 1.46;
 }
@@ -786,15 +786,15 @@ function handlePasswordEvent(event: Event) {
 .login-card__submit {
   width: 100%;
   min-height: 48px;
-  border-radius: 15px;
+  border-radius: var(--radius-control);
   letter-spacing: -0.01em;
 }
 
 .login-card__account-preview {
   padding: 13px 14px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
 }
 
 .login-card__account-preview strong,
@@ -804,7 +804,7 @@ function handlePasswordEvent(event: Event) {
 
 .login-card__account-preview span {
   margin-top: 4px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 500 0.68rem/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
@@ -821,16 +821,16 @@ function handlePasswordEvent(event: Event) {
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.4;
-  transition: color var(--motion-fast) ease;
+  transition: color var(--motion-fast) var(--motion-ease-out);
 }
 
 .login-card__link:hover,
 .login-card__link:focus-visible {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .login-check {
@@ -843,22 +843,22 @@ function handlePasswordEvent(event: Event) {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   text-align: left;
   transition:
-    border-color 0.18s ease,
-    background-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .login-check:hover,
 .login-check:focus-visible {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .login-check.is-active {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .login-check.is-disabled {
@@ -871,18 +871,18 @@ function handlePasswordEvent(event: Event) {
   flex: 0 0 16px;
   display: grid;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--color-shell-border-strong) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 88%, transparent);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--color-shell-panel) 92%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
   transition:
-    border-color 0.18s ease,
-    background-color 0.18s ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
   order: 2;
 }
 
 .login-check.is-active .login-check__box {
-  border-color: color-mix(in srgb, var(--color-primary) 48%, transparent);
-  background: var(--color-primary);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 48%, transparent);
+  background: var(--interactive-primary-bg);
 }
 
 .login-check__mark {
@@ -892,7 +892,7 @@ function handlePasswordEvent(event: Event) {
   border-bottom: 1.6px solid transparent;
   transform: rotate(-45deg) translateY(-1px);
   opacity: 0;
-  transition: opacity 0.18s ease;
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
 }
 
 .login-check.is-active .login-check__mark {
@@ -908,20 +908,28 @@ function handlePasswordEvent(event: Event) {
 
 .login-card__status {
   padding: 10px 12px;
-  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   font-size: 0.79rem;
   line-height: 1.5;
 }
 
 .login-card__status.is-error {
-  background: color-mix(in srgb, var(--color-danger) 9%, var(--color-shell-card-muted));
-  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--status-danger) 16%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 8%, var(--surface-panel));
+  color: var(--status-danger);
 }
 
-.login-card__status.is-info,
+.login-card__status.is-info {
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 16%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 84%, var(--surface-panel));
+  color: var(--text-primary);
+}
+
 .login-card__status.is-success {
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-shell-card-muted));
-  color: var(--color-text-1);
+  border-color: color-mix(in srgb, var(--status-success) 16%, var(--border-default));
+  background: color-mix(in srgb, var(--status-success) 8%, var(--surface-panel));
+  color: color-mix(in srgb, var(--status-success) 84%, var(--text-primary));
 }
 
 :deep(.login-card__form .el-form-item) {
@@ -930,18 +938,18 @@ function handlePasswordEvent(event: Event) {
 
 :deep(.login-card__form .el-input__wrapper) {
   min-height: 46px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   padding: 0 14px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 94%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 0 0 1px color-mix(in srgb, var(--color-shell-border) 84%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--border-default) 84%, transparent);
 }
 
 :deep(.login-card__form .el-input__wrapper.is-focus) {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 0 0 1px color-mix(in srgb, var(--color-primary) 34%, transparent),
-    0 0 0 4px color-mix(in srgb, var(--color-primary) 7%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--interactive-primary-bg) 34%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 32%, transparent);
 }
 </style>
