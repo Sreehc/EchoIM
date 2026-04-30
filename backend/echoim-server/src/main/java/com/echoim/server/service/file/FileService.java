@@ -17,6 +17,10 @@ public interface FileService {
 
     FileDownloadVo getDownloadInfo(Long userId, Long fileId);
 
+    FileStreamPayload getPublicFileStream(Long fileId);
+
+    FileStreamPayload getSignedFileStream(Long fileId, long expiresAt, String disposition, String signature);
+
     ImFileEntity requireOwnedFile(Long userId, Long fileId, Integer... allowedBizTypes);
 
     void enrichMessages(Long userId, List<MessageItemVo> messages);

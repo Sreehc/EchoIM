@@ -366,7 +366,7 @@ function handlePasswordEvent(event: Event) {
             <span class="login-check__box" aria-hidden="true">
               <span class="login-check__mark" />
             </span>
-            <span class="login-check__copy">记住登录状态</span>
+            <span class="login-check__copy">记住我（自动续登）</span>
           </button>
           <button
             class="login-check"

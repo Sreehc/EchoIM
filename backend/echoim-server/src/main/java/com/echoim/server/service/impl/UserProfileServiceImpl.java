@@ -9,6 +9,7 @@ import com.echoim.server.entity.ImUserEntity;
 import com.echoim.server.mapper.ImUserMapper;
 import com.echoim.server.service.user.UserProfileService;
 import com.echoim.server.vo.user.UserPublicProfileVo;
+import com.echoim.server.vo.user.UserPublicPageVo;
 import com.echoim.server.vo.user.UserProfileVo;
 import com.echoim.server.vo.user.UserSearchItemVo;
 import org.springframework.stereotype.Service;
@@ -83,6 +84,16 @@ public class UserProfileServiceImpl implements UserProfileService {
     public UserPublicProfileVo getPublicProfileByUsername(Long currentUserId, String username) {
         String normalizedUsername = normalizeAndValidateUsername(username);
         UserPublicProfileVo profile = imUserMapper.selectPublicProfileByUsername(currentUserId, normalizedUsername);
+        if (profile == null) {
+            throw new BizException(ErrorCode.USER_NOT_FOUND, "用户不存在");
+        }
+        return profile;
+    }
+
+    @Override
+    public UserPublicPageVo getPublicPageByUsername(String username) {
+        String normalizedUsername = normalizeAndValidateUsername(username);
+        UserPublicPageVo profile = imUserMapper.selectPublicPageByUsername(normalizedUsername);
         if (profile == null) {
             throw new BizException(ErrorCode.USER_NOT_FOUND, "用户不存在");
         }

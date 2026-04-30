@@ -3,6 +3,7 @@ package com.echoim.server.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.echoim.server.entity.ImUserEntity;
 import com.echoim.server.vo.user.UserPublicProfileVo;
+import com.echoim.server.vo.user.UserPublicPageVo;
 import com.echoim.server.vo.user.UserProfileVo;
 import com.echoim.server.vo.user.UserSearchItemVo;
 import org.apache.ibatis.annotations.Mapper;
@@ -50,4 +51,6 @@ public interface ImUserMapper extends BaseMapper<ImUserEntity> {
 
     UserPublicProfileVo selectPublicProfileByUsername(@Param("currentUserId") Long currentUserId,
                                                       @Param("username") String username);
+
+    UserPublicPageVo selectPublicPageByUsername(@Param("username") String username);
 }

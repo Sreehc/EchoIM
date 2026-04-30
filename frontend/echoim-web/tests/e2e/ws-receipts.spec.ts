@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-const API_BASE = process.env.VITE_API_BASE_URL?.trim() || 'http://127.0.0.1:8080'
-const WS_URL = process.env.VITE_WS_URL?.trim() || 'ws://127.0.0.1:8091/ws'
+const API_ORIGIN = process.env.PLAYWRIGHT_API_ORIGIN?.trim() || 'http://127.0.0.1:8080'
+const WS_URL = process.env.PLAYWRIGHT_WS_URL?.trim() || 'ws://127.0.0.1:8091/ws'
 
 type WsEnvelope = {
   type: string
@@ -100,7 +100,7 @@ test('raw ws single chat covers delivered and read receipts', async () => {
 })
 
 async function login(username: string) {
-  const response = await fetch(`${API_BASE}/api/auth/login`, {
+  const response = await fetch(`${API_ORIGIN}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password: '123456' }),

@@ -15,6 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read']
+  'open-public-profile': [path: string]
   'update-group-meta': []
   'update-group-notice': []
   'promote-member': [payload: { userId: number; role: 2 | 3 }]
@@ -140,6 +141,20 @@ const actionCards = computed<
                 <dd>{{ field.value }}</dd>
               </div>
             </dl>
+          </section>
+
+          <section v-if="profile.publicProfilePath" class="profile-card">
+            <div class="profile-card__header">
+              <span>公开主页</span>
+              <small>@username</small>
+            </div>
+            <button class="profile-action" type="button" @click="emit('open-public-profile', profile.publicProfilePath)">
+              <div class="profile-action__copy">
+                <span>站内入口</span>
+                <strong>查看公开主页</strong>
+                <p>用公开链接查看这个用户对外展示的基础资料。</p>
+              </div>
+            </button>
           </section>
 
           <section class="profile-card">

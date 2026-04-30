@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   adaptChatMessage,
@@ -31,6 +31,7 @@ import { useUiStore } from '@/stores/ui'
 import { fetchUserPublicProfile } from '@/services/user'
 import { showIncomingMessageNotification } from '@/utils/browserNotifications'
 import { normalizeDisplayText } from '@/utils/text'
+import { buildPublicProfilePath } from '@/utils/publicProfiles'
 import type {
   ApiConversationItem,
   ApiGroupDetail,
@@ -96,6 +97,17 @@ export const useChatStore = defineStore('chat', () => {
 
   let bootstrapPromise: Promise<void> | null = null
   let wsClient: EchoWsClient | null = null
+
+  watch(
+    () => authStore.session?.token ?? null,
+    (token) => {
+      if (!token) {
+        disconnectRealtime()
+        return
+      }
+      void wsClient?.updateToken(token)
+    },
+  )
 
   const filteredConversations = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase()
@@ -491,7 +503,8 @@ export const useChatStore = defineStore('chat', () => {
 
     if (!conversation) return
     if (nextMsgType === 'TEXT' && !nextContent) return
-    if ((nextMsgType === 'STICKER' || nextMsgType === 'IMAGE' || nextMsgType === 'GIF' || nextMsgType === 'FILE') && !payload.fileId) return
+    if ((nextMsgType === 'IMAGE' || nextMsgType === 'GIF' || nextMsgType === 'FILE') && !payload.fileId) return
+    if (nextMsgType === 'STICKER' && !payload.sticker?.stickerId) return
     if (!conversation.canSend) {
       errors.value.noticeMessage = '当前频道仅创建者可发送消息'
       return
@@ -639,6 +652,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function connectRealtime() {
     if (!authStore.session?.token) return
+    const currentSession = await authStore.ensureSessionFresh()
     if (!wsClient) {
       wsClient = new EchoWsClient({
         onEnvelope: handleWsEnvelope,
@@ -651,7 +665,8 @@ export const useChatStore = defineStore('chat', () => {
     const info = await fetchImInfo()
     await wsClient.connect({
       wsUrl: info.path || '/ws',
-      token: authStore.session.token,
+      token: currentSession.token,
+      resolveToken: async () => (await authStore.ensureSessionFresh()).token,
     })
   }
 
@@ -1180,6 +1195,7 @@ export const useChatStore = defineStore('chat', () => {
           { key: 'saved-owner', label: '当前账号', value: me?.nickname ?? '当前用户' },
         ]),
         actions: buildProfileActions(conversation),
+        publicProfilePath: null,
         specialType: conversation.specialType,
         group: null,
         members: [],
@@ -1204,6 +1220,7 @@ export const useChatStore = defineStore('chat', () => {
         { key: 'friend-status', label: '关系状态', value: formatFriendStatus(profile.friendStatus) },
       ]),
       actions: buildProfileActions(conversation),
+      publicProfilePath: buildPublicProfilePath(profile.username),
       specialType: conversation.specialType,
       group: null,
       members: [],
@@ -1249,6 +1266,7 @@ export const useChatStore = defineStore('chat', () => {
         { key: 'owner-user-id', label: isChannel ? '创建者 ID' : '群主 ID', value: group.ownerUserId ? `${group.ownerUserId}` : '' },
       ]),
       actions: buildProfileActions(conversation),
+      publicProfilePath: null,
       specialType: conversation.specialType,
       group: groupMeta,
       members,

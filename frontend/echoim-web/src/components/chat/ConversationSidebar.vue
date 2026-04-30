@@ -41,6 +41,7 @@ import { readBrowserNotificationPermission } from '@/utils/browserNotifications'
 import { STORAGE_KEYS } from '@/utils/storage'
 import { uploadFile } from '@/services/files'
 import { formatMessageTime } from '@/utils/format'
+import { buildPublicProfileUrl } from '@/utils/publicProfiles'
 import ConversationListItem from './ConversationListItem.vue'
 import AvatarBadge from './AvatarBadge.vue'
 import ChatStatePanel from './ChatStatePanel.vue'
@@ -148,6 +149,7 @@ const composeMenuOpen = ref(false)
 const editingProfile = ref(false)
 const avatarUploading = ref(false)
 const avatarUploadError = ref('')
+const profileActionNotice = ref('')
 const passwordForm = reactive({
   oldPassword: '',
   newPassword: '',
@@ -632,6 +634,7 @@ function openPanel(mode: LeftPanelMode) {
 function startProfileEditing() {
   editingProfile.value = true
   avatarUploadError.value = ''
+  profileActionNotice.value = ''
   emit('clear-profile-error')
   emit('clear-profile-notice')
 }
@@ -639,6 +642,7 @@ function startProfileEditing() {
 function cancelProfileEditing() {
   editingProfile.value = false
   avatarUploadError.value = ''
+  profileActionNotice.value = ''
   profileDraft.username = props.currentProfile?.username ?? props.currentUser?.username ?? ''
   profileDraft.nickname = props.currentProfile?.nickname ?? props.currentUser?.nickname ?? ''
   profileDraft.avatarUrl = props.currentProfile?.avatarUrl ?? props.currentUser?.avatarUrl ?? ''
@@ -662,6 +666,7 @@ function submitProfile() {
     signature: profileDraft.signature.trim() || null,
   })
   editingProfile.value = false
+  profileActionNotice.value = ''
 }
 
 function openAvatarPicker() {
@@ -689,7 +694,7 @@ async function handleAvatarChange(event: Event) {
   avatarUploading.value = true
 
   try {
-    const uploaded = await uploadFile(file, 2) as ChatFile
+    const uploaded = await uploadFile(file, 1) as ChatFile
     const nextUrl = uploaded.url ?? uploaded.downloadUrl ?? ''
     if (!nextUrl) {
       throw new Error('头像上传成功，但未返回可用地址')
@@ -706,6 +711,18 @@ function clearAvatarDraft() {
   if (!editingProfile.value || props.profileSaving || avatarUploading.value) return
   profileDraft.avatarUrl = ''
   avatarUploadError.value = ''
+}
+
+async function copyPublicProfileLink() {
+  const username = props.currentProfile?.username ?? props.currentUser?.username ?? ''
+  if (!username) return
+
+  try {
+    await navigator.clipboard.writeText(buildPublicProfileUrl(username))
+    profileActionNotice.value = '公开链接已复制'
+  } catch {
+    profileActionNotice.value = '公开链接复制失败'
+  }
 }
 
 function resetUsernameState() {
@@ -1322,10 +1339,12 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
                 <strong>{{ currentProfile?.email ? '已绑定' : '未绑定' }}</strong>
               </article>
             </div>
+            <div v-if="profileActionNotice" class="sidebar-notice sidebar-notice--success">{{ profileActionNotice }}</div>
             <div class="sidebar-profile-card__actions">
               <el-button type="primary" class="sidebar-profile-card__action" data-testid="profile-edit" @click="startProfileEditing">
                 编辑资料
               </el-button>
+              <el-button class="sidebar-profile-card__action" @click="copyPublicProfileLink">复制公开链接</el-button>
               <el-button class="sidebar-profile-card__action" @click="openPanel('settings')">进入设置</el-button>
             </div>
           </section>
@@ -1821,7 +1840,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 28%, transparent), transparent 12%),
     transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   overflow: hidden;
 }
 
@@ -1866,15 +1885,15 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-panel__identity-copy strong {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font: 600 0.92rem/1.1 var(--font-body);
   letter-spacing: -0.012em;
 }
 
 .sidebar-panel__identity-copy span {
   margin-top: 4px;
-  color: var(--color-text-soft);
-  font: 500 0.66rem/1 var(--font-mono);
+  color: var(--text-quaternary);
+  font: 500 0.7rem/1 var(--font-mono);
   letter-spacing: 0.03em;
 }
 
@@ -1924,22 +1943,22 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   min-width: 0;
   height: 34px;
   padding: 0 13px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 82%, transparent);
-  color: var(--color-text-2);
-  font: 600 0.68rem/1 var(--font-body);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 82%, transparent);
+  color: var(--text-secondary);
+  font: 600 0.7rem/1 var(--font-body);
   letter-spacing: 0.01em;
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .sidebar-panel__folder.is-active {
-  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-card-strong));
-  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-shell-border));
-  color: var(--color-text-1);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 90%, var(--surface-card));
+  border-color: var(--border-brand);
+  color: var(--interactive-selected-fg);
 }
 
 .sidebar-panel__menu-trigger,
@@ -1948,23 +1967,23 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   height: 40px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 13px;
-  background: var(--color-shell-action);
-  color: var(--color-text-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-secondary);
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .sidebar-panel__menu-trigger:hover,
 .sidebar-panel__menu-trigger:focus-visible,
 .sidebar-panel__back:hover,
 .sidebar-panel__back:focus-visible {
-  background: var(--color-shell-action-hover);
-  border-color: var(--color-shell-border-strong);
-  color: var(--color-text-1);
+  background: var(--interactive-secondary-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .sidebar-panel__compose-trigger {
@@ -1972,37 +1991,37 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   height: 40px;
   display: grid;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-action));
-  color: var(--color-primary-strong);
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 8%, var(--interactive-secondary-bg));
+  color: var(--interactive-selected-fg);
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .sidebar-panel__compose-trigger:hover,
 .sidebar-panel__compose-trigger:focus-visible {
-  border-color: color-mix(in srgb, var(--color-primary) 34%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action-hover));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 34%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 10%, var(--interactive-secondary-bg-hover));
 }
 
 .sidebar-panel__search :deep(.el-input__wrapper) {
   min-height: 44px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 88%, transparent);
   box-shadow: none;
   padding-inline: 11px;
 }
 
 .sidebar-panel__search :deep(.el-input__inner) {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .sidebar-panel__search :deep(.el-input__prefix),
 .sidebar-panel__search :deep(.el-input__suffix) {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .sidebar-panel__notice {
@@ -2013,28 +2032,28 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   align-items: stretch;
   gap: 8px;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: var(--radius-card);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 4%, transparent), transparent 68%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), var(--color-shell-card));
-  color: var(--color-text-1);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-card) 96%, transparent), var(--surface-panel));
+  color: var(--text-primary);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--color-shell-border);
+  border: 1px solid var(--border-default);
   transition:
-    background var(--motion-base) ease,
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    background var(--motion-base) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .sidebar-panel__notice:hover,
 .sidebar-panel__notice:focus-within {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 8%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent), var(--color-shell-card));
-  border-color: var(--color-shell-border);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-card) 96%, transparent), var(--surface-panel));
+  border-color: var(--border-strong);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    var(--shadow-card);
+    var(--shadow-sm);
 }
 
 .sidebar-panel__notice-action,
@@ -2157,10 +2176,10 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   z-index: 30;
   width: 228px;
   padding: 8px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, rgba(20, 20, 22, 0.12));
-  box-shadow: var(--shadow-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-overlay) 94%, rgba(20, 20, 22, 0.12));
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(18px);
 }
 
@@ -2175,16 +2194,16 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   text-align: left;
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .sidebar-context-menu__item:hover,
 .sidebar-context-menu__item:focus-visible {
-  background: var(--color-shell-inline);
+  background: var(--interactive-selected-bg);
 }
 
 .sidebar-context-menu__item.is-danger {
@@ -2223,10 +2242,10 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   z-index: 6;
   width: 212px;
   overflow: hidden;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 18px;
-  background: var(--color-shell-card-strong);
-  box-shadow: var(--shadow-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(20px);
 }
 
@@ -2240,7 +2259,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   padding: 0 16px;
   border: 0;
   background: transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   text-align: left;
   font-size: 0.84rem;
   font-weight: 600;
@@ -2248,7 +2267,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-compose-menu__item:hover,
 .sidebar-compose-menu__item:focus-visible {
-  background: var(--color-shell-action-hover);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 .sidebar-compose-menu__icon {
@@ -2257,7 +2276,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
 }
 
 .sidebar-compose-menu__icon :deep(svg) {
@@ -2275,10 +2294,10 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   gap: 0;
   overflow: hidden;
   padding: 0;
-  border-radius: 18px;
-  border: 1px solid var(--color-shell-border);
-  background: var(--color-shell-card-strong);
-  box-shadow: var(--shadow-panel);
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--border-default);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(16px);
 }
 
@@ -2292,13 +2311,13 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   padding: 8px 18px 8px 16px;
   border: 0;
   background: transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   text-align: left;
 }
 
 .sidebar-global-menu__identity:hover,
 .sidebar-global-menu__identity:focus-visible {
-  background: var(--color-shell-action-hover);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 .sidebar-global-menu__identity :deep(.avatar-badge) {
@@ -2312,7 +2331,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.18;
@@ -2323,14 +2342,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 500 0.72rem/1 var(--font-mono);
 }
 
 .sidebar-global-menu__group {
   display: grid;
   padding: 6px 0;
-  border-top: 1px solid var(--color-shell-border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .sidebar-global-menu__item {
@@ -2343,20 +2362,20 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   text-align: left;
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .sidebar-global-menu__item:hover,
 .sidebar-global-menu__item:focus-visible {
-  background: var(--color-shell-action-hover);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 .sidebar-global-menu__item.is-active {
-  background: var(--color-shell-inline);
+  background: var(--interactive-selected-bg);
 }
 
 .sidebar-global-menu__icon {
@@ -2365,7 +2384,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
 }
 
 .sidebar-global-menu__icon :deep(svg) {
@@ -2374,20 +2393,20 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-global-menu__label {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.84rem;
   font-weight: 600;
 }
 
 .sidebar-global-menu__label small {
   margin-left: 6px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font-size: 0.72rem;
   font-weight: 600;
 }
 
 .sidebar-global-menu__meta {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 500 0.68rem/1 var(--font-mono);
 }
 
@@ -2515,9 +2534,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: grid;
   gap: 12px;
   padding: 16px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
-  border: 1px solid var(--color-shell-border);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
+  border: 1px solid var(--border-default);
   box-shadow: none;
 }
 
@@ -2563,8 +2582,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-hero__copy span,
 .settings-hero__identity p {
   margin-top: 5px;
-  color: var(--color-text-soft);
-  font: 500 0.68rem/1.1 var(--font-mono);
+  color: var(--text-quaternary);
+  font: 500 0.7rem/1.1 var(--font-mono);
 }
 
 .settings-hero__copy span {
@@ -2577,7 +2596,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-hero__copy p {
   display: block;
   margin-top: 8px;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   line-height: 1.5;
 }
@@ -2594,9 +2613,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--color-shell-border) 92%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-default) 92%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
 }
 
 .settings-hero__identity :deep(.avatar-badge) {
@@ -2611,7 +2630,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .settings-hero__identity-copy small {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.58rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2651,7 +2670,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .settings-nav__head span {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font-size: 0.72rem;
   line-height: 1.45;
 }
@@ -2665,14 +2684,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-profile-card__meta article {
   min-width: 0;
   padding: 14px 16px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 90%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
 }
 
 .sidebar-profile-card__meta span {
   display: block;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 500 0.64rem/1 var(--font-mono);
   text-transform: uppercase;
 }
@@ -2771,28 +2790,28 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   gap: 4px;
   min-height: 64px;
   padding: 11px 12px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--color-shell-action) 88%, transparent);
-  color: var(--color-text-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 88%, transparent);
+  color: var(--text-secondary);
   text-align: left;
   transition:
-    background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    box-shadow var(--motion-base) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-base) var(--motion-ease-out);
 }
 
 .settings-tabs__item strong {
   display: block;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.78rem;
   line-height: 1.15;
 }
 
 .settings-tabs__item span {
   display: block;
-  color: var(--color-text-2);
+  color: var(--text-tertiary);
   font-size: 0.68rem;
   line-height: 1.38;
   display: -webkit-box;
@@ -2803,19 +2822,19 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .settings-tabs__item:hover,
 .settings-tabs__item:focus-visible {
-  background: color-mix(in srgb, var(--color-shell-inline) 92%, transparent);
-  border-color: color-mix(in srgb, var(--color-shell-border-strong) 92%, transparent);
-  color: var(--color-text-1);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, transparent);
+  border-color: color-mix(in srgb, var(--border-strong) 92%, transparent);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
 }
 
 .settings-tabs__item.is-active {
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-inline));
-  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--color-shell-border-strong));
-  color: var(--color-text-1);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, var(--surface-panel));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 22%, var(--border-strong));
+  color: var(--text-primary);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 3px color-mix(in srgb, var(--color-primary) 4%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
 }
 
 .theme-card,
@@ -2828,9 +2847,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-list--grouped {
   gap: 0;
   overflow: hidden;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 84%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 84%, transparent);
 }
 
 .theme-card__option,
@@ -2841,12 +2860,12 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   justify-content: space-between;
   gap: 14px;
   width: 100%;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   text-align: left;
   transition:
-    background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-base) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-base) var(--motion-ease-out);
 }
 
 .theme-card--stacked .theme-card__option,
@@ -2872,9 +2891,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-shell-glow) 30%, transparent);
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 
@@ -2905,7 +2924,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .theme-card__option p,
 .settings-item p,
 .security-card p {
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-size: 0.72rem;
   line-height: 1.44;
 }
@@ -2921,17 +2940,17 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-item:focus-within,
 .security-card:hover,
 .security-card:focus-within {
-  background: color-mix(in srgb, var(--color-shell-inline) 92%, transparent);
-  border-color: color-mix(in srgb, var(--color-shell-border-strong) 92%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, transparent);
+  border-color: color-mix(in srgb, var(--border-strong) 92%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
 }
 
 .theme-card__option.is-active {
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-shell-inline));
-  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-shell-border-strong));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, var(--surface-panel));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 18%, var(--border-strong));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 3px color-mix(in srgb, var(--color-primary) 4%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
 }
 
 .settings-item {

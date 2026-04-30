@@ -21,6 +21,7 @@ import com.echoim.server.mapper.ImGroupMapper;
 import com.echoim.server.mapper.ImGroupMemberMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.service.file.FileService;
+import com.echoim.server.service.message.StickerCatalog;
 import com.echoim.server.service.message.MessageViewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,6 +61,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
     private final ImGroupMemberMapper imGroupMemberMapper;
     private final ImWsPushService imWsPushService;
     private final FileService fileService;
+    private final StickerCatalog stickerCatalog;
     private final MessageViewService messageViewService;
     private final LocalRateLimitService localRateLimitService;
     private final ObjectMapper objectMapper;
@@ -71,6 +73,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
                                   ImGroupMemberMapper imGroupMemberMapper,
                                   ImWsPushService imWsPushService,
                                   FileService fileService,
+                                  StickerCatalog stickerCatalog,
                                   MessageViewService messageViewService,
                                   LocalRateLimitService localRateLimitService,
                                   ObjectMapper objectMapper) {
@@ -81,6 +84,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         this.imGroupMemberMapper = imGroupMemberMapper;
         this.imWsPushService = imWsPushService;
         this.fileService = fileService;
+        this.stickerCatalog = stickerCatalog;
         this.messageViewService = messageViewService;
         this.localRateLimitService = localRateLimitService;
         this.objectMapper = objectMapper;
@@ -154,8 +158,11 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         if (msgType == MESSAGE_TYPE_TEXT && !StringUtils.hasText(data.getContent())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文本消息内容不能为空");
         }
-        if ((msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
+        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件消息必须传 fileId");
+        }
+        if (msgType == MESSAGE_TYPE_STICKER) {
+            normalizeStickerExtra(data);
         }
     }
 
@@ -246,13 +253,29 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
 
     private ImFileEntity validateAndLoadMessageFile(Long userId, WsGroupChatData data) {
         int msgType = toMessageType(data.getMsgType());
-        if (msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF) {
+        if (msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_IMAGE);
         }
         if (msgType == MESSAGE_TYPE_FILE) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_FILE);
         }
         return null;
+    }
+
+    private void normalizeStickerExtra(WsGroupChatData data) {
+        Object extra = data.getExtraJson();
+        if (!(extra instanceof Map<?, ?> rawMap)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "贴纸参数错误");
+        }
+        Map<String, Object> extraMap = new LinkedHashMap<>();
+        rawMap.forEach((key, value) -> extraMap.put(String.valueOf(key), value));
+        Object stickerObject = extraMap.get("sticker");
+        if (!(stickerObject instanceof Map<?, ?> stickerMap)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "贴纸参数错误");
+        }
+        Object stickerId = stickerMap.get("stickerId");
+        extraMap.put("sticker", stickerCatalog.require(stickerId == null ? null : String.valueOf(stickerId)));
+        data.setExtraJson(extraMap);
     }
 
     private String toJson(Object value) {

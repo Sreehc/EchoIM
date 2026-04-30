@@ -13,6 +13,7 @@ import com.echoim.server.dto.auth.RegisterRequestDto;
 import com.echoim.server.entity.ImAuthSecurityEventEntity;
 import com.echoim.server.entity.ImAuthTrustedDeviceEntity;
 import com.echoim.server.entity.ImUserEntity;
+import com.echoim.server.im.service.ImOnlineService;
 import com.echoim.server.mapper.ImAuthSecurityEventMapper;
 import com.echoim.server.mapper.ImAuthTrustedDeviceMapper;
 import com.echoim.server.mapper.ImUserMapper;
@@ -63,6 +64,8 @@ public class AuthServiceImpl implements AuthService {
     private static final String EVENT_LOGIN_CHALLENGE_VERIFIED = "LOGIN_CHALLENGE_VERIFIED";
     private static final String EVENT_LOGIN_CHALLENGE_RESENT = "LOGIN_CHALLENGE_RESENT";
     private static final String EVENT_TRUSTED_DEVICE_LOGIN = "TRUSTED_DEVICE_LOGIN";
+    private static final String EVENT_TOKEN_REFRESH = "TOKEN_REFRESH";
+    private static final String EVENT_LOGOUT = "LOGOUT";
     private static final String EVENT_TRUSTED_DEVICE_REVOKE = "TRUSTED_DEVICE_REVOKE";
     private static final String EVENT_TRUSTED_DEVICE_REVOKE_ALL = "TRUSTED_DEVICE_REVOKE_ALL";
     private static final String EVENT_RECOVERY_CODE_SENT = "RECOVERY_CODE_SENT";
@@ -75,6 +78,8 @@ public class AuthServiceImpl implements AuthService {
     private static final String RECOVERY_CODE_KEY_PREFIX = "echoim:auth:recovery:code:";
     private static final String RECOVERY_TOKEN_KEY_PREFIX = "echoim:auth:recovery:token:";
     private static final String EMAIL_BIND_KEY_PREFIX = "echoim:auth:email:bind:";
+    private static final String REFRESH_TOKEN_KEY_PREFIX = "echoim:auth:refresh:";
+    private static final String USER_REFRESH_INDEX_KEY_PREFIX = "echoim:auth:refresh:user:";
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -88,6 +93,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthProperties authProperties;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    private final ImOnlineService imOnlineService;
 
     public AuthServiceImpl(ImUserMapper imUserMapper,
                            ImAuthTrustedDeviceMapper trustedDeviceMapper,
@@ -98,7 +104,8 @@ public class AuthServiceImpl implements AuthService {
                            AuthMailService authMailService,
                            AuthProperties authProperties,
                            StringRedisTemplate stringRedisTemplate,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           ImOnlineService imOnlineService) {
         this.imUserMapper = imUserMapper;
         this.trustedDeviceMapper = trustedDeviceMapper;
         this.securityEventMapper = securityEventMapper;
@@ -109,6 +116,7 @@ public class AuthServiceImpl implements AuthService {
         this.authProperties = authProperties;
         this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
+        this.imOnlineService = imOnlineService;
     }
 
     @Override
@@ -260,6 +268,33 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public LoginResponseVo refreshSession(String refreshToken, String ip, String userAgent) {
+        RefreshTokenState tokenState = requireRefreshTokenState(refreshToken);
+        ImUserEntity userEntity = requireUserById(tokenState.getUserId());
+        validateUserStatus(userEntity);
+
+        revokeRefreshTokenInternal(refreshToken);
+        recordSecurityEvent(userEntity.getId(), EVENT_TOKEN_REFRESH, EVENT_SUCCESS, ip, userAgent,
+                Map.of("sessionRefresh", true));
+        return buildAuthenticatedResponse(userEntity, null, null);
+    }
+
+    @Override
+    public void logout(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            return;
+        }
+
+        RefreshTokenState tokenState = loadRefreshTokenState(refreshToken);
+        revokeRefreshTokenInternal(refreshToken);
+        if (tokenState != null) {
+            recordSecurityEvent(tokenState.getUserId(), EVENT_LOGOUT, EVENT_SUCCESS, null, null,
+                    Map.of("sessionRefresh", false));
+            imOnlineService.forceOffline(tokenState.getUserId(), ErrorCode.UNAUTHORIZED, "当前账号已退出登录");
+        }
+    }
+
+    @Override
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         ImUserEntity userEntity = requireUserById(userId);
         if (!passwordEncoder.matches(oldPassword, userEntity.getPasswordHash())) {
@@ -271,6 +306,8 @@ public class AuthServiceImpl implements AuthService {
         userEntity.setPasswordHash(passwordEncoder.encode(normalizedNewPassword));
         imUserMapper.updateById(userEntity);
         revokeAllTrustedDevicesInternal(userId);
+        revokeAllRefreshTokensInternal(userId);
+        imOnlineService.forceOffline(userId, ErrorCode.UNAUTHORIZED, "密码已更新，请重新登录");
         recordSecurityEvent(userId, EVENT_PASSWORD_CHANGE, EVENT_SUCCESS, null, null, Map.of("revokedDevices", true));
     }
 
@@ -362,6 +399,8 @@ public class AuthServiceImpl implements AuthService {
         imUserMapper.updateById(userEntity);
         stringRedisTemplate.delete(recoveryTokenKey(recoveryToken));
         revokeAllTrustedDevicesInternal(userEntity.getId());
+        revokeAllRefreshTokensInternal(userEntity.getId());
+        imOnlineService.forceOffline(userEntity.getId(), ErrorCode.UNAUTHORIZED, "密码已重置，请重新登录");
         recordSecurityEvent(userEntity.getId(), EVENT_PASSWORD_RESET, EVENT_SUCCESS, ip, userAgent,
                 Map.of("email", tokenState.getEmail()));
     }
@@ -544,6 +583,9 @@ public class AuthServiceImpl implements AuthService {
         responseVo.setUserInfo(toLoginUserVo(userEntity));
         responseVo.setTrustedDeviceGrantToken(trustedDeviceGrantToken);
         responseVo.setTrustedDeviceExpireAt(formatDateTime(trustedExpireAt));
+        RefreshTokenGrant refreshTokenGrant = issueRefreshToken(userEntity.getId());
+        responseVo.setRefreshToken(refreshTokenGrant.refreshToken());
+        responseVo.setRefreshTokenExpireAt(formatDateTime(refreshTokenGrant.expireAt()));
         return responseVo;
     }
 
@@ -588,11 +630,40 @@ public class AuthServiceImpl implements AuthService {
         return new TrustedDeviceGrant(grantToken, expireAt);
     }
 
+    private RefreshTokenGrant issueRefreshToken(Long userId) {
+        LocalDateTime expireAt = LocalDateTime.now().plusDays(authProperties.getRefreshTokenExpireDays());
+        String refreshToken = randomToken();
+        String tokenHash = sha256(refreshToken);
+
+        RefreshTokenState tokenState = new RefreshTokenState();
+        tokenState.setUserId(userId);
+        tokenState.setIssuedAt(System.currentTimeMillis());
+
+        long ttlSeconds = secondsUntil(expireAt);
+        storeRedisJson(refreshTokenKey(tokenHash), tokenState, ttlSeconds);
+        stringRedisTemplate.opsForSet().add(userRefreshIndexKey(userId), tokenHash);
+        stringRedisTemplate.expire(userRefreshIndexKey(userId), Duration.ofSeconds(ttlSeconds));
+        return new RefreshTokenGrant(refreshToken, expireAt);
+    }
+
     private void revokeAllTrustedDevicesInternal(Long userId) {
         trustedDeviceMapper.update(null, new LambdaUpdateWrapper<ImAuthTrustedDeviceEntity>()
                 .eq(ImAuthTrustedDeviceEntity::getUserId, userId)
                 .isNull(ImAuthTrustedDeviceEntity::getRevokedAt)
                 .set(ImAuthTrustedDeviceEntity::getRevokedAt, LocalDateTime.now()));
+    }
+
+    private void revokeAllRefreshTokensInternal(Long userId) {
+        String indexKey = userRefreshIndexKey(userId);
+        var tokenHashes = stringRedisTemplate.opsForSet().members(indexKey);
+        if (tokenHashes != null && !tokenHashes.isEmpty()) {
+            List<String> tokenKeys = new ArrayList<>(tokenHashes.size());
+            for (String tokenHash : tokenHashes) {
+                tokenKeys.add(refreshTokenKey(tokenHash));
+            }
+            stringRedisTemplate.delete(tokenKeys);
+        }
+        stringRedisTemplate.delete(indexKey);
     }
 
     private CodeDispatchVo buildCodeDispatch(String maskedEmail) {
@@ -725,6 +796,10 @@ public class AuthServiceImpl implements AuthService {
         return ttl;
     }
 
+    private long secondsUntil(LocalDateTime expireAt) {
+        return Math.max(60L, Duration.between(LocalDateTime.now(), expireAt).getSeconds());
+    }
+
     private void recordSecurityEvent(Long userId,
                                      String eventType,
                                      String eventStatus,
@@ -790,7 +865,47 @@ public class AuthServiceImpl implements AuthService {
         return EMAIL_BIND_KEY_PREFIX + userId;
     }
 
+    private String refreshTokenKey(String tokenHash) {
+        return REFRESH_TOKEN_KEY_PREFIX + tokenHash;
+    }
+
+    private String userRefreshIndexKey(Long userId) {
+        return USER_REFRESH_INDEX_KEY_PREFIX + userId;
+    }
+
+    private RefreshTokenState loadRefreshTokenState(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            return null;
+        }
+        return loadRedisJson(refreshTokenKey(sha256(refreshToken.trim())), RefreshTokenState.class);
+    }
+
+    private RefreshTokenState requireRefreshTokenState(String refreshToken) {
+        RefreshTokenState tokenState = loadRefreshTokenState(refreshToken);
+        if (tokenState == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED, "登录已失效，请重新登录");
+        }
+        return tokenState;
+    }
+
+    private void revokeRefreshTokenInternal(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            return;
+        }
+
+        String normalizedToken = refreshToken.trim();
+        String tokenHash = sha256(normalizedToken);
+        RefreshTokenState tokenState = loadRedisJson(refreshTokenKey(tokenHash), RefreshTokenState.class);
+        stringRedisTemplate.delete(refreshTokenKey(tokenHash));
+        if (tokenState != null) {
+            stringRedisTemplate.opsForSet().remove(userRefreshIndexKey(tokenState.getUserId()), tokenHash);
+        }
+    }
+
     private record TrustedDeviceGrant(String grantToken, LocalDateTime expireAt) {
+    }
+
+    private record RefreshTokenGrant(String refreshToken, LocalDateTime expireAt) {
     }
 
     public static class LoginChallengeState {
@@ -925,6 +1040,27 @@ public class AuthServiceImpl implements AuthService {
 
         public void setEmail(String email) {
             this.email = email;
+        }
+    }
+
+    public static class RefreshTokenState {
+        private Long userId;
+        private long issuedAt;
+
+        public Long getUserId() {
+            return userId;
+        }
+
+        public void setUserId(Long userId) {
+            this.userId = userId;
+        }
+
+        public long getIssuedAt() {
+            return issuedAt;
+        }
+
+        public void setIssuedAt(long issuedAt) {
+            this.issuedAt = issuedAt;
         }
     }
 

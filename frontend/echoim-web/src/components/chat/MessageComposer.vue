@@ -166,21 +166,21 @@ function sendSticker(sticker: StickerDefinition) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding: 11px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 22px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--color-shell-glow) 14%, transparent), transparent 42%),
-    var(--color-shell-card-strong);
-  box-shadow: var(--shadow-soft);
+    var(--surface-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .composer__sticker {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--sticker-accent, var(--color-primary)) 22%, var(--color-shell-border));
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--sticker-accent, var(--color-primary)) 6%, var(--color-shell-card));
+  border: 1px solid color-mix(in srgb, var(--sticker-accent, var(--interactive-primary-bg)) 22%, var(--border-subtle));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--sticker-accent, var(--interactive-primary-bg)) 6%, var(--surface-panel));
   text-align: left;
 }
 
@@ -207,23 +207,25 @@ function sendSticker(sticker: StickerDefinition) {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
-  border: 1px solid var(--color-shell-border);
-  color: var(--color-text-2);
-  font-size: 0.78rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
 }
 
 .composer__reply button {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--interactive-primary-bg);
   font: inherit;
 }
 
 .composer__error {
-  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 5%, var(--surface-card));
+  color: var(--status-danger);
 }
 
 .composer__bar {
@@ -231,12 +233,12 @@ function sendSticker(sticker: StickerDefinition) {
   grid-template-columns: 42px 42px minmax(0, 1fr) 46px;
   align-items: end;
   gap: 6px;
-  min-height: 58px;
-  padding: 7px 8px 7px 9px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
-  box-shadow: var(--shadow-soft);
+  min-height: 60px;
+  padding: 8px 9px 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
 }
 
@@ -248,14 +250,15 @@ function sendSticker(sticker: StickerDefinition) {
   align-self: end;
   border: 0;
   border: 1px solid transparent;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-action) 96%, transparent);
-  color: var(--color-text-soft);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 96%, transparent);
+  color: var(--text-tertiary);
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .composer__icon:disabled {
@@ -264,10 +267,11 @@ function sendSticker(sticker: StickerDefinition) {
 
 .composer__icon:hover,
 .composer__icon:focus-visible {
-  background: var(--color-shell-action-hover);
-  border-color: var(--color-shell-border);
-  color: var(--color-text-1);
+  background: var(--interactive-secondary-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
 }
 
 .composer__bar :deep(.el-textarea) {
@@ -285,15 +289,15 @@ function sendSticker(sticker: StickerDefinition) {
   padding: 10px 8px 9px;
   border: 0;
   background: transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   line-height: 1.5;
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   letter-spacing: -0.01em;
   resize: none;
 }
 
 .composer__bar :deep(.el-textarea__inner::placeholder) {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .composer__action {
@@ -301,14 +305,15 @@ function sendSticker(sticker: StickerDefinition) {
   min-width: 40px;
   height: 44px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-primary) 96%, white);
-  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 20%, transparent);
+  border-radius: var(--radius-control);
+  background: var(--interactive-primary-bg);
+  color: var(--interactive-primary-fg);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--interactive-primary-bg) 16%, transparent);
 }
 
 .composer__action:disabled {
-  background: color-mix(in srgb, var(--color-primary) 72%, rgba(255, 255, 255, 0.18));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 72%, rgba(255, 255, 255, 0.18));
   opacity: 0.72;
 }
 

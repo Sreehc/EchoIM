@@ -3,12 +3,6 @@
   --font-body: 'Public Sans', 'Noto Sans SC', 'PingFang SC', sans-serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', monospace;
 
-  --radius-xs: 8px;
-  --radius-sm: 11px;
-  --radius-md: 15px;
-  --radius-lg: 22px;
-  --radius-pill: 999px;
-
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -20,15 +14,57 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  --shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.035);
-  --shadow-float: 0 14px 32px rgba(15, 23, 42, 0.065);
-  --shadow-panel: 0 18px 42px rgba(15, 23, 42, 0.065);
-  --shadow-card: 0 8px 20px rgba(15, 23, 42, 0.045);
-  --shadow-inset-soft: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  --ref-white: #ffffff;
+  --ref-slate-950: #0f172a;
+  --ref-slate-900: #172033;
+  --ref-slate-850: #243148;
+  --ref-slate-800: #334155;
+  --ref-slate-700: #475569;
+  --ref-slate-600: #64748b;
+  --ref-slate-500: #94a3b8;
+  --ref-slate-300: #cbd5e1;
+  --ref-slate-200: #e2e8f0;
+  --ref-slate-100: #f1f5f9;
+  --ref-slate-50: #f8fafc;
 
-  --motion-fast: 160ms;
-  --motion-base: 220ms;
-  --motion-slow: 320ms;
+  --ref-blue-700: #3656c6;
+  --ref-blue-600: #3f63dd;
+  --ref-blue-500: #4f6ee8;
+  --ref-blue-400: #7f98ff;
+  --ref-blue-300: #a9bcff;
+  --ref-emerald-500: #119c72;
+  --ref-emerald-400: #36be8f;
+  --ref-amber-500: #f59e0b;
+  --ref-red-500: #dc2626;
+  --ref-red-400: #f87171;
+
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --radius-control: var(--radius-sm);
+  --radius-chip: var(--radius-pill);
+  --radius-panel: var(--radius-lg);
+  --radius-card: var(--radius-xl);
+  --radius-bubble: var(--radius-md);
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-sm: 0 8px 18px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 16px 36px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 28px 72px rgba(6, 15, 27, 0.14);
+  --shadow-overlay: 0 36px 96px rgba(6, 15, 27, 0.18);
+  --shadow-inset-soft: inset 0 1px 0 rgba(255, 255, 255, 0.36);
+
+  --motion-duration-fast: 160ms;
+  --motion-duration-base: 220ms;
+  --motion-duration-slow: 320ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --control-height-sm: 34px;
   --control-height-md: 40px;
@@ -39,109 +75,177 @@
   --font-title-md: 620 1.12rem/1.02 var(--font-display);
   --font-title-sm: 620 0.92rem/1.12 var(--font-display);
   --font-eyebrow: 600 0.66rem/1 var(--font-mono);
+
+  --motion-fast: var(--motion-duration-fast);
+  --motion-base: var(--motion-duration-base);
+  --motion-slow: var(--motion-duration-slow);
+  --shadow-soft: var(--shadow-xs);
+  --shadow-card: var(--shadow-sm);
+  --shadow-float: var(--shadow-md);
+  --shadow-panel: var(--shadow-md);
+  --shadow-floating: var(--shadow-lg);
 }
 
 :root,
 :root[data-theme='light'] {
-  --color-bg-app: #f3f5f8;
-  --color-bg-surface: #fbfcfd;
-  --color-bg-panel: #f5f7fa;
-  --color-bg-elevated: #ffffff;
-  --color-chat-stage-base: #f7f8fb;
-  --color-text-1: #0f172a;
-  --color-text-2: #516072;
-  --color-text-3: #69778a;
-  --color-text-soft: #8f9bad;
-  --color-line: rgba(148, 163, 184, 0.24);
-  --color-line-strong: rgba(100, 116, 139, 0.4);
-  --color-primary: #5067cc;
-  --color-primary-strong: #374dad;
-  --color-accent: #0f9f7a;
-  --color-online: #14b87a;
-  --color-warning: #f59e0b;
-  --color-danger: #dc2626;
-  --color-bubble-self: rgba(239, 243, 255, 0.96);
-  --color-bubble-peer: rgba(255, 255, 255, 0.94);
-  --color-bubble-system: rgba(244, 246, 249, 0.92);
-  --color-bubble-self-line: rgba(80, 103, 204, 0.14);
-  --color-bubble-peer-line: rgba(203, 211, 222, 0.72);
-  --color-hover: rgba(15, 23, 42, 0.028);
-  --color-selected: rgba(80, 103, 204, 0.078);
-  --color-chat-stage-top: rgba(255, 255, 255, 0.62);
-  --color-chat-stage-bottom: rgba(247, 248, 251, 0.88);
-  --color-chat-stage-glow: rgba(80, 103, 204, 0.045);
+  --surface-canvas: #eef2f7;
+  --surface-subtle: #f6f8fb;
+  --surface-panel: rgba(255, 255, 255, 0.82);
+  --surface-card: rgba(255, 255, 255, 0.92);
+  --surface-raised: #ffffff;
+  --surface-overlay: rgba(255, 255, 255, 0.96);
+  --surface-inverse: #172033;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-quaternary: #8a97ab;
+  --text-on-brand: #ffffff;
+  --text-danger: #b91c1c;
+
+  --border-subtle: rgba(148, 163, 184, 0.14);
+  --border-default: rgba(100, 116, 139, 0.22);
+  --border-strong: rgba(71, 85, 105, 0.34);
+  --border-brand: rgba(79, 110, 232, 0.34);
+
+  --interactive-primary-bg: #4f6ee8;
+  --interactive-primary-bg-hover: #3f63dd;
+  --interactive-primary-bg-pressed: #3656c6;
+  --interactive-primary-fg: #ffffff;
+  --interactive-secondary-bg: rgba(255, 255, 255, 0.78);
+  --interactive-secondary-bg-hover: rgba(255, 255, 255, 0.96);
+  --interactive-secondary-fg: #334155;
+  --interactive-selected-bg: rgba(79, 110, 232, 0.1);
+  --interactive-selected-fg: #2d4ab1;
+  --interactive-hover-bg: rgba(15, 23, 42, 0.04);
+  --interactive-focus-ring: rgba(79, 110, 232, 0.2);
+
+  --status-success: var(--ref-emerald-500);
+  --status-warning: var(--ref-amber-500);
+  --status-danger: var(--ref-red-500);
+  --status-online: #13b57a;
+
+  --chat-bubble-self-bg: rgba(235, 241, 255, 0.96);
+  --chat-bubble-self-border: rgba(79, 110, 232, 0.2);
+  --chat-bubble-peer-bg: rgba(255, 255, 255, 0.95);
+  --chat-bubble-peer-border: rgba(203, 211, 222, 0.82);
+  --chat-bubble-system-bg: rgba(244, 246, 249, 0.92);
+  --chat-stage-base: #f5f7fb;
+  --chat-stage-top: rgba(255, 255, 255, 0.72);
+  --chat-stage-bottom: rgba(240, 244, 249, 0.92);
+  --chat-stage-glow: rgba(79, 110, 232, 0.06);
+
   --chat-wallpaper-image: url('/wallpapers/windy-hill-light.svg');
-  --chat-wallpaper-opacity: 0.026;
-  --color-focus-ring: rgba(80, 103, 204, 0.14);
-  --color-sidebar-bg: #f8f9fc;
-  --color-sidebar-surface: #ffffff;
-  --color-sidebar-muted: #f2f5f9;
-  --color-sidebar-pill: rgba(80, 103, 204, 0.082);
-  --color-shell-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.955), rgba(250, 251, 253, 0.985));
-  --color-shell-card: rgba(255, 255, 255, 0.76);
-  --color-shell-card-strong: rgba(255, 255, 255, 0.93);
-  --color-shell-card-muted: rgba(248, 250, 252, 0.94);
-  --color-shell-toolbar: rgba(255, 255, 255, 0.78);
-  --color-shell-inline: rgba(244, 246, 249, 0.92);
-  --color-shell-highlight: rgba(214, 220, 230, 0.5);
-  --color-shell-border: rgba(148, 163, 184, 0.18);
-  --color-shell-border-strong: rgba(100, 116, 139, 0.28);
-  --color-shell-glow: rgba(80, 103, 204, 0.04);
-  --color-shell-eyebrow: #59678d;
-  --color-shell-action: rgba(250, 251, 253, 0.88);
-  --color-shell-action-hover: rgba(255, 255, 255, 0.98);
-  --color-shell-backdrop: rgba(243, 245, 248, 0.8);
-  --color-shell-mask: rgba(15, 23, 42, 0.16);
+  --chat-wallpaper-opacity: 0.028;
 }
 
 :root[data-theme='dark'] {
-  --color-bg-app: #0f172a;
-  --color-bg-surface: #111c31;
-  --color-bg-panel: #172338;
-  --color-bg-elevated: #1d2a43;
-  --color-chat-stage-base: #0f1a2d;
-  --color-text-1: #eef1f6;
-  --color-text-2: #cfdae7;
-  --color-text-3: #99a9bc;
-  --color-text-soft: #7f91a6;
-  --color-line: rgba(100, 116, 139, 0.24);
-  --color-line-strong: rgba(148, 163, 184, 0.38);
-  --color-primary: #90a8ff;
-  --color-primary-strong: #bccaff;
-  --color-accent: #46b899;
-  --color-online: #42c59a;
-  --color-warning: #fbbf24;
-  --color-danger: #f87171;
-  --color-bubble-self: rgba(50, 69, 126, 0.88);
-  --color-bubble-peer: rgba(21, 31, 50, 0.93);
-  --color-bubble-system: rgba(24, 35, 55, 0.88);
-  --color-bubble-self-line: rgba(144, 168, 255, 0.2);
-  --color-bubble-peer-line: rgba(71, 85, 105, 0.72);
-  --color-hover: rgba(255, 255, 255, 0.045);
-  --color-selected: rgba(144, 168, 255, 0.14);
-  --color-chat-stage-top: rgba(17, 28, 49, 0.18);
-  --color-chat-stage-bottom: rgba(10, 18, 31, 0.42);
-  --color-chat-stage-glow: rgba(144, 168, 255, 0.08);
+  --surface-canvas: #0d1627;
+  --surface-subtle: #101b30;
+  --surface-panel: rgba(17, 28, 49, 0.86);
+  --surface-card: rgba(23, 35, 57, 0.92);
+  --surface-raised: #1d2a43;
+  --surface-overlay: rgba(24, 37, 59, 0.96);
+  --surface-inverse: #f8fafc;
+
+  --text-primary: #eef2f7;
+  --text-secondary: #c9d5e4;
+  --text-tertiary: #9db0c6;
+  --text-quaternary: #7f91a6;
+  --text-on-brand: #08111f;
+  --text-danger: #fecaca;
+
+  --border-subtle: rgba(148, 163, 184, 0.12);
+  --border-default: rgba(148, 163, 184, 0.22);
+  --border-strong: rgba(191, 202, 219, 0.3);
+  --border-brand: rgba(127, 152, 255, 0.34);
+
+  --interactive-primary-bg: #90a8ff;
+  --interactive-primary-bg-hover: #a4b7ff;
+  --interactive-primary-bg-pressed: #7f98ff;
+  --interactive-primary-fg: #08111f;
+  --interactive-secondary-bg: rgba(255, 255, 255, 0.05);
+  --interactive-secondary-bg-hover: rgba(255, 255, 255, 0.08);
+  --interactive-secondary-fg: #d9e3f0;
+  --interactive-selected-bg: rgba(144, 168, 255, 0.16);
+  --interactive-selected-fg: #dbe5ff;
+  --interactive-hover-bg: rgba(255, 255, 255, 0.06);
+  --interactive-focus-ring: rgba(144, 168, 255, 0.24);
+
+  --status-success: var(--ref-emerald-400);
+  --status-warning: #fbbf24;
+  --status-danger: var(--ref-red-400);
+  --status-online: #40c497;
+
+  --chat-bubble-self-bg: rgba(47, 66, 121, 0.92);
+  --chat-bubble-self-border: rgba(144, 168, 255, 0.24);
+  --chat-bubble-peer-bg: rgba(21, 31, 50, 0.95);
+  --chat-bubble-peer-border: rgba(71, 85, 105, 0.78);
+  --chat-bubble-system-bg: rgba(24, 35, 55, 0.9);
+  --chat-stage-base: #0f1a2d;
+  --chat-stage-top: rgba(18, 30, 51, 0.26);
+  --chat-stage-bottom: rgba(10, 18, 31, 0.48);
+  --chat-stage-glow: rgba(144, 168, 255, 0.08);
+
   --chat-wallpaper-image: url('/wallpapers/windy-hill-dark.svg');
-  --chat-wallpaper-opacity: 0.024;
-  --color-focus-ring: rgba(144, 168, 255, 0.18);
-  --color-sidebar-bg: #111c31;
-  --color-sidebar-surface: #172338;
-  --color-sidebar-muted: #1d2a43;
-  --color-sidebar-pill: rgba(144, 168, 255, 0.14);
-  --color-shell-panel: linear-gradient(180deg, rgba(17, 28, 49, 0.95), rgba(15, 23, 42, 0.985));
-  --color-shell-card: rgba(20, 30, 50, 0.86);
-  --color-shell-card-strong: rgba(23, 35, 57, 0.92);
-  --color-shell-card-muted: rgba(27, 40, 64, 0.88);
-  --color-shell-toolbar: rgba(17, 28, 49, 0.84);
-  --color-shell-inline: rgba(255, 255, 255, 0.04);
-  --color-shell-highlight: rgba(144, 168, 255, 0.14);
-  --color-shell-border: rgba(100, 116, 139, 0.16);
-  --color-shell-border-strong: rgba(148, 163, 184, 0.24);
-  --color-shell-glow: rgba(144, 168, 255, 0.08);
-  --color-shell-eyebrow: #bec7dd;
-  --color-shell-action: rgba(255, 255, 255, 0.04);
-  --color-shell-action-hover: rgba(255, 255, 255, 0.06);
-  --color-shell-backdrop: rgba(11, 19, 33, 0.9);
-  --color-shell-mask: rgba(3, 8, 14, 0.5);
+  --chat-wallpaper-opacity: 0.026;
+}
+
+:root,
+:root[data-theme='light'],
+:root[data-theme='dark'] {
+  --color-bg-app: var(--surface-canvas);
+  --color-bg-surface: var(--surface-subtle);
+  --color-bg-panel: color-mix(in srgb, var(--surface-subtle) 82%, var(--surface-canvas));
+  --color-bg-elevated: var(--surface-raised);
+
+  --color-text-1: var(--text-primary);
+  --color-text-2: var(--text-secondary);
+  --color-text-3: var(--text-tertiary);
+  --color-text-soft: var(--text-quaternary);
+
+  --color-line: var(--border-subtle);
+  --color-line-strong: var(--border-strong);
+  --color-primary: var(--interactive-primary-bg);
+  --color-primary-strong: var(--interactive-selected-fg);
+  --color-accent: var(--status-success);
+  --color-online: var(--status-online);
+  --color-warning: var(--status-warning);
+  --color-danger: var(--status-danger);
+
+  --color-bubble-self: var(--chat-bubble-self-bg);
+  --color-bubble-peer: var(--chat-bubble-peer-bg);
+  --color-bubble-system: var(--chat-bubble-system-bg);
+  --color-bubble-self-line: var(--chat-bubble-self-border);
+  --color-bubble-peer-line: var(--chat-bubble-peer-border);
+
+  --color-hover: var(--interactive-hover-bg);
+  --color-selected: var(--interactive-selected-bg);
+  --color-focus-ring: var(--interactive-focus-ring);
+
+  --color-chat-stage-base: var(--chat-stage-base);
+  --color-chat-stage-top: var(--chat-stage-top);
+  --color-chat-stage-bottom: var(--chat-stage-bottom);
+  --color-chat-stage-glow: var(--chat-stage-glow);
+
+  --color-sidebar-bg: var(--surface-subtle);
+  --color-sidebar-surface: var(--surface-card);
+  --color-sidebar-muted: color-mix(in srgb, var(--surface-subtle) 92%, var(--surface-card));
+  --color-sidebar-pill: var(--interactive-selected-bg);
+
+  --color-shell-panel: linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 96%, transparent), color-mix(in srgb, var(--surface-card) 98%, transparent));
+  --color-shell-card: var(--surface-panel);
+  --color-shell-card-strong: var(--surface-card);
+  --color-shell-card-muted: color-mix(in srgb, var(--surface-subtle) 76%, var(--surface-card));
+  --color-shell-toolbar: color-mix(in srgb, var(--surface-panel) 86%, transparent);
+  --color-shell-inline: color-mix(in srgb, var(--surface-subtle) 86%, var(--surface-card));
+  --color-shell-highlight: color-mix(in srgb, var(--interactive-selected-bg) 74%, white);
+  --color-shell-border: var(--border-subtle);
+  --color-shell-border-strong: var(--border-default);
+  --color-shell-glow: color-mix(in srgb, var(--interactive-focus-ring) 34%, transparent);
+  --color-shell-eyebrow: color-mix(in srgb, var(--text-secondary) 86%, var(--text-tertiary));
+  --color-shell-action: var(--interactive-secondary-bg);
+  --color-shell-action-hover: var(--interactive-secondary-bg-hover);
+  --color-shell-backdrop: color-mix(in srgb, var(--surface-canvas) 86%, transparent);
+  --color-shell-mask: color-mix(in srgb, var(--surface-inverse) 20%, transparent);
 }

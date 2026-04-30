@@ -4,6 +4,9 @@ export const demoSession: AuthSession = {
   token: 'echoim-demo-token',
   tokenType: 'Bearer',
   expiresIn: 7200,
+  expireAt: new Date(Date.now() + 7200 * 1000).toISOString(),
+  refreshToken: 'echoim-demo-refresh-token',
+  refreshTokenExpireAt: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
   userInfo: {
     userId: 10001,
     username: 'echo_demo_01',

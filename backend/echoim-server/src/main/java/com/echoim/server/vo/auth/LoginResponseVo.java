@@ -12,6 +12,8 @@ public class LoginResponseVo {
     private Integer resendAfterSeconds;
     private String trustedDeviceGrantToken;
     private String trustedDeviceExpireAt;
+    private String refreshToken;
+    private String refreshTokenExpireAt;
 
     public String getStatus() {
         return status;
@@ -91,5 +93,21 @@ public class LoginResponseVo {
 
     public void setTrustedDeviceExpireAt(String trustedDeviceExpireAt) {
         this.trustedDeviceExpireAt = trustedDeviceExpireAt;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+
+    public String getRefreshTokenExpireAt() {
+        return refreshTokenExpireAt;
+    }
+
+    public void setRefreshTokenExpireAt(String refreshTokenExpireAt) {
+        this.refreshTokenExpireAt = refreshTokenExpireAt;
     }
 }

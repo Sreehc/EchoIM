@@ -1,13 +1,19 @@
 import type { ApiResponse } from '@/types/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
 const UNAUTHORIZED_CODES = new Set([401, 40100, 40101, 40102])
 
 type TokenGetter = () => string | null
 type UnauthorizedHandler = () => void
+type RefreshHandler = () => Promise<boolean>
+
+export interface RequestJsonInit extends RequestInit {
+  skipAuthRefresh?: boolean
+}
 
 let getToken: TokenGetter = () => null
 let handleUnauthorized: UnauthorizedHandler = () => undefined
+let refreshSession: RefreshHandler = async () => false
+let refreshPromise: Promise<boolean> | null = null
 
 export class HttpError extends Error {
   code?: number
@@ -24,16 +30,18 @@ export class HttpError extends Error {
 export function configureHttpClient(options: {
   getToken: TokenGetter
   onUnauthorized: UnauthorizedHandler
+  refreshSession: RefreshHandler
 }) {
   getToken = options.getToken
   handleUnauthorized = options.onUnauthorized
+  refreshSession = options.refreshSession
 }
 
-export async function getJson<T>(path: string, init?: RequestInit) {
+export async function getJson<T>(path: string, init?: RequestJsonInit) {
   return requestJson<T>(path, { ...init, method: 'GET' })
 }
 
-export async function postJson<T>(path: string, body?: unknown, init?: RequestInit) {
+export async function postJson<T>(path: string, body?: unknown, init?: RequestJsonInit) {
   return requestJson<T>(path, {
     ...init,
     method: 'POST',
@@ -41,7 +49,7 @@ export async function postJson<T>(path: string, body?: unknown, init?: RequestIn
   })
 }
 
-export async function putJson<T>(path: string, body?: unknown, init?: RequestInit) {
+export async function putJson<T>(path: string, body?: unknown, init?: RequestJsonInit) {
   return requestJson<T>(path, {
     ...init,
     method: 'PUT',
@@ -49,7 +57,7 @@ export async function putJson<T>(path: string, body?: unknown, init?: RequestIni
   })
 }
 
-export async function postForm<T>(path: string, body: FormData, init?: RequestInit) {
+export async function postForm<T>(path: string, body: FormData, init?: RequestJsonInit) {
   return requestJson<T>(path, {
     ...init,
     method: 'POST',
@@ -57,17 +65,23 @@ export async function postForm<T>(path: string, body: FormData, init?: RequestIn
   })
 }
 
-export async function deleteJson<T>(path: string, init?: RequestInit) {
+export async function deleteJson<T>(path: string, init?: RequestJsonInit) {
   return requestJson<T>(path, { ...init, method: 'DELETE' })
 }
 
 function resolveUrl(path: string) {
-  if (!API_BASE_URL) return path
-  if (path.startsWith('http://') || path.startsWith('https://')) return path
-  return `${API_BASE_URL}${path}`
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    throw new Error(`HTTP 请求必须使用同源相对路径，当前收到绝对地址：${path}`)
+  }
+
+  if (!path.startsWith('/')) {
+    throw new Error(`HTTP 请求必须以 / 开头，当前收到：${path}`)
+  }
+
+  return path
 }
 
-export async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+export async function requestJson<T>(path: string, init: RequestJsonInit): Promise<T> {
   const headers = new Headers(init.headers ?? {})
   const token = getToken()
 
@@ -96,7 +110,15 @@ export async function requestJson<T>(path: string, init: RequestInit): Promise<T
   const message = payload?.message || response.statusText || '请求失败'
 
   if (!response.ok || !payload || payload.code !== 0) {
-    if (UNAUTHORIZED_CODES.has(code)) {
+    if (UNAUTHORIZED_CODES.has(code) && !init.skipAuthRefresh) {
+      const refreshed = await ensureRefreshedSession()
+      if (refreshed) {
+        return requestJson<T>(path, {
+          ...init,
+          skipAuthRefresh: true,
+        })
+      }
+
       handleUnauthorized()
     }
 
@@ -107,4 +129,16 @@ export async function requestJson<T>(path: string, init: RequestInit): Promise<T
   }
 
   return payload.data
+}
+
+async function ensureRefreshedSession() {
+  if (!refreshPromise) {
+    refreshPromise = refreshSession()
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
 }

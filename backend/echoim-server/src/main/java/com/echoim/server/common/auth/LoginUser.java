@@ -5,6 +5,7 @@ public class LoginUser {
     private Long userId;
     private String username;
     private String tokenType;
+    private Long expireAtMillis;
 
     public Long getUserId() {
         return userId;
@@ -28,5 +29,13 @@ public class LoginUser {
 
     public void setTokenType(String tokenType) {
         this.tokenType = tokenType;
+    }
+
+    public Long getExpireAtMillis() {
+        return expireAtMillis;
+    }
+
+    public void setExpireAtMillis(Long expireAtMillis) {
+        this.expireAtMillis = expireAtMillis;
     }
 }

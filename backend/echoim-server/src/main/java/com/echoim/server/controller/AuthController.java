@@ -80,6 +80,17 @@ public class AuthController {
         ));
     }
 
+    @PostMapping("/refresh")
+    @RateLimit(keyType = RateLimit.KeyType.IP, name = "auth-refresh", permits = 30, windowSeconds = 60, message = "刷新过于频繁")
+    public ApiResponse<LoginResponseVo> refresh(@Valid @RequestBody RefreshTokenRequest request,
+                                                HttpServletRequest servletRequest) {
+        return ApiResponse.success(authService.refreshSession(
+                request.refreshToken(),
+                resolveIp(servletRequest),
+                resolveUserAgent(servletRequest)
+        ));
+    }
+
     @PostMapping("/recovery/send-code")
     @RateLimit(keyType = RateLimit.KeyType.IP, name = "auth-recovery-send", permits = 10, windowSeconds = 60, message = "发送过于频繁")
     public ApiResponse<CodeDispatchVo> sendRecoveryCode(@Valid @RequestBody RecoverySendCodeRequest request,
@@ -117,7 +128,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout() {
+    public ApiResponse<Void> logout(@RequestBody(required = false) LogoutRequest request) {
+        authService.logout(request == null ? null : request.refreshToken());
         return ApiResponse.success();
     }
 
@@ -214,6 +226,16 @@ public class AuthController {
             Long userId,
             @NotBlank(message = "设备指纹不能为空") String deviceFingerprint,
             @NotBlank(message = "授权令牌不能为空") String grantToken
+    ) {
+    }
+
+    public record RefreshTokenRequest(
+            @NotBlank(message = "refreshToken 不能为空") String refreshToken
+    ) {
+    }
+
+    public record LogoutRequest(
+            String refreshToken
     ) {
     }
 

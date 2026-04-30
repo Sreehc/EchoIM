@@ -14,9 +14,9 @@
   overflow: hidden;
   background:
     radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--color-shell-glow) 120%, transparent), transparent 24%),
-    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 22%),
+    radial-gradient(circle at 82% 10%, color-mix(in srgb, var(--interactive-primary-bg) 10%, transparent), transparent 22%),
     linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-shell-mask) 10%, transparent)),
-    var(--color-bg-app);
+    var(--surface-canvas);
 }
 
 .auth-shell__texture {
@@ -27,7 +27,7 @@
     radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-shell-glow) 54%, transparent), transparent 42%),
     linear-gradient(90deg, rgba(255, 255, 255, 0.015), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.015));
   pointer-events: none;
-  opacity: 0.92;
+  opacity: 0.76;
 }
 
 .auth-shell__glow {
@@ -36,13 +36,13 @@
   height: 38rem;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(46px);
-  opacity: 0.18;
+  filter: blur(58px);
+  opacity: 0.14;
 }
 
 .auth-shell__glow--left {
   inset: auto auto -14rem -12rem;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 64%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--interactive-primary-bg) 16%, transparent), transparent 64%);
 }
 
 .auth-shell__glow--right {

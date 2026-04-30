@@ -36,12 +36,16 @@ export function trustedDeviceLoginRequest(payload: { userId: number; deviceFinge
   return postJson<ApiLoginResponse>('/api/auth/trusted-devices/login', payload)
 }
 
+export function refreshSessionRequest(payload: { refreshToken: string }) {
+  return postJson<ApiLoginResponse>('/api/auth/refresh', payload, { skipAuthRefresh: true })
+}
+
 export function changePasswordRequest(payload: ApiChangePasswordPayload) {
   return postJson<void>('/api/auth/change-password', payload)
 }
 
-export function logoutRequest() {
-  return postJson<void>('/api/auth/logout')
+export function logoutRequest(payload?: { refreshToken?: string | null }) {
+  return postJson<void>('/api/auth/logout', payload ?? {}, { skipAuthRefresh: true })
 }
 
 export function sendRecoveryCodeRequest(payload: { email: string }) {

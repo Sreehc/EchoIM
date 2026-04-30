@@ -38,6 +38,7 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups'
 import { forwardMessages } from '@/services/messages'
+import { STICKER_LIBRARY } from '@/stickers/library'
 import type {
   ChangePasswordPayload,
   ChatMessage,
@@ -55,6 +56,7 @@ import type {
 } from '@/types/chat'
 import { adaptConversationSummary, adaptGlobalSearchMessage } from '@/adapters/chat'
 import { formatConversationTime } from '@/utils/format'
+import { buildPublicProfilePath } from '@/utils/publicProfiles'
 
 type ConversationActionCommand = 'open-tab' | 'mark-unread' | 'toggle-top' | 'toggle-mute' | 'archive' | 'delete'
 type ComposeAction = 'single' | 'group' | 'channel'
@@ -110,26 +112,6 @@ const composeDialog = reactive<{
   error: null,
 })
 
-const STICKER_LIBRARY: StickerDefinition[] = [
-  {
-    stickerId: 'orbit_note',
-    title: 'Orbit Note',
-    accent: '#f56b5d',
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><rect width="240" height="240" rx="54" fill="#fff7f0"/><circle cx="120" cy="120" r="74" fill="#f56b5d"/><circle cx="92" cy="102" r="12" fill="#1b1a18"/><circle cx="148" cy="102" r="12" fill="#1b1a18"/><path d="M84 150c18 17 54 17 72 0" fill="none" stroke="#1b1a18" stroke-width="12" stroke-linecap="round"/></svg>`,
-  },
-  {
-    stickerId: 'soft_signal',
-    title: 'Soft Signal',
-    accent: '#0f7b74',
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><rect width="240" height="240" rx="54" fill="#eefcf9"/><path d="M52 168c0-43 30-96 68-96s68 53 68 96" fill="#0f7b74"/><circle cx="120" cy="108" r="34" fill="#fff"/><path d="M104 106h32M110 126h20" stroke="#0f7b74" stroke-width="10" stroke-linecap="round"/></svg>`,
-  },
-  {
-    stickerId: 'midnight_ping',
-    title: 'Midnight Ping',
-    accent: '#4f46e5',
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><rect width="240" height="240" rx="54" fill="#f5f4ff"/><circle cx="120" cy="120" r="78" fill="#4f46e5"/><circle cx="92" cy="104" r="10" fill="#fff"/><circle cx="148" cy="104" r="10" fill="#fff"/><path d="M84 144c11-9 21-13 36-13s25 4 36 13" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/></svg>`,
-  },
-]
 const contactsState = reactive<{
   loading: boolean
   error: string | null
@@ -1188,14 +1170,10 @@ async function handleSendSticker(sticker: StickerDefinition) {
   attachmentError.value = null
 
   try {
-    const file = new File([sticker.svg], `${sticker.stickerId}.svg`, { type: 'image/svg+xml' })
-    const uploadedFile = (await uploadFile(file, 2)) as ChatFile
     await chatStore.sendMessage({
       currentUserId: authStore.currentUser?.userId ?? 0,
       content: sticker.title,
       msgType: 'STICKER',
-      fileId: uploadedFile.fileId,
-      file: uploadedFile,
       replySource: toReplySource(replyingMessage.value),
       sticker: {
         stickerId: sticker.stickerId,
@@ -1229,6 +1207,14 @@ async function handleCheckUsername(username: string) {
   } finally {
     usernameCheck.checking = false
   }
+}
+
+function openPublicProfile(username: string) {
+  router.push(buildPublicProfilePath(username)).catch(() => undefined)
+}
+
+function handleOpenConversationPublicProfile(path: string) {
+  router.push(path).catch(() => undefined)
 }
 
 function handleGlobalKeydown(event: KeyboardEvent) {
@@ -1577,6 +1563,7 @@ function registerDebugHooks() {
       :overlay="uiStore.useOverlayProfile"
       :visible="uiStore.profileOpen"
       @action="handleConversationAction"
+      @open-public-profile="handleOpenConversationPublicProfile"
       @update:visible="uiStore.setProfileOpen"
       @update-group-meta="handleUpdateGroupMeta"
       @update-group-notice="handleUpdateGroupNotice"
@@ -1619,7 +1606,10 @@ function registerDebugHooks() {
             <AvatarBadge :name="user.nickname" :avatar-url="user.avatarUrl" size="lg" />
             <div class="compose-dialog__user-copy">
               <strong>{{ user.nickname }}</strong>
-              <span>@{{ user.username }}</span>
+              <span>
+                @{{ user.username }}
+                <button class="compose-dialog__mini-link" type="button" @click.stop="openPublicProfile(user.username)">主页</button>
+              </span>
               <p>{{ user.signature || user.userNo }}</p>
             </div>
           </button>
@@ -1646,7 +1636,10 @@ function registerDebugHooks() {
             <AvatarBadge :name="user.nickname" :avatar-url="user.avatarUrl" size="lg" />
             <div class="compose-dialog__user-copy">
               <strong>{{ user.nickname }}</strong>
-              <span>@{{ user.username }}</span>
+              <span>
+                @{{ user.username }}
+                <button class="compose-dialog__mini-link" type="button" @click.stop="openPublicProfile(user.username)">主页</button>
+              </span>
               <p>{{ user.signature || user.userNo }}</p>
             </div>
             <button class="compose-dialog__inline-action" type="button" @click="submitFriendRequestForUser(user.userId)">
@@ -1720,7 +1713,10 @@ function registerDebugHooks() {
                 <AvatarBadge :name="user.nickname" :avatar-url="user.avatarUrl" size="md" />
                 <div class="search-sheet__row-copy">
                   <strong>{{ user.nickname }}</strong>
-                  <span>@{{ user.username }}</span>
+                  <span>
+                    @{{ user.username }}
+                    <button class="compose-dialog__mini-link" type="button" @click.stop="openPublicProfile(user.username)">主页</button>
+                  </span>
                   <p>{{ user.signature || user.userNo }}</p>
                 </div>
               </button>
@@ -1833,10 +1829,10 @@ function registerDebugHooks() {
   gap: 0;
   height: 100%;
   min-height: 0;
-  border: 1px solid var(--color-shell-border);
+  border: 1px solid var(--border-default);
   border-radius: 32px;
   background: var(--color-shell-panel);
-  box-shadow: var(--shadow-panel);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px);
   overflow: hidden;
 }
@@ -1849,7 +1845,7 @@ function registerDebugHooks() {
 }
 
 .chat-page__sidebar {
-  border-right: 1px solid var(--color-shell-border);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .chat-page__main {
@@ -1901,10 +1897,10 @@ function registerDebugHooks() {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 16px;
-  border-bottom: 1px solid var(--color-shell-border);
-  color: var(--color-text-2);
-  font: 500 0.73rem/1.45 var(--font-body);
-  background: color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font: 500 0.78rem/1.45 var(--font-body);
+  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
   backdrop-filter: blur(14px);
 }
 
@@ -1978,9 +1974,9 @@ function registerDebugHooks() {
   width: min(760px, 100%);
   margin: 0 auto 12px;
   padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-border));
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-shell-card));
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 14%, var(--border-default));
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 6%, var(--surface-card));
 }
 
 .chat-page__forward-bar span,
@@ -1989,15 +1985,16 @@ function registerDebugHooks() {
 }
 
 .chat-page__forward-bar span {
-  color: var(--color-shell-eyebrow);
-  font: 600 0.62rem/1 var(--font-mono);
+  color: var(--text-quaternary);
+  font: 600 0.7rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .chat-page__forward-bar strong {
   margin-top: 5px;
-  font-size: 0.84rem;
+  color: var(--text-primary);
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
@@ -2017,9 +2014,9 @@ function registerDebugHooks() {
 .chat-page__forward-actions button,
 .compose-dialog__inline-action {
   padding: 9px 11px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 12px;
-  background: var(--color-shell-action);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--interactive-secondary-bg);
 }
 
 .compose-dialog__user--card {
@@ -2051,18 +2048,18 @@ function registerDebugHooks() {
 
 .search-sheet__hero-copy p {
   margin-top: 4px;
-  color: var(--color-text-soft);
-  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
   line-height: 1.48;
 }
 
 .search-sheet__hero-shortcut {
   flex: 0 0 auto;
   padding: 5px 8px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 90%, transparent);
-  color: var(--color-text-soft);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
+  color: var(--text-quaternary);
   font: 600 0.64rem/1 var(--font-mono);
 }
 
@@ -2070,7 +2067,7 @@ function registerDebugHooks() {
   min-height: 20px;
   display: flex;
   align-items: center;
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.74rem;
   line-height: 1.42;
 }
@@ -2079,9 +2076,9 @@ function registerDebugHooks() {
   display: grid;
   gap: 6px;
   padding: 17px 17px 18px;
-  border: 1px dashed var(--color-shell-border-strong);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 84%, transparent);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-card) 84%, transparent);
 }
 
 .search-sheet__blank strong {
@@ -2089,7 +2086,7 @@ function registerDebugHooks() {
 }
 
 .search-sheet__blank p {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -2114,9 +2111,9 @@ function registerDebugHooks() {
   gap: 9px;
   align-content: start;
   padding: 12px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
 }
 
 .search-sheet__section--messages {
@@ -2136,9 +2133,9 @@ function registerDebugHooks() {
 
 .search-sheet__section-head span {
   padding: 4px 7px;
-  border-radius: 999px;
-  background: var(--color-shell-inline);
-  color: var(--color-text-soft);
+  border-radius: var(--radius-pill);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-quaternary);
   font: 700 0.64rem/1 var(--font-mono);
 }
 
@@ -2149,21 +2146,21 @@ function registerDebugHooks() {
   gap: 10px;
   width: 100%;
   padding: 10px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 92%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
   text-align: left;
   transition:
-    background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .search-sheet__row:hover,
 .search-sheet__row:focus-visible {
-  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-shell-border-strong));
-  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-shell-card-strong));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 18%, var(--border-strong));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, var(--surface-card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
 }
 
 .search-sheet__row-copy {
@@ -2188,7 +2185,7 @@ function registerDebugHooks() {
 
 .search-sheet__row-copy span,
 .search-sheet__row-copy p {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.71rem;
   line-height: 1.38;
 }
@@ -2211,7 +2208,7 @@ function registerDebugHooks() {
 
 .search-sheet__meta,
 .search-sheet__time {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.64rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
@@ -2225,9 +2222,9 @@ function registerDebugHooks() {
   place-items: center;
   min-height: 96px;
   padding: 13px;
-  border: 1px dashed var(--color-shell-border);
+  border: 1px dashed var(--border-default);
   border-radius: 15px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font-size: 0.76rem;
   text-align: center;
 }
@@ -2262,14 +2259,14 @@ function registerDebugHooks() {
 }
 
 .forward-sheet__summary span {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.6rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .forward-sheet__summary strong {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font: 600 0.76rem/1.2 var(--font-body);
 }
 
@@ -2284,24 +2281,24 @@ function registerDebugHooks() {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 13px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-card-muted) 66%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 72%, transparent);
   text-align: left;
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .forward-sheet__saved-button:hover,
 .forward-sheet__saved-button:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 .forward-sheet__saved-button:focus-visible {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 28%, transparent);
 }
 
 .forward-sheet__saved-copy {
@@ -2317,7 +2314,7 @@ function registerDebugHooks() {
 }
 
 .forward-sheet__saved-copy span {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.72rem;
   line-height: 1.42;
 }
@@ -2325,23 +2322,23 @@ function registerDebugHooks() {
 .forward-sheet__pill {
   flex-shrink: 0;
   padding: 5px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-action) 70%, transparent);
-  color: var(--color-text-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 70%, transparent);
+  color: var(--text-primary);
   font: 600 0.6rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
 .forward-sheet__saved-button.is-active {
-  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-shell-card-muted));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 90%, var(--surface-panel));
 }
 
 .forward-sheet__saved-button.is-active .forward-sheet__pill {
-  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action));
-  color: color-mix(in srgb, var(--color-primary) 82%, var(--color-text-1));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 20%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 10%, var(--interactive-secondary-bg));
+  color: color-mix(in srgb, var(--interactive-primary-bg) 82%, var(--text-primary));
 }
 
 .compose-dialog {
@@ -2362,15 +2359,15 @@ function registerDebugHooks() {
   gap: 12px;
   align-items: center;
   padding: 13px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
   text-align: left;
 }
 
 .compose-dialog__user:not(.forward-sheet__conversation).is-selected {
-  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-card-strong));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 30%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, var(--surface-card));
 }
 
 .compose-dialog__user-copy {
@@ -2389,25 +2386,25 @@ function registerDebugHooks() {
 
 .compose-dialog__user-copy span,
 .compose-dialog__user-copy p {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.78rem;
 }
 
 .compose-dialog__empty,
 .compose-dialog__error {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.8rem;
 }
 
 .compose-dialog__error {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 :deep(.forward-dialog .el-dialog) {
-  border: 1px solid var(--color-shell-border);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--color-shell-panel) 96%, transparent);
-  box-shadow: var(--shadow-floating);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-overlay) 96%, transparent);
+  box-shadow: var(--shadow-overlay);
 }
 
 :deep(.forward-dialog .el-dialog__header) {
@@ -2419,18 +2416,18 @@ function registerDebugHooks() {
   height: 34px;
   border: 1px solid transparent;
   border-radius: 12px;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 :deep(.forward-dialog .el-dialog__headerbtn:hover),
 :deep(.forward-dialog .el-dialog__headerbtn:focus-visible) {
-  border-color: var(--color-shell-border);
-  background: var(--color-shell-action-hover);
-  color: var(--color-text-1);
+  border-color: var(--border-default);
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
 }
 
 :deep(.forward-dialog .el-dialog__title) {
@@ -2444,16 +2441,16 @@ function registerDebugHooks() {
 
 :deep(.forward-dialog .el-dialog__footer) {
   padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--color-shell-border) 76%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border-default) 76%, transparent);
 }
 
 :deep(.forward-dialog .el-dialog__footer .el-button) {
   min-height: 38px;
   padding-inline: 14px;
   border-radius: 12px;
-  border-color: var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-card-strong) 90%, transparent);
-  color: var(--color-text-1);
+  border-color: var(--border-default);
+  background: color-mix(in srgb, var(--surface-card) 90%, transparent);
+  color: var(--text-primary);
   box-shadow: none;
   transition:
     border-color var(--motion-fast) ease,
@@ -2464,20 +2461,20 @@ function registerDebugHooks() {
 
 :deep(.forward-dialog .el-dialog__footer .el-button:hover),
 :deep(.forward-dialog .el-dialog__footer .el-button:focus-visible) {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 :deep(.forward-dialog .el-dialog__footer .el-button--primary) {
-  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-card));
-  color: color-mix(in srgb, var(--color-primary) 84%, var(--color-text-1));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 22%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 10%, var(--surface-card));
+  color: var(--interactive-selected-fg);
 }
 
 :deep(.forward-dialog .el-dialog__footer .el-button--primary:hover),
 :deep(.forward-dialog .el-dialog__footer .el-button--primary:focus-visible) {
-  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action-hover));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 32%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--interactive-secondary-bg-hover));
 }
 
 :deep(.forward-dialog .el-dialog__footer .el-button.is-loading) {
@@ -2486,27 +2483,27 @@ function registerDebugHooks() {
 
 :deep(.forward-dialog .el-input__wrapper) {
   min-height: 42px;
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 94%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 1px color-mix(in srgb, var(--color-shell-border) 82%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--border-default) 82%, transparent);
 }
 
 :deep(.forward-dialog .el-input__wrapper.is-focus) {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 0 1px color-mix(in srgb, var(--color-primary) 24%, transparent),
-    0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--interactive-primary-bg) 24%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 28%, transparent);
 }
 
 :deep(.forward-dialog .el-input__inner) {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 :deep(.forward-dialog .el-input__prefix),
 :deep(.forward-dialog .el-input__suffix) {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .forward-sheet .compose-dialog__users {
@@ -2520,28 +2517,28 @@ function registerDebugHooks() {
   gap: 11px;
   align-items: start;
   padding: 12px 13px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 88%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-card) 88%, transparent);
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .forward-sheet__conversation:hover,
 .forward-sheet__conversation:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
 }
 
 .forward-sheet__conversation:focus-visible {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 28%, transparent);
   outline: none;
 }
 
 .forward-sheet__conversation.is-selected {
-  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-shell-card-strong));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 90%, var(--surface-card));
 }
 
 .forward-sheet__conversation-copy {
@@ -2557,14 +2554,14 @@ function registerDebugHooks() {
 
 .forward-sheet__conversation-state {
   flex-shrink: 0;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
   font: 600 0.58rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .forward-sheet__conversation.is-selected .forward-sheet__conversation-state {
-  color: color-mix(in srgb, var(--color-primary) 82%, var(--color-text-1));
+  color: color-mix(in srgb, var(--interactive-primary-bg) 82%, var(--text-primary));
 }
 
 .forward-sheet__conversation-copy p {
@@ -2581,8 +2578,8 @@ function registerDebugHooks() {
   gap: 5px;
   padding: 12px 13px;
   border-radius: 12px;
-  border: 1px dashed var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-card) 74%, transparent);
+  border: 1px dashed var(--border-default);
+  background: color-mix(in srgb, var(--surface-panel) 74%, transparent);
 }
 
 .forward-sheet__empty strong,
@@ -2592,20 +2589,20 @@ function registerDebugHooks() {
 }
 
 .forward-sheet__empty strong {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font: 600 0.78rem/1.2 var(--font-body);
 }
 
 .forward-sheet__empty p {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   font-size: 0.72rem;
   line-height: 1.45;
 }
 
 .forward-sheet__error {
   border-style: solid;
-  border-color: color-mix(in srgb, var(--color-danger) 16%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-danger) 4%, var(--color-shell-card));
+  border-color: color-mix(in srgb, var(--status-danger) 16%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 4%, var(--surface-panel));
 }
 
 @media (max-width: 1279px) {

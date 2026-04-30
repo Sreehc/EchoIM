@@ -65,6 +65,10 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
             ctx.close();
             return;
         }
+        if (loginUser != null && message.getType() != WsMessageType.AUTH && isSessionExpired(loginUser)) {
+            forceOfflineAndClose(ctx, message, ErrorCode.TOKEN_EXPIRED, "登录已过期，请重新登录");
+            return;
+        }
 
         try {
             switch (message.getType()) {
@@ -78,13 +82,17 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
                 default -> writeNotice(ctx, message, ErrorCode.PARAM_ERROR, "不支持的消息类型");
             }
         } catch (BizException ex) {
-            if (message.getType() == WsMessageType.CHAT_SINGLE || message.getType() == WsMessageType.CHAT_GROUP) {
+            if (message.getType() == WsMessageType.AUTH) {
+                writeAuthFailureAndClose(ctx, message, ex);
+            } else if (message.getType() == WsMessageType.CHAT_SINGLE || message.getType() == WsMessageType.CHAT_GROUP) {
                 writeWsMessage(ctx, WsMessageType.ACK, message, failedSendAck(ex));
             } else {
                 writeNotice(ctx, message, ex.getCode(), ex.getMessage());
             }
         } catch (Exception ex) {
-            if (message.getType() == WsMessageType.CHAT_SINGLE || message.getType() == WsMessageType.CHAT_GROUP) {
+            if (message.getType() == WsMessageType.AUTH) {
+                writeAuthFailureAndClose(ctx, message, new BizException(ErrorCode.SYSTEM_ERROR, ex.getMessage()));
+            } else if (message.getType() == WsMessageType.CHAT_SINGLE || message.getType() == WsMessageType.CHAT_GROUP) {
                 writeWsMessage(ctx, WsMessageType.ACK, message, failedSendAck(new BizException(ErrorCode.SYSTEM_ERROR, ex.getMessage())));
             } else {
                 writeNotice(ctx, message, ErrorCode.SYSTEM_ERROR, ex.getMessage());
@@ -127,6 +135,10 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
     }
 
     private void handlePing(ChannelHandlerContext ctx, LoginUser loginUser) throws JsonProcessingException {
+        if (loginUser == null || isSessionExpired(loginUser)) {
+            forceOfflineAndClose(ctx, null, ErrorCode.TOKEN_EXPIRED, "登录已过期，请重新登录");
+            return;
+        }
         imOnlineService.refreshHeartbeat(loginUser.getUserId(), currentNodeId(), imProperties.getHeartbeatTimeoutSeconds());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "ALIVE");
@@ -161,6 +173,30 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
         response.setTimestamp(System.currentTimeMillis());
         response.setData(data);
         ctx.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
+    }
+
+    private void writeAuthFailureAndClose(ChannelHandlerContext ctx, WsMessage request, BizException ex) throws JsonProcessingException {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("status", "FAILED");
+        data.put("code", ex.getCode());
+        data.put("message", ex.getMessage());
+        writeWsMessage(ctx, WsMessageType.AUTH, request, data);
+        cleanupChannel(ctx);
+        ctx.close();
+    }
+
+    private void forceOfflineAndClose(ChannelHandlerContext ctx, WsMessage request, int code, String message) throws JsonProcessingException {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("code", code);
+        data.put("message", message);
+        writeWsMessage(ctx, WsMessageType.FORCE_OFFLINE, request, data);
+        cleanupChannel(ctx);
+        ctx.close();
+    }
+
+    private boolean isSessionExpired(LoginUser loginUser) {
+        Long expireAtMillis = loginUser.getExpireAtMillis();
+        return expireAtMillis != null && expireAtMillis <= System.currentTimeMillis();
     }
 
     private String currentNodeId() {

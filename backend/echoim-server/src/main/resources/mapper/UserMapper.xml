@@ -164,4 +164,15 @@
           AND u.status = 1
         LIMIT 1
     </select>
+
+    <select id="selectPublicPageByUsername" resultType="com.echoim.server.vo.user.UserPublicPageVo">
+        SELECT u.username AS username,
+               u.nickname AS nickname,
+               u.avatar_url AS avatarUrl,
+               u.signature AS signature
+        FROM im_user u
+        WHERE u.username = #{username}
+          AND u.status = 1
+        LIMIT 1
+    </select>
 </mapper>

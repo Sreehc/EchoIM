@@ -8,6 +8,7 @@ EchoIM Web 聊天客户端。
 
 - [开发文档](/Users/cheers/Desktop/workspace/EchoIM/EchoIM%20开发文档.md)
 - [接口文档](/Users/cheers/Desktop/workspace/EchoIM/接口文档.md)
+- [UI Token 重构方案](/Users/cheers/Desktop/workspace/EchoIM/frontend/echoim-web/design-system/MASTER.md)
 
 ## 当前已接入能力
 
@@ -126,6 +127,32 @@ npm run dev
 
 - `/api -> http://127.0.0.1:8080`
 - `/ws -> ws://127.0.0.1:8091`
+
+前端请求约定：
+
+- 浏览器侧只请求同源相对路径，例如 `/api/auth/login`、`/api/conversations`、`/ws`
+- 不在前端代码里写 `http://127.0.0.1:8080` 这类完整后端地址
+- 开发环境依赖 Vite proxy，把 `/api` 和 `/ws` 转发到本地 Spring Boot / IM 服务
+- 生产环境依赖 Nginx 做同域名反向代理，避免额外处理 CORS、Cookie 域、证书和环境切换
+
+## 生产部署
+
+推荐把前端静态资源、HTTP API、WebSocket 都挂在同一个域名下：
+
+- `https://im.example.com/` -> 前端静态资源
+- `https://im.example.com/api/...` -> Spring Boot `:8080`
+- `wss://im.example.com/ws` -> IM WebSocket `:8091`
+
+仓库内提供了 Nginx 示例配置：
+
+- [deploy/nginx/echoim.conf](/Users/cheers/Desktop/workspace/EchoIM/deploy/nginx/echoim.conf)
+
+这套方式的直接收益：
+
+1. 前端始终使用 `/api` 和 `/ws`，不区分本地、测试、生产
+2. 浏览器端不需要单独处理跨域
+3. HTTPS 证书只需要配在 Nginx 这一层
+4. Cookie、鉴权头、文件下载链接都更容易保持一致
 
 ## 校验命令
 

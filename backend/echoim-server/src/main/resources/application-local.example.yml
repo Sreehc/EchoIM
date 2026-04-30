@@ -11,8 +11,11 @@ echoim:
         credential: your-turn-password
   jwt:
     secret: ${ECHOIM_JWT_SECRET:your-jwt-secret}
+  auth:
+    refresh-token-expire-days: 30
   file:
     storage-type: oss
+    access-sign-secret: echoim-local-file-access-secret
     max-size: 104857600
     signed-url-expire-seconds: 600
     allowed-image-content-types: image/jpeg,image/png,image/gif,image/webp
@@ -25,3 +28,5 @@ echoim:
       access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:your-access-key-id}
       access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:your-access-key-secret}
       object-prefix: echoim
+    local:
+      root-dir: ${ECHOIM_FILE_LOCAL_ROOT_DIR:./data/echoim-files}

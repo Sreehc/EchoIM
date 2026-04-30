@@ -14,6 +14,7 @@ defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read']
+  'open-public-profile': [path: string]
   'update-group-meta': []
   'update-group-notice': []
   'promote-member': [payload: { userId: number; role: 2 | 3 }]
@@ -42,6 +43,7 @@ const emit = defineEmits<{
       :error-message="errorMessage"
       @close="emit('update:visible', false)"
       @action="emit('action', $event)"
+      @open-public-profile="emit('open-public-profile', $event)"
       @update-group-meta="emit('update-group-meta')"
       @update-group-notice="emit('update-group-notice')"
       @promote-member="emit('promote-member', $event)"
@@ -60,6 +62,7 @@ const emit = defineEmits<{
       :error-message="errorMessage"
       @close="emit('update:visible', false)"
       @action="emit('action', $event)"
+      @open-public-profile="emit('open-public-profile', $event)"
       @update-group-meta="emit('update-group-meta')"
       @update-group-notice="emit('update-group-notice')"
       @promote-member="emit('promote-member', $event)"

@@ -24,6 +24,10 @@ public interface AuthService {
 
     LoginResponseVo loginWithTrustedDevice(Long userId, String deviceFingerprint, String grantToken, String ip, String userAgent);
 
+    LoginResponseVo refreshSession(String refreshToken, String ip, String userAgent);
+
+    void logout(String refreshToken);
+
     void changePassword(Long userId, String oldPassword, String newPassword);
 
     CodeDispatchVo sendRecoveryCode(String email, String ip, String userAgent);

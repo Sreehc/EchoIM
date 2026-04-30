@@ -178,8 +178,8 @@ watch(
   min-height: 70px;
   height: 70px;
   padding: 10px 20px;
-  border-bottom: 1px solid var(--color-shell-border);
-  background: color-mix(in srgb, var(--color-shell-toolbar) 94%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
   backdrop-filter: blur(16px);
 }
 
@@ -229,44 +229,45 @@ watch(
 
 .chat-topbar__identity strong {
   display: block;
-  font-size: 0.92rem;
-  line-height: 1.15;
+  color: var(--text-primary);
+  font-size: 0.96rem;
+  line-height: 1.12;
   font-weight: 600;
-  letter-spacing: -0.014em;
+  letter-spacing: -0.018em;
 }
 
 .chat-topbar__identity p {
   margin-top: 4px;
-  color: var(--color-text-soft);
-  font-size: 0.72rem;
-  line-height: 1.18;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  line-height: 1.28;
   letter-spacing: 0.01em;
 }
 
 .chat-topbar__icon {
   display: grid;
   place-items: center;
-  border-radius: 13px;
-  border: 1px solid var(--color-shell-border);
-  background: var(--color-shell-action);
-  color: var(--color-text-2);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--interactive-secondary-fg);
   transition:
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .chat-topbar__icon:hover,
 .chat-topbar__icon:focus-visible {
-  background: var(--color-shell-action-hover);
-  border-color: var(--color-shell-border);
-  color: var(--color-text-1);
+  background: var(--interactive-secondary-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .chat-topbar__icon.is-active {
-  background: color-mix(in srgb, var(--color-selected) 88%, var(--color-shell-action));
-  color: var(--color-primary-strong);
-  border-color: var(--color-shell-border-strong);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, var(--interactive-secondary-bg));
+  color: var(--interactive-selected-fg);
+  border-color: var(--border-brand);
 }
 
 .chat-topbar__search-shell {
@@ -277,10 +278,10 @@ watch(
   max-width: 100%;
   min-height: 48px;
   padding: 5px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 
 .chat-topbar__search-input {
@@ -291,15 +292,15 @@ watch(
   flex: 1 1 340px;
   padding: 0 14px;
   min-height: 100%;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-shell-border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-inline) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--border-default));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
 }
 
 .chat-topbar__search-input > svg {
   width: 13px;
   height: 13px;
-  color: var(--color-shell-eyebrow);
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 
@@ -322,14 +323,14 @@ watch(
 }
 
 .chat-topbar__search-input :deep(.el-input__inner) {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
 .chat-topbar__search-count {
   min-width: 3.75rem;
-  color: var(--color-text-2);
-  font: 600 0.68rem/1.2 var(--font-mono);
+  color: var(--text-tertiary);
+  font: 600 0.72rem/1.2 var(--font-mono);
   letter-spacing: 0.05em;
   text-align: right;
 }
@@ -341,14 +342,14 @@ watch(
   justify-content: center;
   height: 36px;
   padding: 0 13px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 14px;
-  background: var(--color-shell-action);
-  color: var(--color-text-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
   font: 600 0.72rem/1 var(--font-body);
   transition:
-    background var(--motion-fast) ease,
-    border-color var(--motion-fast) ease;
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .chat-topbar__search-nav {
@@ -359,8 +360,8 @@ watch(
 .chat-topbar__search-nav:focus-visible:not(:disabled),
 .chat-topbar__search-close:hover,
 .chat-topbar__search-close:focus-visible {
-  background: var(--color-shell-action-hover);
-  border-color: var(--color-shell-border-strong);
+  background: var(--interactive-secondary-bg-hover);
+  border-color: var(--border-strong);
 }
 
 .chat-topbar__search-nav:disabled {

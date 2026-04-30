@@ -22,6 +22,7 @@ import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.friend.FriendService;
+import com.echoim.server.service.message.StickerCatalog;
 import com.echoim.server.service.message.MessageViewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 
 @Service
 public class ImSingleChatServiceImpl implements ImSingleChatService {
@@ -66,6 +68,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private final ImWsPushService imWsPushService;
     private final FriendService friendService;
     private final FileService fileService;
+    private final StickerCatalog stickerCatalog;
     private final MessageViewService messageViewService;
     private final LocalRateLimitService localRateLimitService;
     private final ObjectMapper objectMapper;
@@ -77,6 +80,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
                                    ImWsPushService imWsPushService,
                                    FriendService friendService,
                                    FileService fileService,
+                                   StickerCatalog stickerCatalog,
                                    MessageViewService messageViewService,
                                    LocalRateLimitService localRateLimitService,
                                    ObjectMapper objectMapper) {
@@ -87,6 +91,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         this.imWsPushService = imWsPushService;
         this.friendService = friendService;
         this.fileService = fileService;
+        this.stickerCatalog = stickerCatalog;
         this.messageViewService = messageViewService;
         this.localRateLimitService = localRateLimitService;
         this.objectMapper = objectMapper;
@@ -215,8 +220,11 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (msgType == MESSAGE_TYPE_TEXT && !StringUtils.hasText(data.getContent())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文本消息内容不能为空");
         }
-        if ((msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
+        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件消息必须传 fileId");
+        }
+        if (msgType == MESSAGE_TYPE_STICKER) {
+            normalizeStickerExtra(data);
         }
     }
 
@@ -321,13 +329,30 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
 
     private ImFileEntity validateAndLoadMessageFile(Long userId, WsChatSingleData data) {
         int msgType = toMessageType(data.getMsgType());
-        if (msgType == MESSAGE_TYPE_STICKER || msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF) {
+        if (msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_IMAGE);
         }
         if (msgType == MESSAGE_TYPE_FILE) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_FILE);
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void normalizeStickerExtra(WsChatSingleData data) {
+        Object extra = data.getExtraJson();
+        if (!(extra instanceof Map<?, ?> rawMap)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "贴纸参数错误");
+        }
+        Map<String, Object> extraMap = new LinkedHashMap<>();
+        rawMap.forEach((key, value) -> extraMap.put(String.valueOf(key), value));
+        Object stickerObject = extraMap.get("sticker");
+        if (!(stickerObject instanceof Map<?, ?> stickerMap)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "贴纸参数错误");
+        }
+        Object stickerId = stickerMap.get("stickerId");
+        extraMap.put("sticker", stickerCatalog.require(stickerId == null ? null : String.valueOf(stickerId)));
+        data.setExtraJson(extraMap);
     }
 
     private String preview(ImMessageEntity entity, ImFileEntity messageFile) {

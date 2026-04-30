@@ -67,6 +67,8 @@ public class TokenServiceImpl implements TokenService {
             loginUser.setUserId(userId == null ? null : userId.longValue());
             loginUser.setUsername(claims.get("username", String.class));
             loginUser.setTokenType(claims.get("tokenType", String.class));
+            Date expiration = claims.getExpiration();
+            loginUser.setExpireAtMillis(expiration == null ? null : expiration.getTime());
             return loginUser;
         } catch (ExpiredJwtException ex) {
             throw new BizException(ErrorCode.TOKEN_EXPIRED, "token 已过期");

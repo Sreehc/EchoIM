@@ -60,14 +60,19 @@ echoim:
     resend-cooldown-seconds: ${ECHOIM_AUTH_RESEND_COOLDOWN_SECONDS:60}
     max-verify-attempts: ${ECHOIM_AUTH_MAX_VERIFY_ATTEMPTS:5}
     trusted-device-expire-days: ${ECHOIM_AUTH_TRUSTED_DEVICE_EXPIRE_DAYS:30}
+    refresh-token-expire-days: ${ECHOIM_AUTH_REFRESH_TOKEN_EXPIRE_DAYS:30}
   file:
     storage-type: ${ECHOIM_FILE_STORAGE_TYPE:oss}
+    base-url: ${ECHOIM_FILE_BASE_URL:}
+    access-sign-secret: ${ECHOIM_FILE_ACCESS_SIGN_SECRET:echoim-file-access-secret}
     max-size: ${ECHOIM_FILE_MAX_SIZE:104857600}
     signed-url-expire-seconds: ${ECHOIM_FILE_SIGNED_URL_EXPIRE_SECONDS:600}
     allowed-image-content-types: ${ECHOIM_FILE_ALLOWED_IMAGE_CONTENT_TYPES:image/jpeg,image/png,image/gif,image/webp}
     allowed-image-extensions: ${ECHOIM_FILE_ALLOWED_IMAGE_EXTENSIONS:jpg,jpeg,png,gif,webp}
     allowed-file-content-types: ${ECHOIM_FILE_ALLOWED_FILE_CONTENT_TYPES:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed}
     allowed-file-extensions: ${ECHOIM_FILE_ALLOWED_FILE_EXTENSIONS:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip}
+    local:
+      root-dir: ${ECHOIM_FILE_LOCAL_ROOT_DIR:./data/echoim-files}
   im:
     port: ${ECHOIM_IM_PORT:8091}
     ws-path: /ws

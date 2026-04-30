@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Document, Picture } from '@element-plus/icons-vue'
 import type { ChatMessage, ConversationType } from '@/types/chat'
 import { formatMessageTime, highlightText } from '@/utils/format'
+import { findStickerDefinition } from '@/stickers/library'
 import AvatarBadge from './AvatarBadge.vue'
 
 const props = defineProps<{
@@ -42,6 +43,8 @@ type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 
 
 const isSelf = computed(() => props.message.fromUserId === props.currentUserId)
 const isSystem = computed(() => props.message.msgType === 'SYSTEM')
+const stickerDefinition = computed(() => findStickerDefinition(props.message.sticker?.stickerId))
+const stickerTitle = computed(() => props.message.sticker?.title ?? attachmentMeta.value?.title ?? '贴纸')
 const contextMenuVisible = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
@@ -388,16 +391,17 @@ onUnmounted(() => {
         <span>{{ message.content }}</span>
       </template>
       <template v-else-if="message.msgType === 'STICKER'">
-        <div class="message-bubble__file message-bubble__file--sticker" @click="openAttachment(message.file?.downloadUrl)">
-          <img
-            v-if="message.file?.downloadUrl"
-            class="message-bubble__image message-bubble__image--sticker"
-            :src="message.file.downloadUrl"
-            :alt="attachmentMeta?.title || '贴纸消息'"
-          />
+        <div class="message-bubble__file message-bubble__file--sticker">
+          <div
+            v-if="stickerDefinition"
+            class="message-bubble__sticker-art"
+            :aria-label="stickerTitle"
+            role="img"
+            v-html="stickerDefinition.svg"
+          ></div>
           <div class="message-bubble__file-copy">
-            <strong>{{ attachmentMeta?.title }}</strong>
-            <p>{{ attachmentMeta?.description }}</p>
+            <strong>{{ stickerTitle }}</strong>
+            <p>{{ stickerDefinition ? attachmentMeta?.description : '当前客户端未内置这张贴纸，将按文本回退显示。' }}</p>
           </div>
         </div>
       </template>
@@ -607,11 +611,11 @@ onUnmounted(() => {
 .message-bubble {
   position: relative;
   max-width: min(62ch, 74%);
-  padding: 9px 12px 8px;
-  border: 1px solid var(--color-bubble-peer-line);
-  border-radius: 15px 15px 15px 11px;
-  background: var(--color-bubble-peer);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+  padding: 10px 13px 9px;
+  border: 1px solid var(--chat-bubble-peer-border);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) 12px;
+  background: var(--chat-bubble-peer-bg);
+  box-shadow: var(--shadow-xs);
 }
 
 .message-bubble.is-compact {
@@ -619,32 +623,32 @@ onUnmounted(() => {
 }
 
 .message-bubble.is-self {
-  border-color: var(--color-bubble-self-line);
-  border-radius: 15px 15px 11px 15px;
-  background: var(--color-bubble-self);
+  border-color: var(--chat-bubble-self-border);
+  border-radius: var(--radius-bubble) var(--radius-bubble) 12px var(--radius-bubble);
+  background: var(--chat-bubble-self-bg);
 }
 
 .message-bubble.is-search-active {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-primary) 14%, transparent),
-    0 0 0 4px color-mix(in srgb, var(--color-primary) 5%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--interactive-primary-bg) 14%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent),
     0 1px 2px rgba(15, 23, 42, 0.025);
 }
 
 .message-bubble.is-grouped:not(.is-self) {
-  border-top-left-radius: 9px;
+  border-top-left-radius: 10px;
 }
 
 .message-bubble.is-grouped-next:not(.is-self) {
-  border-bottom-left-radius: 9px;
+  border-bottom-left-radius: 10px;
 }
 
 .message-bubble.is-self.is-grouped {
-  border-top-right-radius: 9px;
+  border-top-right-radius: 10px;
 }
 
 .message-bubble.is-self.is-grouped-next {
-  border-bottom-right-radius: 9px;
+  border-bottom-right-radius: 10px;
 }
 
 .message-bubble.is-system {
@@ -652,16 +656,16 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-text-3);
-  font: 500 0.64rem/1.1 var(--font-mono);
+  color: var(--text-tertiary);
+  font: 500 0.72rem/1.1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
 .message-bubble__sender {
   display: inline-block;
   margin-bottom: 4px;
-  color: var(--color-shell-eyebrow);
-  font: 600 0.62rem/1 var(--font-mono);
+  color: var(--text-quaternary);
+  font: 600 0.7rem/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -671,29 +675,29 @@ onUnmounted(() => {
   top: 10px;
   right: 10px;
   padding: 5px 9px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card) 76%, transparent);
-  color: var(--color-text-2);
-  font: 600 0.66rem/1 var(--font-body);
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 14%, var(--border-default));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 76%, transparent);
+  color: var(--text-secondary);
+  font: 600 0.72rem/1 var(--font-body);
 }
 
 .message-bubble__selector.is-selected {
-  border-color: color-mix(in srgb, var(--color-primary) 26%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-card));
-  color: var(--color-primary-strong);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 26%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 14%, var(--surface-card));
+  color: var(--interactive-selected-fg);
 }
 
 .message-bubble p {
   margin: 0;
   white-space: pre-wrap;
-  font-size: 0.88rem;
-  line-height: 1.54;
+  font-size: 0.875rem;
+  line-height: 1.58;
   letter-spacing: -0.008em;
 }
 
 .message-bubble__text-layout {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .message-bubble__text {
@@ -702,9 +706,9 @@ onUnmounted(() => {
 
 .message-bubble__highlight {
   padding: 0 0.08em;
-  border-radius: 0.3rem;
-  background: color-mix(in srgb, var(--color-primary) 7%, white);
-  color: var(--color-text-1);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--interactive-selected-bg) 72%, white);
+  color: var(--text-primary);
 }
 
 .message-bubble__meta {
@@ -714,8 +718,8 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
-  color: color-mix(in srgb, var(--color-text-2) 82%, transparent);
-  font: 500 0.62rem/1 var(--font-mono);
+  color: color-mix(in srgb, var(--text-tertiary) 84%, transparent);
+  font: 500 0.72rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -727,35 +731,35 @@ onUnmounted(() => {
 
 .message-bubble__forward {
   margin-bottom: 5px;
-  color: var(--color-text-soft);
-  font-size: 0.68rem;
-  line-height: 1.34;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.38;
 }
 
 .message-bubble__reply {
   width: 100%;
-  margin-bottom: 5px;
-  padding: 6px 9px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 8%, var(--color-shell-border));
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-shell-inline));
-  color: var(--color-text-2);
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 8%, var(--border-subtle));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--interactive-primary-bg) 4%, var(--surface-panel));
+  color: var(--text-secondary);
   text-align: left;
-  font: 500 0.68rem/1.38 var(--font-body);
+  font: 500 0.75rem/1.42 var(--font-body);
 }
 
 .message-bubble__status {
   min-width: 15px;
   display: inline-flex;
   justify-content: flex-end;
-  color: color-mix(in srgb, var(--color-text-2) 72%, transparent);
-  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--text-tertiary) 72%, transparent);
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: -0.18em;
 }
 
 .message-bubble__status.is-read {
-  color: var(--color-primary-strong);
+  color: var(--interactive-selected-fg);
 }
 
 .message-bubble__status.is-sent {
@@ -763,16 +767,16 @@ onUnmounted(() => {
 }
 
 .message-bubble__status.is-group {
-  color: color-mix(in srgb, #d6efff 86%, var(--color-primary));
+  color: color-mix(in srgb, #d6efff 86%, var(--interactive-primary-bg));
 }
 
 .message-bubble__status.is-failed {
-  color: var(--color-danger);
+  color: var(--status-danger);
   letter-spacing: 0;
 }
 
 .message-bubble__status.is-sending {
-  color: color-mix(in srgb, var(--color-text-soft) 82%, transparent);
+  color: color-mix(in srgb, var(--text-quaternary) 82%, transparent);
   letter-spacing: 0;
 }
 
@@ -780,7 +784,7 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--interactive-primary-bg);
   font: inherit;
 }
 
@@ -790,12 +794,12 @@ onUnmounted(() => {
 }
 
 .message-bubble__edited {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .message-bubble__views {
-  color: color-mix(in srgb, var(--color-text-2) 84%, transparent);
-  font: 600 0.6rem/1 var(--font-mono);
+  color: color-mix(in srgb, var(--text-tertiary) 84%, transparent);
+  font: 600 0.7rem/1 var(--font-mono);
   letter-spacing: 0.03em;
 }
 
@@ -814,13 +818,13 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-primary);
-  font: 600 0.72rem/1 var(--font-body);
+  color: var(--interactive-primary-bg);
+  font: 600 0.78rem/1 var(--font-body);
 }
 
 .message-bubble__editor-actions button:disabled,
 .message-bubble__retry:disabled {
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .message-bubble__file {
@@ -835,7 +839,7 @@ onUnmounted(() => {
   width: min(320px, 100%);
   max-height: 280px;
   object-fit: cover;
-  border-radius: 11px;
+  border-radius: 12px;
 }
 
 .message-bubble__preview {
@@ -844,18 +848,18 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-bg-panel));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 7%, var(--surface-subtle));
   flex-shrink: 0;
 }
 
 .message-bubble__preview svg {
   width: 18px;
   height: 18px;
-  color: var(--color-primary);
+  color: var(--interactive-primary-bg);
 }
 
 .message-bubble__preview--file {
-  background: color-mix(in srgb, var(--color-text-1) 6%, var(--color-bg-panel));
+  background: color-mix(in srgb, var(--text-primary) 6%, var(--surface-subtle));
 }
 
 .message-bubble__file-copy {
@@ -870,8 +874,8 @@ onUnmounted(() => {
 }
 
 .message-bubble__file p {
-  color: var(--color-text-2);
-  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
 }
 
 .message-bubble__download {
@@ -879,15 +883,15 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-primary);
-  font: 600 0.72rem/1 var(--font-body);
+  color: var(--interactive-primary-bg);
+  font: 600 0.76rem/1 var(--font-body);
 }
 
 .message-bubble__file--image {
   min-width: 240px;
   padding: 8px;
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-bg-panel));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--interactive-primary-bg) 3%, var(--surface-subtle));
   cursor: pointer;
   flex-direction: column;
   align-items: stretch;
@@ -897,7 +901,7 @@ onUnmounted(() => {
   min-width: 180px;
   padding: 8px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 84%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 84%, transparent);
   cursor: pointer;
   flex-direction: column;
   align-items: center;
@@ -909,13 +913,26 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
+.message-bubble__sticker-art {
+  width: min(180px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-bubble__sticker-art :deep(svg) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .message-bubble__gif-badge {
   align-self: flex-start;
   padding: 4px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-panel));
-  color: var(--color-primary-strong);
-  font: 700 0.62rem/1 var(--font-mono);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--surface-subtle));
+  color: var(--interactive-selected-fg);
+  font: 700 0.68rem/1 var(--font-mono);
 }
 
 .message-bubble__reactions {
@@ -927,9 +944,9 @@ onUnmounted(() => {
 
 .message-bubble__reaction,
 .message-bubble__reaction-pick {
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 92%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
 }
 
 .message-bubble__reaction {
@@ -937,17 +954,17 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  color: var(--color-text-1);
-  font-size: 0.68rem;
+  color: var(--text-primary);
+  font-size: 0.72rem;
 }
 
 .message-bubble__reaction.is-active {
-  border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 38%, var(--border-subtle));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent);
 }
 
 .message-bubble__reaction strong {
-  font: 700 0.64rem/1 var(--font-mono);
+  font: 700 0.68rem/1 var(--font-mono);
 }
 
 .message-bubble__reaction-menu {
@@ -955,7 +972,7 @@ onUnmounted(() => {
   gap: 8px;
   padding-bottom: 10px;
   margin-bottom: 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-shell-border) 88%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
 }
 
 .message-bubble__reaction-pick {
@@ -964,7 +981,7 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   padding: 0 10px;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font-size: 0.96rem;
 }
 
@@ -973,10 +990,10 @@ onUnmounted(() => {
   z-index: 2200;
   min-width: 216px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--color-shell-border) 92%, transparent);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card) 96%, rgba(12, 14, 18, 0.94));
-  box-shadow: var(--shadow-float);
+  border: 1px solid color-mix(in srgb, var(--border-default) 92%, transparent);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-overlay) 94%, rgba(12, 14, 18, 0.94));
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(16px);
 }
 
@@ -987,23 +1004,23 @@ onUnmounted(() => {
   border: 0;
   border-radius: 11px;
   background: transparent;
-  color: var(--color-text-1);
+  color: var(--text-primary);
   text-align: left;
   font: 600 0.78rem/1.2 var(--font-body);
 }
 
 .message-bubble__context-item:hover,
 .message-bubble__context-item:focus-visible {
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 90%, transparent);
 }
 
 .message-bubble__context-item.is-danger {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .message-bubble__context-item.is-danger:hover,
 .message-bubble__context-item.is-danger:focus-visible {
-  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  background: color-mix(in srgb, var(--status-danger) 10%, transparent);
 }
 
 .message-context-menu-fade-enter-active,

@@ -1,6 +1,5 @@
 package com.echoim.server.service.impl;
 
-import com.aliyun.oss.OSS;
 import com.echoim.server.common.audit.AuditLogService;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
@@ -9,11 +8,13 @@ import com.echoim.server.entity.ImFileEntity;
 import com.echoim.server.im.model.WsMessageItem;
 import com.echoim.server.mapper.ImFileMapper;
 import com.echoim.server.service.file.FileService;
+import com.echoim.server.service.file.FileStreamPayload;
+import com.echoim.server.service.file.storage.FileStorageService;
+import com.echoim.server.service.file.storage.LocalFileStorageService;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import com.echoim.server.vo.file.FileDownloadVo;
 import com.echoim.server.vo.file.FileInfoVo;
 import org.apache.tika.Tika;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,33 +22,43 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.URL;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class FileServiceImpl implements FileService {
 
     private static final int FILE_STATUS_NORMAL = 1;
+    private static final int BIZ_TYPE_AVATAR = 1;
     private static final int BIZ_TYPE_IMAGE = 2;
     private static final int BIZ_TYPE_FILE = 4;
 
     private final ImFileMapper imFileMapper;
     private final FileProperties fileProperties;
-    private final ObjectProvider<OSS> ossProvider;
     private final AuditLogService auditLogService;
+    private final LocalFileStorageService localFileStorageService;
+    private final Map<String, FileStorageService> storageServices;
     private final Tika tika = new Tika();
 
     public FileServiceImpl(ImFileMapper imFileMapper,
                            FileProperties fileProperties,
-                           ObjectProvider<OSS> ossProvider,
-                           AuditLogService auditLogService) {
+                           AuditLogService auditLogService,
+                           LocalFileStorageService localFileStorageService,
+                           List<FileStorageService> storageServices) {
         this.imFileMapper = imFileMapper;
         this.fileProperties = fileProperties;
-        this.ossProvider = ossProvider;
         this.auditLogService = auditLogService;
+        this.localFileStorageService = localFileStorageService;
+        this.storageServices = storageServices.stream()
+                .collect(Collectors.toMap(FileStorageService::storageType, Function.identity()));
     }
 
     @Override
@@ -58,34 +69,41 @@ public class FileServiceImpl implements FileService {
         if (file.getSize() > fileProperties.getMaxSize()) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件大小超出限制");
         }
+
         int resolvedBizType = resolveBizType(file, bizType);
         String fileName = normalizeFileName(file.getOriginalFilename());
         String ext = extractExt(fileName);
         byte[] bytes = readBytes(file);
         String detectedContentType = detectContentType(bytes, fileName);
         validateFileSecurity(resolvedBizType, file.getContentType(), detectedContentType, ext, bytes);
-        OSS oss = requireOssClient();
+
         String objectKey = buildObjectKey(userId, ext);
-        try {
-            oss.putObject(fileProperties.getOss().getBucketName(), objectKey, new ByteArrayInputStream(bytes));
-        } catch (Exception ex) {
-            throw new BizException(ErrorCode.SYSTEM_ERROR, "文件上传失败");
-        }
+        FileStorageService storageService = currentStorageService();
+        storageService.store(resolveBucketName(storageService), objectKey, bytes);
 
         ImFileEntity entity = new ImFileEntity();
         entity.setOwnerUserId(userId);
         entity.setBizType(resolvedBizType);
-        entity.setStorageType(fileProperties.getStorageType());
-        entity.setBucketName(fileProperties.getOss().getBucketName());
+        entity.setStorageType(storageService.storageType());
+        entity.setBucketName(resolveBucketName(storageService));
         entity.setObjectKey(objectKey);
         entity.setFileName(fileName);
         entity.setFileExt(ext);
         entity.setContentType(defaultContentType(detectedContentType));
         entity.setFileSize(file.getSize());
-        entity.setUrl(buildCanonicalUrl(objectKey));
         entity.setStatus(FILE_STATUS_NORMAL);
         imFileMapper.insert(entity);
-        auditLogService.log("FILE_UPLOAD", Map.of("userId", userId, "fileId", entity.getId(), "fileName", fileName, "bizType", resolvedBizType));
+
+        entity.setUrl(storageService.generatePublicUrl(entity));
+        imFileMapper.updateById(entity);
+
+        auditLogService.log("FILE_UPLOAD", Map.of(
+                "userId", userId,
+                "fileId", entity.getId(),
+                "fileName", fileName,
+                "bizType", resolvedBizType,
+                "storageType", storageService.storageType()
+        ));
         return toFileInfoVo(entity);
     }
 
@@ -101,7 +119,7 @@ public class FileServiceImpl implements FileService {
         ImFileEntity entity = requireAccessibleFile(userId, fileId);
         FileDownloadVo vo = new FileDownloadVo();
         vo.setFileId(entity.getId());
-        vo.setDownloadUrl(generateSignedUrl(entity.getObjectKey()));
+        vo.setDownloadUrl(resolveDownloadUrl(entity));
         vo.setExpiresIn(fileProperties.getSignedUrlExpireSeconds());
         vo.setExpireAt(LocalDateTime.now().plusSeconds(fileProperties.getSignedUrlExpireSeconds()));
         auditLogService.log("FILE_DOWNLOAD", Map.of("userId", userId, "fileId", fileId));
@@ -109,17 +127,32 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    public ImFileEntity requireOwnedFile(Long userId, Long fileId, Integer... allowedBizTypes) {
-        ImFileEntity entity = imFileMapper.selectById(fileId);
-        if (entity == null || !Objects.equals(entity.getStatus(), FILE_STATUS_NORMAL)) {
-            throw new BizException(ErrorCode.FILE_NOT_FOUND, "文件不存在");
+    public FileStreamPayload getPublicFileStream(Long fileId) {
+        ImFileEntity entity = requireNormalFile(fileId);
+        if (!Integer.valueOf(BIZ_TYPE_AVATAR).equals(entity.getBizType())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "该文件不支持公开访问");
         }
+        return storageServiceFor(entity).open(entity, "inline");
+    }
+
+    @Override
+    public FileStreamPayload getSignedFileStream(Long fileId, long expiresAt, String disposition, String signature) {
+        ImFileEntity entity = requireNormalFile(fileId);
+        if (!localFileStorageService.verifySignature(fileId, disposition, expiresAt, signature)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "文件访问签名无效");
+        }
+        return storageServiceFor(entity).open(entity, normalizeDisposition(disposition, entity));
+    }
+
+    @Override
+    public ImFileEntity requireOwnedFile(Long userId, Long fileId, Integer... allowedBizTypes) {
+        ImFileEntity entity = requireNormalFile(fileId);
         if (!Objects.equals(entity.getOwnerUserId(), userId)) {
             throw new BizException(ErrorCode.FORBIDDEN, "无权使用该文件");
         }
         if (allowedBizTypes != null && allowedBizTypes.length > 0) {
-            Set<Integer> allowedSet = new HashSet<>(Arrays.asList(allowedBizTypes));
-            if (!allowedSet.contains(entity.getBizType())) {
+            List<Integer> allowed = Arrays.asList(allowedBizTypes);
+            if (!allowed.contains(entity.getBizType())) {
                 throw new BizException(ErrorCode.PARAM_ERROR, "文件类型不匹配");
             }
         }
@@ -164,10 +197,7 @@ public class FileServiceImpl implements FileService {
     }
 
     private ImFileEntity requireAccessibleFile(Long userId, Long fileId) {
-        ImFileEntity entity = imFileMapper.selectById(fileId);
-        if (entity == null || !Objects.equals(entity.getStatus(), FILE_STATUS_NORMAL)) {
-            throw new BizException(ErrorCode.FILE_NOT_FOUND, "文件不存在");
-        }
+        ImFileEntity entity = requireNormalFile(fileId);
         if (Objects.equals(entity.getOwnerUserId(), userId)) {
             return entity;
         }
@@ -177,10 +207,17 @@ public class FileServiceImpl implements FileService {
         return entity;
     }
 
+    private ImFileEntity requireNormalFile(Long fileId) {
+        ImFileEntity entity = imFileMapper.selectById(fileId);
+        if (entity == null || !Objects.equals(entity.getStatus(), FILE_STATUS_NORMAL)) {
+            throw new BizException(ErrorCode.FILE_NOT_FOUND, "文件不存在");
+        }
+        return entity;
+    }
+
     private Map<Long, ImFileEntity> loadFileMap(List<Long> fileIds) {
-        List<ImFileEntity> entities = imFileMapper.selectBatchIds(fileIds);
         Map<Long, ImFileEntity> fileMap = new HashMap<>();
-        for (ImFileEntity entity : entities) {
+        for (ImFileEntity entity : imFileMapper.selectBatchIds(fileIds)) {
             fileMap.put(entity.getId(), entity);
         }
         return fileMap;
@@ -195,32 +232,44 @@ public class FileServiceImpl implements FileService {
         vo.setFileSize(entity.getFileSize());
         vo.setBizType(entity.getBizType());
         vo.setObjectKey(entity.getObjectKey());
-        vo.setUrl(entity.getUrl());
-        vo.setDownloadUrl(generateSignedUrl(entity.getObjectKey()));
+        vo.setUrl(storageServiceFor(entity).generatePublicUrl(entity));
+        vo.setDownloadUrl(resolveDownloadUrl(entity));
         vo.setExpiresIn(fileProperties.getSignedUrlExpireSeconds());
         vo.setExpireAt(LocalDateTime.now().plusSeconds(fileProperties.getSignedUrlExpireSeconds()));
         return vo;
     }
 
-    private String generateSignedUrl(String objectKey) {
-        OSS oss = requireOssClient();
-        Instant expireAt = Instant.now().plusSeconds(fileProperties.getSignedUrlExpireSeconds());
-        URL url = oss.generatePresignedUrl(fileProperties.getOss().getBucketName(), objectKey, Date.from(expireAt));
-        return url.toString();
+    private String resolveDownloadUrl(ImFileEntity entity) {
+        return storageServiceFor(entity).generateDownloadUrl(
+                entity,
+                normalizeDisposition(null, entity),
+                fileProperties.getSignedUrlExpireSeconds()
+        );
     }
 
-    private OSS requireOssClient() {
-        OSS oss = ossProvider.getIfAvailable();
-        if (oss == null) {
-            throw new BizException(ErrorCode.SYSTEM_ERROR, "OSS 存储未配置");
+    private FileStorageService currentStorageService() {
+        return storageServices.computeIfAbsent(fileProperties.getStorageType(), ignored -> {
+            throw new BizException(ErrorCode.SYSTEM_ERROR, "不支持的文件存储类型");
+        });
+    }
+
+    private FileStorageService storageServiceFor(ImFileEntity entity) {
+        String storageType = StringUtils.hasText(entity.getStorageType()) ? entity.getStorageType() : fileProperties.getStorageType();
+        FileStorageService storageService = storageServices.get(storageType);
+        if (storageService == null) {
+            throw new BizException(ErrorCode.SYSTEM_ERROR, "不支持的文件存储类型");
         }
-        return oss;
+        return storageService;
+    }
+
+    private String resolveBucketName(FileStorageService storageService) {
+        return "oss".equals(storageService.storageType()) ? fileProperties.getOss().getBucketName() : null;
     }
 
     private int resolveBizType(MultipartFile file, Integer bizType) {
         if (bizType != null) {
-            if (bizType != BIZ_TYPE_IMAGE && bizType != BIZ_TYPE_FILE) {
-                throw new BizException(ErrorCode.PARAM_ERROR, "bizType 仅支持图片或文件");
+            if (bizType != BIZ_TYPE_AVATAR && bizType != BIZ_TYPE_IMAGE && bizType != BIZ_TYPE_FILE) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "bizType 仅支持头像、图片或文件");
             }
             return bizType;
         }
@@ -249,7 +298,7 @@ public class FileServiceImpl implements FileService {
                                       String detectedContentType,
                                       String ext,
                                       byte[] bytes) {
-        if (resolvedBizType == BIZ_TYPE_IMAGE) {
+        if (resolvedBizType == BIZ_TYPE_AVATAR || resolvedBizType == BIZ_TYPE_IMAGE) {
             validateWhitelist(ext, detectedContentType, fileProperties.getAllowedImageExtensions(), fileProperties.getAllowedImageContentTypes());
             if (clientContentType != null && !clientContentType.startsWith("image/")) {
                 throw new BizException(ErrorCode.PARAM_ERROR, "图片类型不合法");
@@ -263,6 +312,7 @@ public class FileServiceImpl implements FileService {
             }
             return;
         }
+
         validateWhitelist(ext, detectedContentType, fileProperties.getAllowedFileExtensions(), fileProperties.getAllowedFileContentTypes());
         if (clientContentType != null
                 && !"application/octet-stream".equals(clientContentType)
@@ -299,7 +349,7 @@ public class FileServiceImpl implements FileService {
         LocalDateTime now = LocalDateTime.now();
         String uuid = UUID.randomUUID().toString().replace("-", "");
         String suffix = StringUtils.hasText(ext) ? "." + ext : "";
-        return fileProperties.getOss().getObjectPrefix()
+        return "echoim"
                 + "/" + now.getYear()
                 + "/" + String.format("%02d", now.getMonthValue())
                 + "/" + String.format("%02d", now.getDayOfMonth())
@@ -308,13 +358,14 @@ public class FileServiceImpl implements FileService {
                 + suffix;
     }
 
-    private String buildCanonicalUrl(String objectKey) {
-        String endpoint = fileProperties.getOss().getEndpoint();
-        if (!StringUtils.hasText(endpoint) || !StringUtils.hasText(fileProperties.getOss().getBucketName())) {
-            return null;
+    private String normalizeDisposition(String disposition, ImFileEntity entity) {
+        if (StringUtils.hasText(disposition)) {
+            return "attachment".equalsIgnoreCase(disposition) ? "attachment" : "inline";
         }
-        String cleanEndpoint = endpoint.replaceFirst("^https?://", "");
-        return "https://" + fileProperties.getOss().getBucketName() + "." + cleanEndpoint + "/" + objectKey;
+        if (entity == null || entity.getContentType() == null) {
+            return "attachment";
+        }
+        return entity.getContentType().startsWith("image/") ? "inline" : "attachment";
     }
 
     private String defaultContentType(String contentType) {

@@ -12,6 +12,7 @@ import type {
   MessageForwardSource,
   MessageReplySource,
   MessageType,
+  PublicUserProfile,
   RecoveryVerifyResult,
   GroupMemberItem,
   GroupCreatePayload,
@@ -48,6 +49,7 @@ export type ApiTrustedDeviceSummary = TrustedDeviceSummary
 export type ApiSecurityEventSummary = SecurityEventSummary
 
 export type ApiCurrentUserProfile = CurrentUserProfile
+export type ApiPublicUserProfile = PublicUserProfile
 export type ApiUpdateCurrentUserProfilePayload = UpdateCurrentUserProfilePayload
 export type ApiChangePasswordPayload = ChangePasswordPayload
 export type ApiCallSessionSummary = CallSessionSummary
@@ -187,6 +189,8 @@ export interface WsEnvelope<T = unknown> {
 export interface WsAuthPayload {
   status: 'SUCCESS' | 'FAILED'
   userId?: number
+  code?: number
+  message?: string
 }
 
 export interface WsNoticePayload {

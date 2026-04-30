@@ -21,7 +21,6 @@ declare module 'vue' {
     ConversationProfilePanelBody: typeof import('./components/chat/ConversationProfilePanelBody.vue')['default']
     ConversationSidebar: typeof import('./components/chat/ConversationSidebar.vue')['default']
     ElButton: typeof import('element-plus/es')['ElButton']
-    ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDrawer: typeof import('element-plus/es')['ElDrawer']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']

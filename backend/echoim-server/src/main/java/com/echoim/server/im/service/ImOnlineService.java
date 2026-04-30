@@ -1,6 +1,7 @@
 package com.echoim.server.im.service;
 
 import com.echoim.server.common.auth.LoginUser;
+import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.im.constant.ImRedisKey;
 import com.echoim.server.im.session.ImSessionContext;
 import com.echoim.server.im.session.ImSessionManager;
@@ -16,10 +17,14 @@ public class ImOnlineService {
 
     private final ImSessionManager imSessionManager;
     private final StringRedisTemplate stringRedisTemplate;
+    private final ImWsPushService imWsPushService;
 
-    public ImOnlineService(ImSessionManager imSessionManager, StringRedisTemplate stringRedisTemplate) {
+    public ImOnlineService(ImSessionManager imSessionManager,
+                           StringRedisTemplate stringRedisTemplate,
+                           ImWsPushService imWsPushService) {
         this.imSessionManager = imSessionManager;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.imWsPushService = imWsPushService;
     }
 
     public void markOnline(LoginUser loginUser, Channel channel, String nodeId, int heartbeatTimeoutSeconds) {
@@ -30,6 +35,7 @@ public class ImOnlineService {
         );
         Channel previousChannel = imSessionManager.register(context, channel);
         if (previousChannel != null && previousChannel != channel) {
+            imWsPushService.pushForceOffline(previousChannel, ErrorCode.UNAUTHORIZED, "账号已在其他连接登录");
             previousChannel.close();
         }
 
@@ -51,6 +57,24 @@ public class ImOnlineService {
         if (!imSessionManager.removeIfMatch(userId, channel)) {
             return;
         }
+        clearPresence(userId);
+    }
+
+    public void forceOffline(Long userId, int code, String message) {
+        if (userId == null) {
+            return;
+        }
+        imSessionManager.getChannel(userId).ifPresent(channel -> {
+            if (channel.isActive()) {
+                imWsPushService.pushForceOffline(channel, code, message);
+                channel.close();
+            }
+        });
+        imSessionManager.remove(userId);
+        clearPresence(userId);
+    }
+
+    private void clearPresence(Long userId) {
         stringRedisTemplate.delete(ImRedisKey.onlineUser(userId));
         stringRedisTemplate.delete(ImRedisKey.heartbeatUser(userId));
         stringRedisTemplate.delete(ImRedisKey.routeUser(userId));

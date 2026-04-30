@@ -25,8 +25,8 @@ body,
 body {
   margin: 0;
   overflow: hidden;
-  background: var(--color-bg-app);
-  color: var(--color-text-1);
+  background: var(--surface-canvas);
+  color: var(--text-primary);
   font: 400 16px/1.58 var(--font-body);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -40,10 +40,10 @@ body::before {
   pointer-events: none;
   background:
     radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--color-shell-glow) 100%, transparent), transparent 18%),
-    radial-gradient(circle at 82% 2%, color-mix(in srgb, var(--color-primary) 4%, transparent), transparent 14%),
-    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--color-bg-surface) 94%, transparent), transparent 24%),
+    radial-gradient(circle at 82% 2%, color-mix(in srgb, var(--interactive-primary-bg) 5%, transparent), transparent 14%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--surface-subtle) 94%, transparent), transparent 24%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
-  opacity: 0.56;
+  opacity: 0.62;
 }
 
 body::after {
@@ -87,7 +87,7 @@ ul {
 }
 
 :focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 68%, white);
+  outline: 2px solid color-mix(in srgb, var(--interactive-primary-bg) 68%, white);
   outline-offset: 3px;
 }
 

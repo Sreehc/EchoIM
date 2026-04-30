@@ -4,6 +4,7 @@ import com.echoim.server.dto.user.UpdateProfileRequestDto;
 import com.echoim.server.common.auth.LoginUser;
 import com.echoim.server.common.PageResponse;
 import com.echoim.server.vo.user.UserPublicProfileVo;
+import com.echoim.server.vo.user.UserPublicPageVo;
 import com.echoim.server.vo.user.UserProfileVo;
 import com.echoim.server.vo.user.UserSearchItemVo;
 
@@ -20,6 +21,8 @@ public interface UserProfileService {
     UserPublicProfileVo getPublicProfile(Long currentUserId, Long targetUserId);
 
     UserPublicProfileVo getPublicProfileByUsername(Long currentUserId, String username);
+
+    UserPublicPageVo getPublicPageByUsername(String username);
 
     Map<String, Object> checkUsername(Long currentUserId, String username);
 }

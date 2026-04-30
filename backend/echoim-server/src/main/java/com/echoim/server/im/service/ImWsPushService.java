@@ -32,6 +32,13 @@ public class ImWsPushService {
         if (channelOptional.isEmpty() || !channelOptional.get().isActive()) {
             return;
         }
+        pushToChannel(channelOptional.get(), type, traceId, clientMsgId, data);
+    }
+
+    public void pushToChannel(Channel channel, WsMessageType type, String traceId, String clientMsgId, Object data) {
+        if (channel == null || !channel.isActive()) {
+            return;
+        }
         WsMessage response = new WsMessage();
         response.setType(type);
         response.setTraceId(traceId);
@@ -39,10 +46,24 @@ public class ImWsPushService {
         response.setTimestamp(System.currentTimeMillis());
         response.setData(data);
         try {
-            channelOptional.get().writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
+            channel.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
         } catch (JsonProcessingException ex) {
             throw new BizException(ErrorCode.SYSTEM_ERROR, "WebSocket 消息编码失败");
         }
+    }
+
+    public void pushForceOffline(Channel channel, int code, String message) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("code", code);
+        data.put("message", message);
+        pushToChannel(channel, WsMessageType.FORCE_OFFLINE, null, null, data);
+    }
+
+    public void pushForceOffline(Long userId, int code, String message) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("code", code);
+        data.put("message", message);
+        pushToUser(userId, WsMessageType.FORCE_OFFLINE, null, null, data);
     }
 
     public void pushConversationChange(Long userId,

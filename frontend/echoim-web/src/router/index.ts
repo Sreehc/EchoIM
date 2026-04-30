@@ -16,6 +16,11 @@ const router = createRouter({
       children: [{ path: '', name: 'login', component: () => import('@/views/LoginView.vue') }],
     },
     {
+      path: '/u',
+      component: () => import('@/layouts/AuthLayout.vue'),
+      children: [{ path: ':username', name: 'public-profile', component: () => import('@/views/PublicProfileView.vue') }],
+    },
+    {
       path: '/chat',
       component: () => import('@/layouts/ChatLayout.vue'),
       meta: { requiresAuth: true },

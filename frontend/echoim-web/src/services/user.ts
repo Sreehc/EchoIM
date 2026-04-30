@@ -1,5 +1,6 @@
 import type {
   ApiCurrentUserProfile,
+  ApiPublicUserProfile,
   ApiUpdateCurrentUserProfilePayload,
   ApiUsernameAvailability,
   ApiUserPublicProfile,
@@ -22,6 +23,10 @@ export function fetchUserPublicProfile(userId: number) {
 
 export function fetchUserPublicProfileByUsername(username: string) {
   return getJson<ApiUserPublicProfile>(`/api/users/by-username/${encodeURIComponent(username)}`)
+}
+
+export function fetchPublicUserProfileByUsername(username: string) {
+  return getJson<ApiPublicUserProfile>(`/api/public/users/by-username/${encodeURIComponent(username)}`)
 }
 
 export function searchUsers(keyword: string, pageNo = 1, pageSize = 20) {

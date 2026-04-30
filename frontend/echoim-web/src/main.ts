@@ -16,6 +16,14 @@ app.use(router)
 
 configureHttpClient({
   getToken: () => useAuthStore(pinia).session?.token ?? null,
+  refreshSession: async () => {
+    try {
+      await useAuthStore(pinia).refreshSession()
+      return true
+    } catch {
+      return false
+    }
+  },
   onUnauthorized: () => {
     useAuthStore(pinia).clearSession()
     useChatStore(pinia).resetState()

@@ -8,13 +8,13 @@ import type {
 } from '@/types/api'
 import type { ConnectionStatus } from '@/types/chat'
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL?.trim() ?? ''
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 20000]
 const HEARTBEAT_INTERVAL = 25000
 
 interface ConnectOptions {
   wsUrl: string
   token: string
+  resolveToken?: () => Promise<string>
 }
 
 interface EchoWsClientOptions {
@@ -24,9 +24,11 @@ interface EchoWsClientOptions {
 }
 
 function buildWsUrl(path: string) {
-  if (WS_BASE_URL) return WS_BASE_URL
-
   if (path.startsWith('ws://') || path.startsWith('wss://')) return path
+
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    throw new Error(`WebSocket 连接必须使用 /ws 这类同源路径，当前收到绝对地址：${path}`)
+  }
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
@@ -52,6 +54,7 @@ export class EchoWsClient {
     this.connectOptions = {
       wsUrl: buildWsUrl(options.wsUrl),
       token: options.token,
+      resolveToken: options.resolveToken,
     }
     this.manualClose = false
 
@@ -60,6 +63,18 @@ export class EchoWsClient {
     }
 
     await this.openSocket(false)
+  }
+
+  async updateToken(token: string) {
+    if (!this.connectOptions) return
+
+    this.connectOptions.token = token
+
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    this.sendWithSocket(this.socket, 'AUTH', { token })
   }
 
   disconnect() {
@@ -131,6 +146,15 @@ export class EchoWsClient {
     if (!options) return
 
     this.setStatus(isReconnect ? 'reconnecting' : 'connecting')
+    let token: string
+    try {
+      token = await this.resolveToken(options)
+    } catch (error) {
+      if (!this.manualClose) {
+        this.scheduleReconnect()
+      }
+      throw error
+    }
 
     await new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(options.wsUrl)
@@ -150,7 +174,7 @@ export class EchoWsClient {
 
       const handleOpen = () => {
         this.socket = socket
-        this.send('AUTH', { token: options.token })
+        this.sendWithSocket(socket, 'AUTH', { token })
       }
 
       const handleMessage = async (event: MessageEvent) => {
@@ -163,19 +187,25 @@ export class EchoWsClient {
         }
 
         if (message.type === 'AUTH') {
-          const status = (message.data as { status?: string })?.status
-        if (status === 'SUCCESS') {
-          this.reconnectIndex = 0
-          this.startHeartbeat()
-          this.setStatus('ready')
-          settleResolve()
-          if (isReconnect) {
-            await this.options.onReconnectReady()
-          }
+          const authPayload = message.data as { status?: string; message?: string }
+          const status = authPayload?.status
+          if (status === 'SUCCESS') {
+            this.reconnectIndex = 0
+            this.startHeartbeat()
+            this.setStatus('ready')
+            settleResolve()
+            if (isReconnect) {
+              await this.options.onReconnectReady()
+            }
             return
           }
 
-          settleReject(new Error('WebSocket 鉴权失败'))
+          const authError = new Error(authPayload?.message || 'WebSocket 鉴权失败')
+          if (!settled) {
+            settleReject(authError)
+          }
+          this.stopHeartbeat()
+          socket.close()
           return
         }
 
@@ -268,6 +298,10 @@ export class EchoWsClient {
       throw new Error('实时连接尚未就绪')
     }
 
+    this.sendWithSocket(this.socket, type, data, clientMsgId)
+  }
+
+  private sendWithSocket(socket: WebSocket, type: WsMessageType, data: unknown, clientMsgId?: string) {
     const message: WsEnvelope = {
       type,
       traceId: `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
@@ -276,7 +310,17 @@ export class EchoWsClient {
       data,
     }
 
-    this.socket.send(JSON.stringify(message))
+    socket.send(JSON.stringify(message))
+  }
+
+  private async resolveToken(options: ConnectOptions) {
+    if (!options.resolveToken) {
+      return options.token
+    }
+
+    const nextToken = await options.resolveToken()
+    options.token = nextToken
+    return nextToken
   }
 
   private setStatus(status: ConnectionStatus) {

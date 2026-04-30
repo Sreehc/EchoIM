@@ -9,6 +9,8 @@ import java.util.List;
 public class FileProperties {
 
     private String storageType = "oss";
+    private String baseUrl;
+    private String accessSignSecret = "echoim-file-access-secret";
     private long maxSize = 104857600L;
     private int signedUrlExpireSeconds = 600;
     private List<String> allowedImageContentTypes = new ArrayList<>(List.of("image/jpeg", "image/png", "image/gif", "image/webp"));
@@ -29,6 +31,7 @@ public class FileProperties {
             "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip"
     ));
     private Oss oss = new Oss();
+    private Local local = new Local();
 
     public String getStorageType() {
         return storageType;
@@ -36,6 +39,22 @@ public class FileProperties {
 
     public void setStorageType(String storageType) {
         this.storageType = storageType;
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
+    public String getAccessSignSecret() {
+        return accessSignSecret;
+    }
+
+    public void setAccessSignSecret(String accessSignSecret) {
+        this.accessSignSecret = accessSignSecret;
     }
 
     public long getMaxSize() {
@@ -94,6 +113,14 @@ public class FileProperties {
         this.oss = oss;
     }
 
+    public Local getLocal() {
+        return local;
+    }
+
+    public void setLocal(Local local) {
+        this.local = local;
+    }
+
     public static class Oss {
 
         private String endpoint;
@@ -140,6 +167,19 @@ public class FileProperties {
 
         public void setObjectPrefix(String objectPrefix) {
             this.objectPrefix = objectPrefix;
+        }
+    }
+
+    public static class Local {
+
+        private String rootDir = "./data/echoim-files";
+
+        public String getRootDir() {
+            return rootDir;
+        }
+
+        public void setRootDir(String rootDir) {
+            this.rootDir = rootDir;
         }
     }
 }

@@ -20,6 +20,13 @@ export interface CurrentUserProfile extends UserInfo {
   status: number | null
 }
 
+export interface PublicUserProfile {
+  username: string
+  nickname: string
+  avatarUrl: string | null
+  signature: string | null
+}
+
 export interface UpdateCurrentUserProfilePayload {
   username?: string | null
   nickname: string
@@ -43,6 +50,9 @@ export interface AuthSession {
   token: string
   tokenType: string
   expiresIn: number
+  expireAt: string | null
+  refreshToken: string | null
+  refreshTokenExpireAt: string | null
   userInfo: UserInfo
 }
 
@@ -51,6 +61,9 @@ export interface LoginFlowResponse {
   token?: string
   tokenType?: string
   expiresIn?: number
+  expireAt?: string | null
+  refreshToken?: string | null
+  refreshTokenExpireAt?: string | null
   userInfo?: UserInfo
   challengeTicket?: string
   maskedEmail?: string
@@ -67,6 +80,8 @@ export interface StoredAccount {
   sessionToken: string | null
   sessionTokenType: string | null
   sessionExpireAt: string | null
+  refreshToken: string | null
+  refreshTokenExpireAt: string | null
   trustedDeviceGrantToken: string | null
   trustedDeviceExpireAt: string | null
   deviceFingerprint: string | null
@@ -360,6 +375,7 @@ export interface ConversationProfile {
   notice?: string | null
   fields: ProfileField[]
   actions: ProfileAction[]
+  publicProfilePath?: string | null
   specialType?: SpecialConversationType | null
   group?: GroupGovernanceMeta | null
   members?: GroupMemberItem[]

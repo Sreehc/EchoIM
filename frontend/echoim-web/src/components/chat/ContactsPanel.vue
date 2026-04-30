@@ -228,7 +228,7 @@ function requestCountBadge(item: FriendRequestItem) {
   padding: 22px 20px 20px;
   background:
     radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-shell-glow) 46%, transparent), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-card) 96%, transparent), transparent);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 96%, transparent), transparent);
 }
 
 .contacts-panel__hero {
@@ -245,8 +245,8 @@ function requestCountBadge(item: FriendRequestItem) {
 
 .contacts-panel__copy p {
   margin-top: 4px;
-  color: var(--color-text-2);
-  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
   line-height: 1.46;
 }
 
@@ -264,15 +264,15 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-panel__back,
 .contacts-panel__switch,
 .contacts-card__action {
-  border: 1px solid var(--color-shell-border);
-  background: var(--color-shell-action);
-  color: var(--color-text-1);
+  border: 1px solid var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
 }
 
 .contacts-panel__back {
   width: 44px;
   height: 44px;
-  border-radius: 13px;
+  border-radius: var(--radius-control);
 }
 
 .contacts-panel__add {
@@ -282,10 +282,10 @@ function requestCountBadge(item: FriendRequestItem) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-action));
-  color: var(--color-text-1);
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 10%, var(--interactive-secondary-bg));
+  color: var(--text-primary);
 }
 
 .contacts-panel__back:hover,
@@ -306,15 +306,15 @@ function requestCountBadge(item: FriendRequestItem) {
 
 .contacts-panel__switch {
   padding: 10px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font: 600 0.68rem/1 var(--font-body);
   letter-spacing: 0.01em;
 }
 
 .contacts-panel__switch.is-active {
-  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-shell-action));
-  color: var(--color-primary-strong);
+  border-color: var(--border-brand);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 90%, var(--interactive-secondary-bg));
+  color: var(--interactive-selected-fg);
 }
 
 .contacts-panel__scroll {
@@ -331,10 +331,10 @@ function requestCountBadge(item: FriendRequestItem) {
   display: grid;
   gap: 12px;
   padding: 15px 16px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-shell-card-strong) 96%, transparent);
-  box-shadow: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
+  box-shadow: var(--shadow-xs);
 }
 
 .contacts-card__main {
@@ -361,23 +361,24 @@ function requestCountBadge(item: FriendRequestItem) {
 }
 
 .contacts-card__title strong {
-  font-size: 0.84rem;
+  color: var(--text-primary);
+  font-size: 0.88rem;
   line-height: 1.2;
 }
 
 .contacts-card__title span {
   padding: 5px 8px;
-  border-radius: 999px;
-  background: var(--color-shell-action);
-  color: var(--color-text-soft);
-  font: 600 0.62rem/1 var(--font-mono);
+  border-radius: var(--radius-pill);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-quaternary);
+  font: 600 0.66rem/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
 .contacts-card__copy p {
   margin-top: 6px;
-  color: var(--color-text-2);
-  font-size: 0.74rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
   line-height: 1.46;
 }
 
@@ -395,7 +396,7 @@ function requestCountBadge(item: FriendRequestItem) {
   justify-content: center;
   gap: 7px;
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   font: 600 0.72rem/1 var(--font-body);
   white-space: nowrap;
   text-align: center;
@@ -406,10 +407,10 @@ function requestCountBadge(item: FriendRequestItem) {
   height: 40px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 12px;
-  background: var(--color-shell-action);
-  color: var(--color-text-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-secondary);
 }
 
 .contacts-card__action :deep(svg) {
@@ -419,13 +420,13 @@ function requestCountBadge(item: FriendRequestItem) {
 }
 
 .contacts-card__action.is-primary {
-  border-color: color-mix(in srgb, var(--color-accent) 18%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-shell-action));
+  border-color: color-mix(in srgb, var(--status-success) 18%, var(--border-default));
+  background: color-mix(in srgb, var(--status-success) 12%, var(--interactive-secondary-bg));
 }
 
 .contacts-card__action.is-danger {
-  border-color: color-mix(in srgb, var(--color-danger) 18%, var(--color-shell-border));
-  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-shell-action));
+  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 10%, var(--interactive-secondary-bg));
 }
 
 @media (max-width: 767px) {

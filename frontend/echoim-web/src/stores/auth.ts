@@ -18,6 +18,7 @@ import {
   fetchTrustedDevicesRequest,
   loginRequest,
   logoutRequest,
+  refreshSessionRequest,
   resendLoginChallengeRequest,
   resetRecoveryPasswordRequest,
   revokeAllTrustedDevicesRequest,
@@ -34,6 +35,8 @@ import { STORAGE_KEYS } from '@/utils/storage'
 import { normalizeDisplayText } from '@/utils/text'
 
 type SessionPersistence = 'local' | 'session' | 'none'
+const REFRESH_LEAD_TIME_MS = 5 * 60 * 1000
+const MIN_SESSION_VALIDITY_MS = 90 * 1000
 
 const initialSessionState = readPersistedSession()
 
@@ -53,6 +56,8 @@ export const useAuthStore = defineStore('auth', () => {
   const securityEvents = ref<SecurityEventSummary[]>([])
   const profileError = ref<string | null>(null)
   const profileNotice = ref<string | null>(null)
+  let refreshPromise: Promise<AuthSession | null> | null = null
+  let refreshTimer: number | null = null
 
   const isAuthenticated = computed(() => Boolean(session.value?.token))
   const currentUser = computed(() => session.value?.userInfo ?? null)
@@ -155,6 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       await changePasswordRequest(payload)
+      clearStoredSessionTokensForCurrentAccount()
       clearTrustedGrantForCurrentAccount()
       profileNotice.value = '密码已更新'
     } catch (error) {
@@ -165,10 +171,74 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function refreshSession() {
+    if (refreshPromise) {
+      return refreshPromise
+    }
+
+    const currentSession = session.value
+    if (!currentSession?.refreshToken) {
+      throw new Error('登录已失效，请重新登录')
+    }
+
+    const persistence = sessionPersistence.value
+    const userId = currentSession.userInfo.userId
+    const deviceFingerprint = getStoredAccount(userId)?.deviceFingerprint ?? null
+
+    refreshPromise = (async () => {
+      try {
+        const response = normalizeLoginFlow(await refreshSessionRequest({
+          refreshToken: currentSession.refreshToken ?? '',
+        }))
+        if (response.status !== 'authenticated') {
+          throw new Error('登录状态异常')
+        }
+
+        applyAuthenticatedSession(response, {
+          rememberMe: persistence === 'local',
+          deviceFingerprint,
+          persistStoredAccount: persistence === 'local',
+        })
+        return session.value
+      } catch (error) {
+        clearStoredSessionTokens(userId)
+        clearSession()
+        throw error
+      } finally {
+        refreshPromise = null
+      }
+    })()
+
+    return refreshPromise
+  }
+
+  async function ensureSessionFresh(minValidityMs = MIN_SESSION_VALIDITY_MS) {
+    const currentSession = session.value
+    if (!currentSession) {
+      throw new Error('登录已失效，请重新登录')
+    }
+
+    const expiresAt = new Date(currentSession.expireAt ?? '').getTime()
+    if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt - minValidityMs) {
+      const nextSession = await refreshSession()
+      if (!nextSession) {
+        throw new Error('登录已失效，请重新登录')
+      }
+      return nextSession
+    }
+
+    return currentSession
+  }
+
   async function logout() {
+    const refreshToken = session.value?.refreshToken ?? null
+    const userId = session.value?.userInfo.userId ?? null
     try {
-      await logoutRequest()
+      await logoutRequest({ refreshToken })
     } finally {
+      if (userId != null) {
+        clearStoredAuthState(userId)
+      }
       clearSession()
     }
   }
@@ -183,6 +253,9 @@ export const useAuthStore = defineStore('auth', () => {
         token: account.sessionToken ?? '',
         tokenType: account.sessionTokenType ?? 'Bearer',
         expiresIn: Math.max(60, Math.floor((expiresAt - Date.now()) / 1000)),
+        expireAt: account.sessionExpireAt,
+        refreshToken: account.refreshToken,
+        refreshTokenExpireAt: account.refreshTokenExpireAt,
         userInfo: account.userInfo,
       })
       session.value = nextSession
@@ -193,11 +266,39 @@ export const useAuthStore = defineStore('auth', () => {
         sessionToken: nextSession.token,
         sessionTokenType: nextSession.tokenType,
         sessionExpireAt: account.sessionExpireAt,
+        refreshToken: account.refreshToken,
+        refreshTokenExpireAt: account.refreshTokenExpireAt,
         trustedDeviceGrantToken: account.trustedDeviceGrantToken,
         trustedDeviceExpireAt: account.trustedDeviceExpireAt,
         deviceFingerprint: account.deviceFingerprint,
       })
       return session.value
+    }
+
+    if (isStoredRefreshUsable(account)) {
+      isLoading.value = true
+
+      try {
+        const response = normalizeLoginFlow(await refreshSessionRequest({
+          refreshToken: account.refreshToken ?? '',
+        }))
+        if (response.status !== 'authenticated') {
+          throw new Error('账号切换失败')
+        }
+        applyAuthenticatedSession(response, {
+          rememberMe: true,
+          deviceFingerprint: account.deviceFingerprint,
+          persistStoredAccount: true,
+        })
+        return session.value
+      } catch (error) {
+        if (error instanceof HttpError && error.code && [401, 40100, 40101, 40102].includes(error.code)) {
+          clearStoredSessionTokens(userId)
+        }
+        throw error
+      } finally {
+        isLoading.value = false
+      }
     }
 
     if (!isTrustedDeviceGrantUsable(account)) {
@@ -343,6 +444,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearSession() {
+    refreshPromise = null
+    stopRefreshTimer()
     session.value = null
     sessionPersistence.value = 'none'
     profile.value = null
@@ -389,27 +492,36 @@ export const useAuthStore = defineStore('auth', () => {
       persistStoredAccount: boolean
     },
   ) {
-    if (!response.token || !response.tokenType || !response.expiresIn || !response.userInfo) {
+    if (!response.token || !response.tokenType || !response.expiresIn || !response.userInfo || !response.refreshToken) {
       throw new Error('登录返回不完整')
     }
+
+    const expireAt = response.expireAt ?? new Date(Date.now() + response.expiresIn * 1000).toISOString()
+    const refreshTokenExpireAt = response.refreshTokenExpireAt ?? null
 
     const nextSession: AuthSession = normalizeSession({
       token: response.token,
       tokenType: response.tokenType,
       expiresIn: response.expiresIn,
+      expireAt,
+      refreshToken: response.refreshToken,
+      refreshTokenExpireAt,
       userInfo: response.userInfo,
     })
 
     session.value = nextSession
     sessionPersistence.value = options.rememberMe ? 'local' : 'session'
     persistSession(nextSession, sessionPersistence.value)
+    scheduleRefresh(nextSession)
     if (options.persistStoredAccount) {
       const sessionExpireAt = new Date(Date.now() + nextSession.expiresIn * 1000).toISOString()
       upsertStoredAccount(nextSession, {
         rememberMe: true,
         sessionToken: nextSession.token,
         sessionTokenType: nextSession.tokenType,
-        sessionExpireAt,
+        sessionExpireAt: expireAt || sessionExpireAt,
+        refreshToken: nextSession.refreshToken,
+        refreshTokenExpireAt,
         trustedDeviceGrantToken: response.trustedDeviceGrantToken ?? null,
         trustedDeviceExpireAt: response.trustedDeviceExpireAt ?? null,
         deviceFingerprint: options.deviceFingerprint,
@@ -424,6 +536,8 @@ export const useAuthStore = defineStore('auth', () => {
       sessionToken?: string | null
       sessionTokenType?: string | null
       sessionExpireAt?: string | null
+      refreshToken?: string | null
+      refreshTokenExpireAt?: string | null
       trustedDeviceGrantToken?: string | null
       trustedDeviceExpireAt?: string | null
       deviceFingerprint?: string | null
@@ -464,6 +578,33 @@ export const useAuthStore = defineStore('auth', () => {
     clearTrustedGrant(userId)
   }
 
+  function clearStoredSessionTokensForCurrentAccount() {
+    const userId = session.value?.userInfo.userId
+    if (!userId) return
+    clearStoredSessionTokens(userId)
+  }
+
+  function clearStoredSessionTokens(userId: number) {
+    storedAccounts.value = storedAccounts.value.map((account) =>
+      account.userInfo.userId === userId
+        ? {
+            ...account,
+            sessionToken: null,
+            sessionTokenType: null,
+            sessionExpireAt: null,
+            refreshToken: null,
+            refreshTokenExpireAt: null,
+          }
+        : account,
+    )
+    persistStoredAccounts(storedAccounts.value)
+  }
+
+  function clearStoredAuthState(userId: number) {
+    clearStoredSessionTokens(userId)
+    clearTrustedGrant(userId)
+  }
+
   function clearAllTrustedGrants() {
     storedAccounts.value = storedAccounts.value.map((account) => ({
       ...account,
@@ -494,6 +635,28 @@ export const useAuthStore = defineStore('auth', () => {
   function getStoredAccount(userId: number) {
     return storedAccounts.value.find((item) => item.userInfo.userId === userId) ?? null
   }
+
+  function scheduleRefresh(nextSession: AuthSession | null) {
+    stopRefreshTimer()
+    if (!nextSession) return
+
+    const expiresAt = new Date(nextSession.expireAt ?? '').getTime()
+    if (!Number.isFinite(expiresAt)) return
+
+    const delay = Math.max(5_000, expiresAt - Date.now() - REFRESH_LEAD_TIME_MS)
+    refreshTimer = window.setTimeout(() => {
+      void refreshSession().catch(() => undefined)
+    }, delay)
+  }
+
+  function stopRefreshTimer() {
+    if (refreshTimer != null) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+  }
+
+  scheduleRefresh(session.value)
 
   return {
     session,
@@ -532,6 +695,8 @@ export const useAuthStore = defineStore('auth', () => {
     ensureCurrentProfile,
     saveCurrentProfile,
     changePassword,
+    refreshSession,
+    ensureSessionFresh,
     clearProfileNotice,
     clearProfileError,
   }
@@ -597,8 +762,14 @@ function persistStoredAccounts(accounts: StoredAccount[]) {
 }
 
 function normalizeSession(session: AuthSession): AuthSession {
+  const expireAt = typeof session.expireAt === 'string' ? session.expireAt : new Date(0).toISOString()
+  const refreshToken = typeof session.refreshToken === 'string' ? session.refreshToken : null
+  const refreshTokenExpireAt = typeof session.refreshTokenExpireAt === 'string' ? session.refreshTokenExpireAt : null
   return {
     ...session,
+    expireAt,
+    refreshToken,
+    refreshTokenExpireAt,
     userInfo: {
       ...session.userInfo,
       nickname: normalizeDisplayText(session.userInfo.nickname),
@@ -630,6 +801,8 @@ function normalizeStoredAccount(raw: unknown): StoredAccount | null {
     sessionToken: typeof record.sessionToken === 'string' ? record.sessionToken : null,
     sessionTokenType: typeof record.sessionTokenType === 'string' ? record.sessionTokenType : null,
     sessionExpireAt: typeof record.sessionExpireAt === 'string' ? record.sessionExpireAt : null,
+    refreshToken: typeof record.refreshToken === 'string' ? record.refreshToken : null,
+    refreshTokenExpireAt: typeof record.refreshTokenExpireAt === 'string' ? record.refreshTokenExpireAt : null,
     trustedDeviceGrantToken: typeof record.trustedDeviceGrantToken === 'string' ? record.trustedDeviceGrantToken : null,
     trustedDeviceExpireAt: typeof record.trustedDeviceExpireAt === 'string' ? record.trustedDeviceExpireAt : null,
     deviceFingerprint: typeof record.deviceFingerprint === 'string' ? record.deviceFingerprint : null,
@@ -644,6 +817,8 @@ function toStoredAccount(
     sessionToken?: string | null
     sessionTokenType?: string | null
     sessionExpireAt?: string | null
+    refreshToken?: string | null
+    refreshTokenExpireAt?: string | null
     trustedDeviceGrantToken?: string | null
     trustedDeviceExpireAt?: string | null
     deviceFingerprint?: string | null
@@ -656,7 +831,9 @@ function toStoredAccount(
     rememberMe: meta?.rememberMe ?? existing?.rememberMe ?? true,
     sessionToken: meta?.sessionToken ?? existing?.sessionToken ?? session.token,
     sessionTokenType: meta?.sessionTokenType ?? existing?.sessionTokenType ?? session.tokenType,
-    sessionExpireAt: meta?.sessionExpireAt ?? existing?.sessionExpireAt ?? new Date(Date.now() + session.expiresIn * 1000).toISOString(),
+    sessionExpireAt: meta?.sessionExpireAt ?? existing?.sessionExpireAt ?? session.expireAt,
+    refreshToken: meta?.refreshToken ?? existing?.refreshToken ?? session.refreshToken,
+    refreshTokenExpireAt: meta?.refreshTokenExpireAt ?? existing?.refreshTokenExpireAt ?? session.refreshTokenExpireAt,
     trustedDeviceGrantToken: meta?.trustedDeviceGrantToken ?? existing?.trustedDeviceGrantToken ?? null,
     trustedDeviceExpireAt: meta?.trustedDeviceExpireAt ?? existing?.trustedDeviceExpireAt ?? null,
     deviceFingerprint: meta?.deviceFingerprint ?? existing?.deviceFingerprint ?? null,
@@ -669,6 +846,16 @@ function isStoredSessionUsable(account: StoredAccount) {
   }
 
   const expiresAt = new Date(account.sessionExpireAt).getTime()
+  if (!Number.isFinite(expiresAt)) return false
+  return Date.now() < expiresAt - 60_000
+}
+
+function isStoredRefreshUsable(account: StoredAccount) {
+  if (!account.refreshToken || !account.refreshTokenExpireAt) {
+    return false
+  }
+
+  const expiresAt = new Date(account.refreshTokenExpireAt).getTime()
   if (!Number.isFinite(expiresAt)) return false
   return Date.now() < expiresAt - 60_000
 }

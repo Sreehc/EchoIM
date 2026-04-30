@@ -33,14 +33,14 @@ const emit = defineEmits<{
   gap: 12px;
   justify-items: center;
   padding: 30px 24px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 28px;
-  background: var(--color-shell-card);
-  box-shadow:
-    var(--shadow-inset-soft),
-    var(--shadow-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-shell-glow) 8%, transparent), transparent 30%),
+    var(--surface-card);
+  box-shadow: var(--shadow-sm);
   text-align: center;
-  color: var(--color-text-2);
+  color: var(--text-secondary);
 }
 
 .state-panel--compact {
@@ -48,38 +48,42 @@ const emit = defineEmits<{
 }
 
 .state-panel__eyebrow {
-  color: var(--color-shell-eyebrow);
+  color: var(--text-quaternary);
   font: var(--font-eyebrow);
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
 
 .state-panel strong {
-  color: var(--color-text-1);
+  color: var(--text-primary);
   font: var(--font-title-sm);
 }
 
 .state-panel p {
   max-width: 30ch;
-  color: var(--color-text-3);
-  font-size: 0.86rem;
+  color: var(--text-tertiary);
+  font-size: 0.88rem;
   line-height: 1.5;
 }
 
 .state-panel__action {
   min-height: var(--control-height-sm);
   padding: 0 16px;
-  border: 1px solid var(--color-shell-border);
-  border-radius: 999px;
-  background: var(--color-shell-action);
-  color: var(--color-text-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
   font-size: 0.84rem;
   font-weight: 600;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .state-panel__action:hover,
 .state-panel__action:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
 }
 </style>

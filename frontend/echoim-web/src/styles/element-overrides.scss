@@ -1,19 +1,19 @@
 :root {
-  --el-color-primary: var(--color-primary);
-  --el-color-primary-light-3: color-mix(in srgb, var(--color-primary) 70%, white);
-  --el-color-primary-light-5: color-mix(in srgb, var(--color-primary) 55%, white);
-  --el-color-primary-light-7: color-mix(in srgb, var(--color-primary) 35%, white);
-  --el-border-radius-base: var(--radius-sm);
+  --el-color-primary: var(--interactive-primary-bg);
+  --el-color-primary-light-3: color-mix(in srgb, var(--interactive-primary-bg) 70%, white);
+  --el-color-primary-light-5: color-mix(in srgb, var(--interactive-primary-bg) 55%, white);
+  --el-color-primary-light-7: color-mix(in srgb, var(--interactive-primary-bg) 35%, white);
+  --el-border-radius-base: var(--radius-control);
   --el-border-radius-round: 999px;
-  --el-border-color: var(--color-line);
-  --el-fill-color-blank: var(--color-bg-surface);
-  --el-bg-color: var(--color-bg-surface);
-  --el-bg-color-page: var(--color-bg-app);
-  --el-text-color-primary: var(--color-text-1);
-  --el-text-color-regular: var(--color-text-2);
-  --el-text-color-secondary: var(--color-text-3);
-  --el-fill-color-light: color-mix(in srgb, var(--color-bg-panel) 72%, transparent);
-  --el-bg-color-overlay: var(--color-shell-card-strong);
+  --el-border-color: var(--border-subtle);
+  --el-fill-color-blank: var(--surface-subtle);
+  --el-bg-color: var(--surface-subtle);
+  --el-bg-color-page: var(--surface-canvas);
+  --el-text-color-primary: var(--text-primary);
+  --el-text-color-regular: var(--text-secondary);
+  --el-text-color-secondary: var(--text-tertiary);
+  --el-fill-color-light: color-mix(in srgb, var(--surface-panel) 72%, transparent);
+  --el-bg-color-overlay: var(--surface-overlay);
   --el-mask-color: var(--color-shell-mask);
 }
 
@@ -25,56 +25,56 @@
 
 .el-input__wrapper,
 .el-textarea__inner {
-  border-radius: 14px;
-  background: var(--color-shell-inline);
-  border: 1px solid var(--color-shell-border);
-  color: var(--color-text-1);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .el-input__wrapper.is-focus,
 .el-textarea__inner:focus {
-  box-shadow: 0 0 0 2px var(--color-focus-ring) !important;
-  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-shell-border));
+  box-shadow: 0 0 0 3px var(--interactive-focus-ring) !important;
+  border-color: var(--border-brand);
 }
 
 .el-button {
   min-height: var(--control-height-md);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   font-weight: 600;
   letter-spacing: -0.01em;
-  border-color: var(--color-shell-border);
-  background: var(--color-shell-action);
-  color: var(--color-text-1);
+  border-color: var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--interactive-secondary-fg);
   transition:
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    transform var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .el-button--primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  background: var(--interactive-primary-bg);
+  border-color: var(--interactive-primary-bg);
+  color: var(--interactive-primary-fg);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--interactive-primary-bg) 16%, transparent);
 }
 
 .el-button:hover,
 .el-button:focus-visible {
-  border-color: var(--color-shell-border-strong);
-  background: var(--color-shell-action-hover);
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
   transform: none;
 }
 
 .el-button--primary:hover,
 .el-button--primary:focus-visible {
-  background: color-mix(in srgb, var(--color-primary) 88%, white);
-  border-color: color-mix(in srgb, var(--color-primary) 88%, white);
+  background: var(--interactive-primary-bg-hover);
+  border-color: var(--interactive-primary-bg-hover);
 }
 
 .el-input__wrapper {
@@ -82,11 +82,11 @@
 }
 
 .el-input__wrapper:hover {
-  background: color-mix(in srgb, var(--color-shell-inline) 92%, var(--color-shell-action-hover));
+  background: color-mix(in srgb, var(--surface-panel) 84%, var(--interactive-secondary-bg-hover));
 }
 
 .el-form-item__label {
-  color: var(--color-text-2);
+  color: var(--text-secondary);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -104,10 +104,10 @@
 .el-dialog,
 .el-select-dropdown,
 .el-popover {
-  border: 1px solid var(--color-shell-border) !important;
-  border-radius: 18px !important;
-  background: var(--color-shell-card-strong) !important;
-  box-shadow: var(--shadow-panel) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-panel) !important;
+  background: var(--surface-overlay) !important;
+  box-shadow: var(--shadow-lg) !important;
   backdrop-filter: blur(20px);
 }
 
@@ -119,8 +119,8 @@
 }
 
 .el-dropdown__popper.el-popper .el-popper__arrow::before {
-  background: var(--color-shell-card-strong) !important;
-  border: 1px solid var(--color-shell-border) !important;
+  background: var(--surface-overlay) !important;
+  border: 1px solid var(--border-default) !important;
   box-shadow: none !important;
 }
 
@@ -130,14 +130,14 @@
 
 .el-dropdown-menu__item {
   min-height: 40px;
-  border-radius: 12px;
-  color: var(--color-text-1);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
 }
 
 .el-dropdown-menu__item:not(.is-disabled):hover,
 .el-dropdown-menu__item:not(.is-disabled):focus {
-  background: var(--color-shell-inline);
-  color: var(--color-text-1);
+  background: var(--interactive-hover-bg);
+  color: var(--text-primary);
 }
 
 .el-message-box__headerbtn,
@@ -147,7 +147,7 @@
 
 .el-message-box__content,
 .el-message-box__header {
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .el-dialog__header {
@@ -160,7 +160,7 @@
 
 .el-dialog__title {
   font: var(--font-title-sm);
-  color: var(--color-text-1);
+  color: var(--text-primary);
 }
 
 .el-overlay-dialog {
@@ -172,27 +172,27 @@
 }
 
 .el-switch {
-  --el-switch-on-color: var(--color-primary);
-  --el-switch-off-color: color-mix(in srgb, var(--color-text-soft) 24%, var(--color-shell-inline));
+  --el-switch-on-color: var(--interactive-primary-bg);
+  --el-switch-off-color: color-mix(in srgb, var(--text-quaternary) 24%, var(--surface-panel));
 }
 
 .el-radio-button__inner {
-  border-radius: 18px !important;
-  background: var(--color-shell-action);
-  border-color: var(--color-shell-border);
+  border-radius: var(--radius-panel) !important;
+  background: var(--interactive-secondary-bg);
+  border-color: var(--border-default);
   box-shadow: none !important;
 }
 
 .el-radio-button__original-radio:checked + .el-radio-button__inner {
-  background: color-mix(in srgb, var(--color-primary) 82%, white);
-  border-color: color-mix(in srgb, var(--color-primary) 82%, white);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 82%, white);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 82%, white);
 }
 
 .el-skeleton__item {
-  background: color-mix(in srgb, var(--color-shell-inline) 82%, transparent) !important;
+  background: color-mix(in srgb, var(--surface-panel) 82%, transparent) !important;
 }
 
 .el-scrollbar__bar.is-vertical > div,
 .el-scrollbar__bar.is-horizontal > div {
-  background: color-mix(in srgb, var(--color-text-soft) 30%, transparent) !important;
+  background: color-mix(in srgb, var(--text-quaternary) 30%, transparent) !important;
 }

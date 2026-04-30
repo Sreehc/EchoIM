@@ -97,13 +97,14 @@ function visibleUnreadCount(item: ConversationSummary) {
   min-height: 70px;
   padding: 8px 12px 8px 14px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: var(--radius-panel);
   background: transparent;
   text-align: left;
   transition:
-    background var(--motion-base) ease,
-    color var(--motion-base) ease,
-    border-color var(--motion-fast) ease;
+    background var(--motion-base) var(--motion-ease-out),
+    color var(--motion-base) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .conversation-item::before {
@@ -115,9 +116,9 @@ function visibleUnreadCount(item: ConversationSummary) {
   width: 2px;
   border-radius: 999px;
   pointer-events: none;
-  background: color-mix(in srgb, var(--color-primary) 72%, transparent);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 72%, transparent);
   opacity: 0;
-  transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
+  transition: opacity var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
   transform: scaleY(0.72);
 }
 
@@ -128,8 +129,8 @@ function visibleUnreadCount(item: ConversationSummary) {
 
 .conversation-item:hover,
 .conversation-item:focus-visible {
-  background: color-mix(in srgb, var(--color-shell-card) 88%, transparent);
-  border-color: var(--color-shell-border);
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+  border-color: var(--border-subtle);
 }
 
 .conversation-item:hover::before,
@@ -140,9 +141,10 @@ function visibleUnreadCount(item: ConversationSummary) {
 }
 
 .conversation-item.is-active {
-  background: color-mix(in srgb, var(--color-selected) 80%, var(--color-shell-card-strong));
-  color: var(--color-text-1);
-  border-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-shell-border));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 86%, var(--surface-card));
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 16%, var(--border-default));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .conversation-item__avatar {
@@ -151,9 +153,9 @@ function visibleUnreadCount(item: ConversationSummary) {
 
 .conversation-item__highlight {
   padding: 0 0.08em;
-  border-radius: 0.35rem;
-  background: color-mix(in srgb, var(--color-shell-highlight) 74%, transparent);
-  color: var(--color-text-1);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--interactive-selected-bg) 78%, white);
+  color: var(--text-primary);
 }
 
 .conversation-item__head,
@@ -178,7 +180,8 @@ function visibleUnreadCount(item: ConversationSummary) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-size: 0.93rem;
   font-weight: 600;
   letter-spacing: -0.012em;
   line-height: 1.18;
@@ -194,9 +197,9 @@ function visibleUnreadCount(item: ConversationSummary) {
 }
 
 .conversation-item__time {
-  color: var(--color-text-soft);
+  color: var(--text-tertiary);
   flex-shrink: 0;
-  font: 500 0.68rem/1 var(--font-mono);
+  font: 500 0.75rem/1 var(--font-mono);
   white-space: nowrap;
   letter-spacing: 0.02em;
 }
@@ -207,9 +210,9 @@ function visibleUnreadCount(item: ConversationSummary) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--color-text-3);
-  font-size: 0.78rem;
-  line-height: 1.28;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  line-height: 1.32;
 }
 
 .conversation-item__meta {
@@ -226,7 +229,7 @@ function visibleUnreadCount(item: ConversationSummary) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--color-text-soft);
+  color: var(--text-quaternary);
 }
 
 .conversation-item__state-icon {
@@ -241,24 +244,24 @@ function visibleUnreadCount(item: ConversationSummary) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 86%, white);
-  color: #fff;
-  font: 700 0.58rem/1 var(--font-mono);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--status-success) 88%, white);
+  color: var(--text-on-brand);
+  font: 700 0.62rem/1 var(--font-mono);
   letter-spacing: 0.02em;
 }
 
 .conversation-item.is-muted .conversation-item__badge {
-  background: var(--color-text-soft);
+  background: var(--text-quaternary);
 }
 
 .conversation-item.is-active .conversation-item__time,
 .conversation-item.is-active .conversation-item__foot p,
 .conversation-item.is-active .conversation-item__state {
-  color: var(--color-text-2);
+  color: var(--text-secondary);
 }
 
 .conversation-item.is-active .conversation-item__badge {
-  background: color-mix(in srgb, var(--color-primary) 82%, white);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 82%, white);
 }
 </style>

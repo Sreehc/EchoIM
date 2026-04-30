@@ -50,7 +50,6 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
       <span v-if="initials" class="avatar-badge__initials">{{ initials }}</span>
       <component :is="type === 'user' ? User : UserFilled" v-else class="avatar-badge__icon" />
     </template>
-    <span v-if="online" class="avatar-badge__online"></span>
   </div>
 </template>
 
@@ -107,23 +106,6 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
 
 .avatar-badge__initials {
   line-height: 1;
-}
-
-.avatar-badge__online {
-  position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--color-bg-surface);
-  border-radius: 50%;
-  background: var(--color-online);
-}
-
-.avatar-badge.size-xl .avatar-badge__online {
-  width: 11px;
-  height: 11px;
-  border-width: 2px;
 }
 
 .type-user.tone-0 {

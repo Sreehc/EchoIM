@@ -10,6 +10,7 @@ public class AuthProperties {
     private int resendCooldownSeconds = 60;
     private int maxVerifyAttempts = 5;
     private int trustedDeviceExpireDays = 30;
+    private int refreshTokenExpireDays = 30;
 
     public String getMailFrom() {
         return mailFrom;
@@ -49,5 +50,13 @@ public class AuthProperties {
 
     public void setTrustedDeviceExpireDays(int trustedDeviceExpireDays) {
         this.trustedDeviceExpireDays = trustedDeviceExpireDays;
+    }
+
+    public int getRefreshTokenExpireDays() {
+        return refreshTokenExpireDays;
+    }
+
+    public void setRefreshTokenExpireDays(int refreshTokenExpireDays) {
+        this.refreshTokenExpireDays = refreshTokenExpireDays;
     }
 }
