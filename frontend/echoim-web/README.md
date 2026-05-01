@@ -1,122 +1,90 @@
 # echoim-web
 
-EchoIM Web 聊天客户端。
+EchoIM 用户端前端，基于 Vue 3 + TypeScript + Pinia + Element Plus 构建。
 
-当前前端已经从“静态页面阶段”进入“真实后端联调阶段”，并且开始按 Telegram 常用能力做产品化补齐。
+## 技术栈
 
-相关总文档：
+- **框架**：Vue 3 (Composition API) + TypeScript
+- **状态管理**：Pinia
+- **UI 组件**：Element Plus
+- **构建工具**：Vite
+- **实时通信**：WebSocket（原生 API）
+- **通话**：WebRTC
 
-- [开发文档](/Users/cheers/Desktop/workspace/EchoIM/EchoIM%20开发文档.md)
-- [接口文档](/Users/cheers/Desktop/workspace/EchoIM/接口文档.md)
-- [UI Token 重构方案](/Users/cheers/Desktop/workspace/EchoIM/frontend/echoim-web/design-system/MASTER.md)
+## 项目结构
 
-## 当前已接入能力
+```
+src/
+├── adapters/       # API 响应数据适配层
+├── assets/         # 静态资源（图标、贴纸 SVG）
+├── components/     # 通用组件
+├── composables/    # 组合式函数
+├── router/         # Vue Router 路由配置
+├── stores/         # Pinia 状态管理
+│   ├── auth.ts     # 认证状态
+│   ├── chat.ts     # 聊天核心状态
+│   ├── call.ts     # 语音通话状态
+│   └── ...
+├── styles/         # 全局样式与主题变量
+├── types/          # TypeScript 类型定义
+├── utils/          # 工具函数
+└── views/
+    ├── LoginView.vue
+    ├── PublicProfileView.vue
+    └── chat/
+        └── ChatHomeView.vue
+```
 
-- 登录：`POST /api/auth/login`
-- 退出登录：`POST /api/auth/logout`
-- 会话列表：`GET /api/conversations`
-- 历史消息：`GET /api/conversations/:id/messages`
-- 上拉更早消息：`GET /api/conversations/:id/messages?maxSeqNo=...`
-- 已读 / 置顶 / 免打扰 / 删除：`PUT /read`、`PUT /top`、`PUT /mute`、`DELETE /api/conversations/:id`
-- 单聊 / 群聊详情：`GET /api/users/:id`、`GET /api/groups/:id`
-- 消息撤回 / 编辑：`PUT /api/messages/:id/recall`、`PUT /api/messages/:id/edit`
-- 实时链路：`GET /api/im/info` + `WebSocket /ws`
-- 离线补回：`POST /api/offline-sync/messages`
+## 已实现功能
 
-## 当前前端状态说明
+### 消息与会话
+- 单聊、群聊、频道三种会话类型
+- 文本、图片、文件、GIF、贴纸消息发送
+- 消息撤回、编辑、回复、转发
+- 消息已读回执与送达状态
+- 表情回应（Reaction）
+- 离线消息同步（上线自动拉取未读）
+- 输入状态实时提示
+- 解散群聊 / 频道后隐藏输入框，显示解散提示
 
-### 已完成
-
-- 单聊 / 群聊 / 频道型会话基础界面
-- 会话列表与聊天主区联动
-- 会话详情抽屉
-- 会话内消息搜索
-- 文本消息发送、编辑、撤回
-- 已读、送达、重连、离线补回
-- 置顶、免打扰、删除
-- 深浅主题、聊天偏好、桌面通知
+### 会话管理
+- 会话置顶、免打扰、归档
+- 手动标记未读
+- 会话文件夹（收件箱、归档、未读、单聊、群聊、频道）
+- Saved Messages（收藏 / 自对话）
 - 右键会话菜单
 
-### 部分完成
+### 社交功能
+- 好友申请与好友列表
+- 用户搜索
+- 全局搜索（会话、用户、消息内容）
+- 个人资料编辑
+- 公开主页查看
 
-- `Mark as unread`
-  当前是前端本地行为，刷新后不保留。
-- `Archive`
-  当前是前端本地隐藏，不是真正归档。
-- 图片消息
-  已有消息类型，但展示体验还不够完整。
-- 文件消息
-  已有卡片展示，但下载 / 预览链路需要补强。
-- 新建私聊 / 群组 / 频道
-  入口存在，真实创建流程还未完成。
+### 群组治理
+- 群主 / 管理员 / 普通成员角色
+- 群公告、群名称编辑
+- 成员管理
+- 群解散
 
-## 产品优先级 PRD 清单
+### 语音通话
+- 一对一语音通话（WebRTC）
+- 信令协商与 ICE 交换
+- 通话状态管理
 
-### P0
+### 界面与体验
+- 深色 / 浅色主题切换
+- 聊天偏好设置（回车发送、紧凑列表、紧凑气泡）
+- 桌面通知
+- 响应式布局
 
-- 真实归档
-- 真实标记未读
-- 新建私聊 / 群组 / 频道完整创建流程
-- 图片消息真实展示
-- 文件消息下载 / 预览增强
-- 回复 / 引用消息
-
-### P1
-
-- 转发消息
-- Saved Messages
-- 全局搜索
-- 联系人闭环
-- 会话文件夹
-
-### P2
-
-- 表情 / Sticker / GIF
-- reaction
-- 语音消息
-- 多账号
-- 用户名公开体系 / 分享链接
-
-## 前端任务拆分表
-
-### 第一阶段：补真能力
-
-| 模块 | 任务 | 输出 |
-|---|---|---|
-| 会话列表 | 接入真实归档状态 | 会话筛选、归档显隐、状态持久化 |
-| 会话列表 | 接入真实标记未读 | 右键菜单、角标、多端一致 |
-| 新建流程 | 完成新建私聊 / 群组 / 频道 | 弹层、表单、创建后跳转 |
-| 消息区 | 图片消息真实展示 | 缩略图、查看大图、失败态 |
-| 消息区 | 文件消息增强 | 下载、基础预览、错误提示 |
-| 输入区 | 回复 / 引用 | 回复条、发送、消息展示、跳转 |
-
-### 第二阶段：补高频聊天能力
-
-| 模块 | 任务 | 输出 |
-|---|---|---|
-| 消息区 | 转发消息 | 转发入口、选择目标会话、发送结果 |
-| 会话区 | Saved Messages | 内置自用会话、列表固定展示 |
-| 搜索 | 全局搜索 | 会话 / 联系人 / 消息搜索页 |
-| 联系人 | 联系人闭环 | 搜索、申请、通过、资料联动 |
-
-### 第三阶段：补组织能力
-
-| 模块 | 任务 | 输出 |
-|---|---|---|
-| 会话列表 | 会话文件夹 | 文件夹切换、规则筛选、管理入口 |
-| 群组 / 频道 | 角色与治理 | 成员列表、角色展示、基础管理动作 |
-| 会话列表 | 批量管理 | 批量已读、归档、静音、删除 |
-
-## 本地联调
+## 本地开发
 
 前置条件：
+- Node.js 18+
+- 后端服务已启动（Spring Boot `:8080` + WebSocket `:8091`）
 
-- MySQL 已启动，并存在 `echoim` 数据库与演示账号种子数据
-- Redis 已启动
-- `ECHOIM_JWT_SECRET` 必须满足 HMAC 长度要求，建议至少 32 字节
-- 如果本地没有 OSS，后端需设置 `ECHOIM_FILE_STORAGE_TYPE=local`
-
-启动步骤：
+启动：
 
 ```bash
 npm install
@@ -124,55 +92,30 @@ npm run dev
 ```
 
 默认开发代理：
+- `/api` -> `http://127.0.0.1:8080`
+- `/ws` -> `ws://127.0.0.1:8091`
 
-- `/api -> http://127.0.0.1:8080`
-- `/ws -> ws://127.0.0.1:8091`
+前端只请求同源相对路径（如 `/api/auth/login`），不直接写后端完整地址。开发环境依赖 Vite proxy，生产环境依赖 Nginx 反向代理。
 
-前端请求约定：
+## 生产构建
 
-- 浏览器侧只请求同源相对路径，例如 `/api/auth/login`、`/api/conversations`、`/ws`
-- 不在前端代码里写 `http://127.0.0.1:8080` 这类完整后端地址
-- 开发环境依赖 Vite proxy，把 `/api` 和 `/ws` 转发到本地 Spring Boot / IM 服务
-- 生产环境依赖 Nginx 做同域名反向代理，避免额外处理 CORS、Cookie 域、证书和环境切换
+```bash
+npm run build
+```
 
-## 生产部署
+构建产物输出到 `dist/` 目录，使用 Nginx 托管静态文件并反向代理 API 和 WebSocket。Nginx 配置示例见 `deploy/nginx/echoim.conf`。
 
-推荐把前端静态资源、HTTP API、WebSocket 都挂在同一个域名下：
+推荐部署方式：前端静态资源、HTTP API、WebSocket 挂在同一域名下：
 
-- `https://im.example.com/` -> 前端静态资源
+- `https://im.example.com/` -> 前端静态文件
 - `https://im.example.com/api/...` -> Spring Boot `:8080`
 - `wss://im.example.com/ws` -> IM WebSocket `:8091`
-
-仓库内提供了 Nginx 示例配置：
-
-- [deploy/nginx/echoim.conf](/Users/cheers/Desktop/workspace/EchoIM/deploy/nginx/echoim.conf)
-
-这套方式的直接收益：
-
-1. 前端始终使用 `/api` 和 `/ws`，不区分本地、测试、生产
-2. 浏览器端不需要单独处理跨域
-3. HTTPS 证书只需要配在 Nginx 这一层
-4. Cookie、鉴权头、文件下载链接都更容易保持一致
 
 ## 校验命令
 
 ```bash
-npm run typecheck
-npm run build
-npm run test:e2e
-npm run test:a11y
+npm run typecheck    # TypeScript 类型检查
+npm run build        # 生产构建
+npm run test:e2e     # 端到端测试
+npm run test:a11y    # 无障碍测试
 ```
-
-`test:e2e` 当前覆盖：
-
-- 单聊发送、已读、断线重连与离线补回
-- 消息编辑、撤回与退出登录
-- 基础布局、设置面板、资料编辑、桌面通知提示
-
-## 评审建议
-
-前端评审时，不要只看“页面像不像 Telegram”，而要优先检查：
-
-1. 状态是否真实持久化
-2. 会话和消息在刷新、多端、重连后是否一致
-3. 新功能是否已经具备真实后端闭环
