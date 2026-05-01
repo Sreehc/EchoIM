@@ -15,6 +15,7 @@ import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.service.ImGroupChatService;
 import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.common.ratelimit.LocalRateLimitService;
+import com.echoim.server.common.util.ContentSanitizer;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImGroupMapper;
@@ -198,14 +199,17 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
     }
 
     private ImMessageEntity buildMessage(Long fromUserId, WsGroupChatData data, String clientMsgId, Integer conversationType) {
+        int msgType = toMessageType(data.getMsgType());
         ImMessageEntity entity = new ImMessageEntity();
         entity.setConversationId(data.getConversationId());
         entity.setConversationType(conversationType);
         entity.setClientMsgId(clientMsgId);
         entity.setFromUserId(fromUserId);
         entity.setGroupId(data.getGroupId());
-        entity.setMsgType(toMessageType(data.getMsgType()));
-        entity.setContent(data.getContent());
+        entity.setMsgType(msgType);
+        entity.setContent(ContentSanitizer.isTextType(msgType)
+                ? ContentSanitizer.escapeHtml(data.getContent())
+                : data.getContent());
         entity.setExtraJson(toJson(data.getExtraJson()));
         entity.setFileId(data.getFileId());
         entity.setSendStatus(MESSAGE_STATUS_SENT);

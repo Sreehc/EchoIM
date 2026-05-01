@@ -2,6 +2,7 @@ package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
 import com.echoim.server.common.PageResponse;
+import com.echoim.server.common.annotation.RequireLogin;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequireLogin
 @RestController
 @RequestMapping("/admin/users")
 public class AdminUserController {

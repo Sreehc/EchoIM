@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireLogin;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequireLogin
 @RestController
 @RequestMapping("/admin/versions")
 public class AdminVersionController {
@@ -21,6 +23,9 @@ public class AdminVersionController {
                         "versionCode", "v0.1.0",
                         "versionName", "EchoIM MVP",
                         "platform", "web",
+                        "releaseNote", "首个发布版本",
+                        "forceUpdate", 0,
+                        "grayPercent", 100,
                         "publishStatus", 1
                 )
         ));

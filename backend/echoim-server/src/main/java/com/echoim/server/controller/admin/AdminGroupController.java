@@ -2,11 +2,13 @@ package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
 import com.echoim.server.common.PageResponse;
+import com.echoim.server.common.annotation.RequireLogin;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
+@RequireLogin
 @RestController
 @RequestMapping("/admin/groups")
 public class AdminGroupController {

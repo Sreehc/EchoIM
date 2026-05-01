@@ -49,4 +49,6 @@ public interface ImConversationUserMapper extends BaseMapper<ImConversationUserE
 
     void hideConversation(@Param("conversationId") Long conversationId,
                           @Param("userId") Long userId);
+
+    List<Long> selectDistinctPeerUserIds(@Param("userId") Long userId);
 }

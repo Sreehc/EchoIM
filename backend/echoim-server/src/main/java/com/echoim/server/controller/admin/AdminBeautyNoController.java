@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireLogin;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequireLogin
 @RestController
 @RequestMapping("/admin/beauty-nos")
 public class AdminBeautyNoController {
@@ -20,7 +22,8 @@ public class AdminBeautyNoController {
                         "beautyNoId", 1L,
                         "beautyNo", "88888",
                         "levelType", 3,
-                        "status", 1
+                        "status", 1,
+                        "remark", "至尊靓号"
                 )
         ));
     }

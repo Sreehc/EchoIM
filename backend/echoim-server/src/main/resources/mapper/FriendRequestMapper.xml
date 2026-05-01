@@ -24,8 +24,9 @@
               WHEN r.to_user_id = #{userId} THEN r.from_user_id
               ELSE r.to_user_id
           END
-        WHERE r.from_user_id = #{userId}
-           OR r.to_user_id = #{userId}
+        WHERE (r.from_user_id = #{userId}
+           OR r.to_user_id = #{userId})
+          AND r.status = 0
         ORDER BY r.created_at DESC, r.id DESC
     </select>
 </mapper>

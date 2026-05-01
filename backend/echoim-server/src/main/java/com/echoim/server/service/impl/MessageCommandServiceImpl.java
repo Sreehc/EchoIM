@@ -4,6 +4,7 @@ import com.echoim.server.common.auth.LoginUser;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.common.audit.AuditLogService;
+import com.echoim.server.common.util.ContentSanitizer;
 import com.echoim.server.dto.message.EditMessageRequestDto;
 import com.echoim.server.dto.message.ForwardMessageRequestDto;
 import com.echoim.server.entity.ImMessageReactionEntity;
@@ -118,7 +119,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         Map<String, Object> extraMap = parseExtra(message.getExtraJson());
         extraMap.put("edited", true);
         extraMap.put("editedAt", LocalDateTime.now());
-        message.setContent(requestDto.getContent().trim());
+        message.setContent(ContentSanitizer.escapeHtml(requestDto.getContent().trim()));
         message.setExtraJson(toJson(extraMap));
         imMessageMapper.updateById(message);
         refreshConversationPreview(message);

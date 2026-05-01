@@ -22,5 +22,8 @@ public enum WsMessageType {
     NOTICE,
     CONVERSATION_CHANGE,
     FORCE_OFFLINE,
-    OFFLINE_SYNC
+    OFFLINE_SYNC,
+    TYPING,
+    USER_ONLINE,
+    USER_OFFLINE
 }

@@ -7,6 +7,7 @@ import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.dto.conversation.ConversationPageQueryDto;
 import com.echoim.server.dto.conversation.MessagePageQueryDto;
 import com.echoim.server.service.conversation.ConversationService;
+import com.echoim.server.vo.conversation.ConversationFileVo;
 import com.echoim.server.vo.conversation.ConversationItemVo;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import jakarta.validation.Valid;
@@ -49,6 +50,14 @@ public class ConversationController {
     public ApiResponse<PageResponse<MessageItemVo>> messages(@PathVariable Long id,
                                                              @Valid MessagePageQueryDto queryDto) {
         return ApiResponse.success(conversationService.pageConversationMessages(LoginUserContext.requireUserId(), id, queryDto));
+    }
+
+    @RequireLogin
+    @GetMapping("/{id}/files")
+    public ApiResponse<PageResponse<ConversationFileVo>> files(@PathVariable Long id,
+                                                               @RequestParam(defaultValue = "1") long pageNo,
+                                                               @RequestParam(defaultValue = "20") long pageSize) {
+        return ApiResponse.success(conversationService.pageConversationFiles(LoginUserContext.requireUserId(), id, pageNo, pageSize));
     }
 
     @RequireLogin

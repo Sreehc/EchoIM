@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireLogin;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequireLogin
 @RestController
 @RequestMapping("/admin/configs")
 public class AdminConfigController {
@@ -20,6 +22,7 @@ public class AdminConfigController {
                         "configKey", "file.max-size-mb",
                         "configValue", "50",
                         "configName", "文件上传大小限制",
+                        "remark", "超过此大小的文件将被拒绝上传",
                         "status", 1
                 )
         ));

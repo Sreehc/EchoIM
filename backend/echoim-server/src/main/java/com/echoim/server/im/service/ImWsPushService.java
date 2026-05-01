@@ -4,6 +4,7 @@ import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.im.model.WsMessage;
 import com.echoim.server.im.model.WsMessageType;
+import com.echoim.server.im.monitor.WsMetrics;
 import com.echoim.server.im.session.ImSessionManager;
 import com.echoim.server.vo.conversation.ConversationItemVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,10 +22,12 @@ public class ImWsPushService {
 
     private final ImSessionManager imSessionManager;
     private final ObjectMapper objectMapper;
+    private final WsMetrics wsMetrics;
 
-    public ImWsPushService(ImSessionManager imSessionManager, ObjectMapper objectMapper) {
+    public ImWsPushService(ImSessionManager imSessionManager, ObjectMapper objectMapper, WsMetrics wsMetrics) {
         this.imSessionManager = imSessionManager;
         this.objectMapper = objectMapper;
+        this.wsMetrics = wsMetrics;
     }
 
     public void pushToUser(Long userId, WsMessageType type, String traceId, String clientMsgId, Object data) {
@@ -47,6 +50,7 @@ public class ImWsPushService {
         response.setData(data);
         try {
             channel.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
+            wsMetrics.recordMessageSent();
         } catch (JsonProcessingException ex) {
             throw new BizException(ErrorCode.SYSTEM_ERROR, "WebSocket 消息编码失败");
         }

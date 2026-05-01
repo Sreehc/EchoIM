@@ -6,9 +6,12 @@ import com.echoim.server.common.exception.BizException;
 import com.echoim.server.im.model.WsAuthData;
 import com.echoim.server.im.model.WsMessage;
 import com.echoim.server.im.model.WsMessageType;
+import com.echoim.server.im.monitor.WsMetrics;
 import com.echoim.server.im.service.ImOnlineService;
 import com.echoim.server.im.service.ImGroupChatService;
 import com.echoim.server.im.service.ImSingleChatService;
+import com.echoim.server.im.service.ImWsPushService;
+import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.service.call.CallService;
 import com.echoim.server.service.token.TokenService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -35,6 +38,9 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
     private final ImGroupChatService imGroupChatService;
     private final CallService callService;
     private final com.echoim.server.config.ImProperties imProperties;
+    private final ImWsPushService imWsPushService;
+    private final ImConversationUserMapper imConversationUserMapper;
+    private final WsMetrics wsMetrics;
 
     public ImTextFrameHandler(ObjectMapper objectMapper,
                               TokenService tokenService,
@@ -42,7 +48,10 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
                               ImSingleChatService imSingleChatService,
                               ImGroupChatService imGroupChatService,
                               CallService callService,
-                              com.echoim.server.config.ImProperties imProperties) {
+                              com.echoim.server.config.ImProperties imProperties,
+                              ImWsPushService imWsPushService,
+                              ImConversationUserMapper imConversationUserMapper,
+                              WsMetrics wsMetrics) {
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.imOnlineService = imOnlineService;
@@ -50,10 +59,14 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
         this.imGroupChatService = imGroupChatService;
         this.callService = callService;
         this.imProperties = imProperties;
+        this.imWsPushService = imWsPushService;
+        this.imConversationUserMapper = imConversationUserMapper;
+        this.wsMetrics = wsMetrics;
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame frame) throws Exception {
+        wsMetrics.recordMessageReceived();
         WsMessage message = objectMapper.readValue(frame.text(), WsMessage.class);
         if (message == null || message.getType() == null) {
             ctx.close();
@@ -79,6 +92,7 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
                 case ACK -> writeWsMessage(ctx, WsMessageType.ACK, message, imSingleChatService.deliveredAck(loginUser, message));
                 case READ -> writeWsMessage(ctx, WsMessageType.READ, message, imSingleChatService.read(loginUser, message));
                 case CALL_OFFER, CALL_ANSWER, CALL_ICE_CANDIDATE -> callService.relaySignal(loginUser, message);
+                case TYPING -> handleTyping(loginUser, message);
                 default -> writeNotice(ctx, message, ErrorCode.PARAM_ERROR, "不支持的消息类型");
             }
         } catch (BizException ex) {
@@ -145,6 +159,31 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
         writeWsMessage(ctx, WsMessageType.PONG, null, data);
     }
 
+    @SuppressWarnings("unchecked")
+    private void handleTyping(LoginUser loginUser, WsMessage message) {
+        Object rawData = message.getData();
+        if (!(rawData instanceof Map<?, ?> raw)) {
+            return;
+        }
+        Object convIdObj = raw.get("conversationId");
+        if (convIdObj == null) {
+            return;
+        }
+        Long conversationId;
+        try {
+            conversationId = convIdObj instanceof Number n ? n.longValue() : Long.parseLong(convIdObj.toString());
+        } catch (NumberFormatException e) {
+            return;
+        }
+
+        // Forward typing indicator to the other member in the single conversation
+        imConversationUserMapper.selectByConversationId(conversationId).stream()
+                .map(u -> u.getUserId())
+                .filter(uid -> !uid.equals(loginUser.getUserId()))
+                .forEach(peerId -> imWsPushService.pushToUser(peerId, WsMessageType.TYPING,
+                        message.getTraceId(), message.getClientMsgId(), rawData));
+    }
+
     private void writeNotice(ChannelHandlerContext ctx, WsMessage request, int code, String message) throws JsonProcessingException {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("code", code);
@@ -176,6 +215,7 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
     }
 
     private void writeAuthFailureAndClose(ChannelHandlerContext ctx, WsMessage request, BizException ex) throws JsonProcessingException {
+        wsMetrics.recordAuthFailure();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "FAILED");
         data.put("code", ex.getCode());
