@@ -1,5 +1,12 @@
 -- EchoIM test data seed
 -- Run after sql/init.sql.
+--
+-- ===== 管理员账号（仅管理员知悉） =====
+--   用户名: admin
+--   密码:   EchoIM@Admin2026!
+--   请勿将此密码告知普通用户，admin 端不对普通用户开放。
+-- ==========================================
+--
 -- All demo user passwords are: 123456
 
 SET NAMES utf8mb4 COLLATE utf8mb4_general_ci;
@@ -12,7 +19,7 @@ START TRANSACTION;
 -- System records.
 INSERT INTO sys_admin_user (id, username, password_hash, nickname, role_code, status, created_at, updated_at)
 VALUES
-  (1, 'admin', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '系统管理员', 'super_admin', 1, NOW(), NOW())
+  (1, 'admin', '$2y$10$POPZtrpq1AZXxYd.eU5fJ.gBjlfLnYQDSNni..jze7CtD02q16vmq', '系统管理员', 'super_admin', 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
   password_hash = VALUES(password_hash),
   nickname = VALUES(nickname),
@@ -25,7 +32,7 @@ VALUES
   (1, 'file.max-size-mb', '50', '文件上传大小限制', '上传文件最大 50MB', 1, NOW(), NOW()),
   (2, 'message.recall-seconds', '120', '消息撤回时间限制', '发送后 120 秒内可撤回', 1, NOW(), NOW()),
   (3, 'register.enabled', 'true', '是否允许注册', '控制前台注册开关', 1, NOW(), NOW()),
-  (4, 'demo.seed-version', '2026-04-29', '演示数据版本', '用于确认 initdata.sql 是否已经执行', 1, NOW(), NOW())
+  (4, 'demo.seed-version', '2026-05-01', '演示数据版本', '用于确认 initdata.sql 是否已经执行', 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
   config_value = VALUES(config_value),
   config_name = VALUES(config_name),
@@ -95,7 +102,7 @@ WHERE group_id BETWEEN 20001 AND 20010
 
 DELETE FROM im_group
 WHERE id BETWEEN 20001 AND 20010
-   OR group_no IN ('G20001', 'G20002');
+   OR group_no IN ('G5418203967', 'CH7293846150');
 
 DELETE FROM im_friend
 WHERE user_id BETWEEN 10001 AND 10006
@@ -107,18 +114,18 @@ WHERE from_user_id BETWEEN 10001 AND 10006
 
 DELETE FROM im_user
 WHERE id BETWEEN 10001 AND 10006
-   OR user_no IN ('E10001', 'E10002', 'E10003', 'E10004', 'E10005', 'E10006')
+   OR user_no IN ('U3829104756', 'U7150284639', 'U4910382756', 'U6284715093', 'U8531947260', 'U2073659148')
    OR username IN ('echo_demo_01', 'echo_demo_02', 'echo_demo_03', 'echo_demo_04', 'echo_demo_05', 'echo_demo_06');
 
 -- Demo users.
 INSERT INTO im_user (id, user_no, username, password_hash, nickname, avatar_url, gender, phone, email, signature, status, last_login_at, created_at, updated_at)
 VALUES
-  (10001, 'E10001', 'echo_demo_01', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', 'Echo用户01', NULL, 1, '13800000001', 'echo01@example.com', '正在把 EchoIM 调到顺手。', 1, NOW(), NOW(), NOW()),
-  (10002, 'E10002', 'echo_demo_02', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '周序', NULL, 1, '13800000002', 'zhouxu@example.com', '产品、接口和体验一起推进。', 1, NOW(), NOW(), NOW()),
-  (10003, 'E10003', 'echo_demo_03', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '宋眠', NULL, 2, '13800000003', 'songmian@example.com', '关注细节和可用性。', 1, NOW(), NOW(), NOW()),
-  (10004, 'E10004', 'echo_demo_04', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '裴见', NULL, 1, '13800000004', 'peijian@example.com', '负责联调与排查。', 1, NOW(), NOW(), NOW()),
-  (10005, 'E10005', 'echo_demo_05', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '程原', NULL, 1, '13800000005', 'chengyuan@example.com', '把复杂事情讲清楚。', 1, NOW(), NOW(), NOW()),
-  (10006, 'E10006', 'echo_demo_06', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '沈曜', NULL, 1, '13800000006', 'shenyao@example.com', '先验证，再上线。', 1, NOW(), NOW(), NOW());
+  (10001, 'U3829104756', 'echo_demo_01', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', 'Echo用户01', NULL, 1, '13800000001', 'echo01@example.com', '正在把 EchoIM 调到顺手。', 1, NOW(), NOW(), NOW()),
+  (10002, 'U7150284639', 'echo_demo_02', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '周序', NULL, 1, '13800000002', 'zhouxu@example.com', '产品、接口和体验一起推进。', 1, NOW(), NOW(), NOW()),
+  (10003, 'U4910382756', 'echo_demo_03', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '宋眠', NULL, 2, '13800000003', 'songmian@example.com', '关注细节和可用性。', 1, NOW(), NOW(), NOW()),
+  (10004, 'U6284715093', 'echo_demo_04', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '裴见', NULL, 1, '13800000004', 'peijian@example.com', '负责联调与排查。', 1, NOW(), NOW(), NOW()),
+  (10005, 'U8531947260', 'echo_demo_05', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '程原', NULL, 1, '13800000005', 'chengyuan@example.com', '把复杂事情讲清楚。', 1, NOW(), NOW(), NOW()),
+  (10006, 'U2073659148', 'echo_demo_06', '$2y$10$EbnxVPdt9jN1hV5IYzGMQe1Cd0i8Nta611/Yj.Rfb4YgIgH90XS1y', '沈曜', NULL, 1, '13800000006', 'shenyao@example.com', '先验证，再上线。', 1, NOW(), NOW(), NOW());
 
 -- Friend requests and accepted friend relations.
 INSERT INTO im_friend_request (id, from_user_id, to_user_id, apply_msg, status, handled_by, handled_at, created_at, updated_at)
@@ -143,8 +150,8 @@ VALUES
 -- Group and members.
 INSERT INTO im_group (id, group_no, group_name, owner_user_id, conversation_type, avatar_url, notice, status, created_at, updated_at)
 VALUES
-  (20001, 'G20001', 'EchoIM 工作台', 10001, 2, NULL, '用于测试群聊、未读、通知和长消息展示。', 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (20002, 'G20002', 'EchoIM 发布频道', 10001, 3, NULL, '仅创建者可发送消息，用于测试频道消息样式和查看人数。', 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
+  (20001, 'G5418203967', 'EchoIM 工作台', 10001, 2, NULL, '用于测试群聊、未读、通知和长消息展示。', 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (20002, 'CH7293846150', 'EchoIM 发布频道', 10001, 3, NULL, '仅创建者可发送消息，用于测试频道消息样式和查看人数。', 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
 
 INSERT INTO im_group_member (id, group_id, user_id, role, nick_name, join_source, join_at, status, updated_at)
 VALUES
@@ -162,14 +169,14 @@ VALUES
   (12, 20002, 10006, 2, '沈曜', 2, TIMESTAMPADD(DAY, -2, NOW()), 1, NOW());
 
 -- Conversations.
-INSERT INTO im_conversation (id, conversation_type, biz_key, biz_id, conversation_name, avatar_url, last_message_id, last_message_preview, last_message_time, status, created_at, updated_at)
+INSERT INTO im_conversation (id, conversation_no, conversation_type, biz_key, biz_id, conversation_name, avatar_url, last_message_id, last_message_preview, last_message_time, status, created_at, updated_at)
 VALUES
-  (30001, 1, '10001_10002', NULL, '周序', NULL, 40008, '我刚发了一条新消息，前端应该能显示未读。', TIMESTAMPADD(MINUTE, -3, NOW()), 1, TIMESTAMPADD(DAY, -7, NOW()), NOW()),
-  (30002, 2, 'group_20001', 20001, 'EchoIM 工作台', NULL, 40022, '通知条和空态都可以按这个数据回归。', TIMESTAMPADD(MINUTE, -8, NOW()), 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (30003, 1, '10001_10003', NULL, '宋眠', NULL, 40028, '浅色主题里这段摘要应该也清楚。', TIMESTAMPADD(HOUR, -2, NOW()), 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
-  (30004, 1, '10001_10004', NULL, '裴见', NULL, 40034, '我下午会继续压测 WebSocket。', TIMESTAMPADD(HOUR, -5, NOW()), 1, TIMESTAMPADD(DAY, -5, NOW()), NOW()),
-  (30005, 1, '10001_10005', NULL, '程原', NULL, 40038, '收到，等你确认后我再发第二版。', TIMESTAMPADD(DAY, -1, NOW()), 1, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
-  (30006, 3, 'channel_20002', 20002, 'EchoIM 发布频道', NULL, 40042, '今晚会把新一版消息状态展示合并到主分支。', TIMESTAMPADD(MINUTE, -16, NOW()), 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
+  (30001, 'fb92ac3b-6f29-4413-89f9-3fa793d7922f', 1, '10001_10002', NULL, '周序', NULL, 40008, '我刚发了一条新消息，前端应该能显示未读。', TIMESTAMPADD(MINUTE, -3, NOW()), 1, TIMESTAMPADD(DAY, -7, NOW()), NOW()),
+  (30002, 'e71e4539-f9b4-422e-9c00-80e50338818c', 2, 'group_20001', 20001, 'EchoIM 工作台', NULL, 40022, '通知条和空态都可以按这个数据回归。', TIMESTAMPADD(MINUTE, -8, NOW()), 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (30003, '1bda6918-3c8e-4c35-96a2-19b004ce712e', 1, '10001_10003', NULL, '宋眠', NULL, 40028, '浅色主题里这段摘要应该也清楚。', TIMESTAMPADD(HOUR, -2, NOW()), 1, TIMESTAMPADD(DAY, -6, NOW()), NOW()),
+  (30004, '86f53164-5751-4800-a29a-4ad48b3a13c8', 1, '10001_10004', NULL, '裴见', NULL, 40034, '我下午会继续压测 WebSocket。', TIMESTAMPADD(HOUR, -5, NOW()), 1, TIMESTAMPADD(DAY, -5, NOW()), NOW()),
+  (30005, '974d29c9-3839-4349-9571-cdf7aea57cb0', 1, '10001_10005', NULL, '程原', NULL, 40038, '收到，等你确认后我再发第二版。', TIMESTAMPADD(DAY, -1, NOW()), 1, TIMESTAMPADD(DAY, -4, NOW()), NOW()),
+  (30006, 'e540775f-71b5-4c0c-9d1c-62799ea6ead8', 3, 'channel_20002', 20002, 'EchoIM 发布频道', NULL, 40042, '今晚会把新一版消息状态展示合并到主分支。', TIMESTAMPADD(MINUTE, -16, NOW()), 1, TIMESTAMPADD(DAY, -2, NOW()), NOW());
 
 INSERT INTO im_conversation_user (id, conversation_id, user_id, unread_count, last_read_seq, is_top, is_mute, is_archived, manual_unread, deleted, created_at, updated_at)
 VALUES

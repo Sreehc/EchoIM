@@ -8,5 +8,4 @@ backend/echoim-server/src/main/resources/application-local.yml
 
 # Development docs
 /docs/
-/sql/README.md
 /*文档.md

@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS im_group_member (
 
 CREATE TABLE IF NOT EXISTS im_conversation (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '会话ID',
+  conversation_no VARCHAR(64) NOT NULL COMMENT '会话对外编号(UUID v4)',
   conversation_type TINYINT NOT NULL COMMENT '1单聊 2群聊 3频道',
   biz_key VARCHAR(64) NOT NULL COMMENT '单聊为较小用户ID_较大用户ID，群聊为group_{groupId}',
   biz_id BIGINT DEFAULT NULL COMMENT '业务ID，群聊时为groupId',
@@ -130,6 +131,7 @@ CREATE TABLE IF NOT EXISTS im_conversation (
   status TINYINT NOT NULL DEFAULT 1 COMMENT '1正常 2删除',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_conversation_no (conversation_no),
   UNIQUE KEY uk_type_biz_key (conversation_type, biz_key),
   KEY idx_last_message_time (last_message_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='会话表';
