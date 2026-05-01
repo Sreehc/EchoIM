@@ -71,9 +71,11 @@
                    ELSE COALESCE(lm.seq_no, 0)
                END AS latestSeq,
                CASE
+                   WHEN g.status = 2 THEN FALSE
                    WHEN c.conversation_type = 3 THEN COALESCE(current_gm.role = 1, FALSE)
                    ELSE TRUE
                END AS canSend,
+               g.status AS groupStatus,
                current_gm.role AS myRole,
                CASE
                    WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN 'SAVED_MESSAGES'

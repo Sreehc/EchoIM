@@ -39,6 +39,7 @@ import {
 } from '@/services/groups'
 import { forwardMessages } from '@/services/messages'
 import { STICKER_LIBRARY } from '@/stickers/library'
+import { ChatRound, Close, Guide, Search, UserFilled } from '@element-plus/icons-vue'
 import type {
   ChangePasswordPayload,
   ChatMessage,
@@ -110,6 +111,13 @@ const composeDialog = reactive<{
   loading: false,
   submitting: false,
   error: null,
+})
+
+const editGroupDialog = reactive({
+  visible: false,
+  field: 'name' as 'name' | 'notice',
+  value: '',
+  saving: false,
 })
 
 const contactsState = reactive<{
@@ -258,6 +266,63 @@ const liveStatusMessage = computed(
 const e2eHooksEnabled = computed(
   () => import.meta.env.DEV || import.meta.env.VITE_ENABLE_E2E_HOOKS === 'true',
 )
+
+const typingLabel = computed(() => {
+  const convId = chatStore.activeConversationId
+  if (!convId) return ''
+  const userIds = chatStore.getTypingUserIds(convId)
+  if (!userIds.length) return ''
+  // For simplicity, show generic label (peer name resolution would require profile lookup)
+  return userIds.length === 1 ? '对方正在输入...' : `${userIds.length} 人正在输入...`
+})
+
+function getAddContactState(user: UserSearchItem) {
+  switch (user.friendStatus) {
+    case 'FRIEND':
+      return {
+        label: '已是好友',
+        tone: 'success',
+        actionable: true,
+        actionLabel: '发起聊天',
+      }
+    case 'PENDING_OUT':
+    case 'PENDING_IN':
+      return {
+        label: '申请处理中',
+        tone: 'pending',
+        actionable: false,
+        actionLabel: '处理中',
+      }
+    case 'BLOCKED_OUT':
+      return {
+        label: '已拉黑',
+        tone: 'danger',
+        actionable: false,
+        actionLabel: '已拉黑',
+      }
+    case 'BLOCKED_IN':
+      return {
+        label: '对方已拉黑',
+        tone: 'danger',
+        actionable: false,
+        actionLabel: '不可添加',
+      }
+    case 'SELF':
+      return {
+        label: '本人',
+        tone: 'neutral',
+        actionable: false,
+        actionLabel: '当前账号',
+      }
+    default:
+      return {
+        label: '可添加',
+        tone: 'brand',
+        actionable: true,
+        actionLabel: '加好友',
+      }
+  }
+}
 
 onMounted(() => {
   uiStore.applyTheme(uiStore.theme)
@@ -674,31 +739,39 @@ async function handleDeleteFriend(friendId: number) {
   await loadContacts(true)
 }
 
-async function handleUpdateGroupMeta() {
-  if (!chatStore.activeConversation?.groupId || !chatStore.activeProfile?.group) return
+function openEditGroupDialog(field: 'name' | 'notice') {
+  if (!chatStore.activeProfile?.group) return
+  editGroupDialog.field = field
+  editGroupDialog.value = field === 'name'
+    ? chatStore.activeProfile.group.groupName
+    : chatStore.activeProfile.group.notice ?? ''
+  editGroupDialog.saving = false
+  editGroupDialog.visible = true
+}
 
-  const { value } = await ElMessageBox.prompt('输入新的群名或频道名', '更新名称', {
-    inputValue: chatStore.activeProfile.group.groupName,
-    confirmButtonText: '保存',
-    cancelButtonText: '取消',
-  }).catch(() => ({ value: null }))
-  if (!value) return
-  await updateGroup(chatStore.activeConversation.groupId, { groupName: value })
-  await chatStore.fetchConversationProfile(chatStore.activeConversation.conversationId, true)
+async function submitEditGroupDialog() {
+  if (!chatStore.activeConversation?.groupId) return
+  editGroupDialog.saving = true
+  try {
+    const payload = editGroupDialog.field === 'name'
+      ? { groupName: editGroupDialog.value.trim() }
+      : { notice: editGroupDialog.value.trim() }
+    await updateGroup(chatStore.activeConversation.groupId, payload)
+    await chatStore.fetchConversationProfile(chatStore.activeConversation.conversationId, true)
+    editGroupDialog.visible = false
+  } catch {
+    // error handled by store
+  } finally {
+    editGroupDialog.saving = false
+  }
+}
+
+async function handleUpdateGroupMeta() {
+  openEditGroupDialog('name')
 }
 
 async function handleUpdateGroupNotice() {
-  if (!chatStore.activeConversation?.groupId || !chatStore.activeProfile?.group) return
-
-  const { value } = await ElMessageBox.prompt('输入公告内容', '更新公告', {
-    inputValue: chatStore.activeProfile.group.notice ?? '',
-    confirmButtonText: '保存',
-    cancelButtonText: '取消',
-    inputType: 'textarea',
-  }).catch(() => ({ value: null }))
-  if (value == null) return
-  await updateGroup(chatStore.activeConversation.groupId, { notice: value })
-  await chatStore.fetchConversationProfile(chatStore.activeConversation.conversationId, true)
+  openEditGroupDialog('notice')
 }
 
 async function handlePromoteGroupMember(userId: number, role: 2 | 3) {
@@ -728,6 +801,15 @@ async function handleAddGroupMembers() {
 
 async function handleLeaveActiveGroup() {
   if (!chatStore.activeConversation?.groupId) return
+  try {
+    await ElMessageBox.confirm('退出后将不再收到该会话的新消息，确认退出？', '退出会话', {
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
   await leaveGroup(chatStore.activeConversation.groupId, true)
   uiStore.setProfileOpen(false)
   await chatStore.refreshConversationList(true)
@@ -736,6 +818,15 @@ async function handleLeaveActiveGroup() {
 
 async function handleDissolveActiveGroup() {
   if (!chatStore.activeConversation?.groupId) return
+  try {
+    await ElMessageBox.confirm('解散后所有成员将无法继续在该会话中发送消息，此操作不可撤销。', '解散会话', {
+      confirmButtonText: '解散',
+      cancelButtonText: '取消',
+      type: 'error',
+    })
+  } catch {
+    return
+  }
   await dissolveGroup(chatStore.activeConversation.groupId)
   uiStore.setProfileOpen(false)
   await chatStore.refreshConversationList(true)
@@ -1132,6 +1223,17 @@ function toReplySource(message: ChatMessage | null): MessageReplySource | null {
   }
 }
 
+let typingThrottleTimer: ReturnType<typeof setTimeout> | null = null
+function handleTypingInput() {
+  const convId = chatStore.activeConversationId
+  if (!convId) return
+  if (typingThrottleTimer) return // Throttle: send at most once per 2 seconds
+  chatStore.sendTyping(convId)
+  typingThrottleTimer = setTimeout(() => {
+    typingThrottleTimer = null
+  }, 2000)
+}
+
 async function handleSendTextMessage(content: string) {
   attachmentError.value = null
   await chatStore.sendMessage({
@@ -1513,7 +1615,17 @@ function registerDebugHooks() {
             @toggle-forward-selection="toggleForwardSelection"
             @toggle-reaction="handleToggleReaction"
           />
+          <div v-if="typingLabel" class="chat-page__typing" data-testid="typing-indicator">
+            {{ typingLabel }}
+          </div>
+          <div
+            v-if="chatStore.activeConversation.groupStatus === 2"
+            class="chat-page__dissolved"
+          >
+            {{ chatStore.activeConversation.conversationType === 3 ? '该频道已解散' : '该群已解散' }}
+          </div>
           <MessageComposer
+            v-else
             :enter-to-send="uiStore.chatPreferences.enterToSend"
             :can-send="chatStore.activeConversation.canSend"
             :replying-message="replyingMessage"
@@ -1529,6 +1641,7 @@ function registerDebugHooks() {
             @send="handleSendTextMessage"
             @upload-file="handleUploadAttachment"
             @send-sticker="handleSendSticker"
+            @typing="handleTypingInput"
           />
         </div>
       </template>
@@ -1576,82 +1689,172 @@ function registerDebugHooks() {
 
     <el-dialog
       v-model="composeDialog.visible"
-      :title="composeDialog.mode === 'single' ? '新建私聊' : composeDialog.mode === 'channel' ? '新建频道' : '新建群组'"
       width="520px"
       destroy-on-close
+      :show-close="false"
+      class="compose-modal"
     >
-      <div class="compose-dialog">
-        <el-input
-          v-model="composeDialog.keyword"
-          placeholder="搜索用户昵称、用户名或编号"
-          clearable
-        />
-        <el-input
-          v-if="composeDialog.mode !== 'single'"
-          v-model="composeDialog.groupName"
-          :placeholder="composeDialog.mode === 'channel' ? '输入频道名称' : '输入群组名称'"
-          maxlength="40"
-        />
-        <div v-if="composeDialog.error" class="compose-dialog__error">{{ composeDialog.error }}</div>
-        <div class="compose-dialog__users">
-          <div v-if="composeDialog.loading" class="compose-dialog__empty">正在搜索用户…</div>
+      <header class="compose-modal__header">
+        <div class="compose-modal__header-main">
+          <span class="compose-modal__icon" :class="`compose-modal__icon--${composeDialog.mode}`">
+            <ChatRound v-if="composeDialog.mode === 'single'" />
+            <UserFilled v-else-if="composeDialog.mode === 'group'" />
+            <Guide v-else />
+          </span>
+          <div class="compose-modal__header-copy">
+            <strong>
+              {{ composeDialog.mode === 'single' ? '新建私聊' : composeDialog.mode === 'channel' ? '新建频道' : '新建群组' }}
+            </strong>
+            <p>
+              {{ composeDialog.mode === 'single' ? '搜索并选择一位用户开始对话' : composeDialog.mode === 'channel' ? '创建频道，向关注者广播消息' : '创建群组，邀请成员一起交流' }}
+            </p>
+          </div>
+        </div>
+        <button class="compose-modal__close" type="button" aria-label="关闭" @click="closeComposeDialog">
+          <Close />
+        </button>
+      </header>
+
+      <div class="compose-modal__body">
+        <div v-if="composeDialog.mode !== 'single'" class="compose-modal__name-field">
+          <label class="compose-modal__label">
+            {{ composeDialog.mode === 'channel' ? '频道名称' : '群组名称' }}
+          </label>
+          <el-input
+            v-model="composeDialog.groupName"
+            :placeholder="composeDialog.mode === 'channel' ? '给频道起个名字' : '给群组起个名字'"
+            maxlength="40"
+            class="compose-modal__name-input"
+          />
+        </div>
+
+        <div class="compose-modal__search-field">
+          <label class="compose-modal__label">添加成员</label>
+          <div class="compose-modal__search-bar">
+            <Search class="compose-modal__search-icon" />
+            <el-input
+              v-model="composeDialog.keyword"
+              placeholder="搜索昵称、用户名或编号"
+              clearable
+              class="compose-modal__search-input"
+            />
+          </div>
+        </div>
+
+        <div v-if="composeDialog.selectedUserIds.length" class="compose-modal__chips">
+          <span
+            v-for="uid in composeDialog.selectedUserIds"
+            :key="uid"
+            class="compose-modal__chip"
+          >
+            {{ composeDialog.users.find(u => u.userId === uid)?.nickname ?? uid }}
+            <button type="button" aria-label="移除" @click="toggleComposeUser(uid)">
+              <Close />
+            </button>
+          </span>
+        </div>
+
+        <div v-if="composeDialog.error" class="compose-modal__error">{{ composeDialog.error }}</div>
+
+        <div class="compose-modal__user-list">
+          <div v-if="composeDialog.loading" class="compose-modal__status">
+            <span class="compose-modal__spinner"></span>
+            正在搜索…
+          </div>
           <button
             v-for="user in composeDialog.users"
             :key="user.userId"
-            class="compose-dialog__user"
+            class="compose-modal__user"
             :class="{ 'is-selected': composeDialog.selectedUserIds.includes(user.userId) }"
             type="button"
             @click="toggleComposeUser(user.userId)"
           >
             <AvatarBadge :name="user.nickname" :avatar-url="user.avatarUrl" size="lg" />
-            <div class="compose-dialog__user-copy">
-              <strong>{{ user.nickname }}</strong>
-              <span>
-                @{{ user.username }}
-                <button class="compose-dialog__mini-link" type="button" @click.stop="openPublicProfile(user.username)">主页</button>
-              </span>
+            <div class="compose-modal__user-copy">
+              <div class="compose-modal__user-head">
+                <strong>{{ user.nickname }}</strong>
+                <span class="compose-modal__user-tag">@{{ user.username }}</span>
+              </div>
               <p>{{ user.signature || user.userNo }}</p>
             </div>
+            <span v-if="composeDialog.selectedUserIds.includes(user.userId)" class="compose-modal__check">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
           </button>
-          <div v-if="!composeDialog.loading && !composeDialog.users.length" class="compose-dialog__empty">
-            没有匹配的用户
+          <div v-if="!composeDialog.loading && !composeDialog.users.length && composeDialog.keyword" class="compose-modal__status">
+            没有找到匹配的用户
+          </div>
+          <div v-if="!composeDialog.loading && !composeDialog.users.length && !composeDialog.keyword" class="compose-modal__status compose-modal__status--hint">
+            输入关键词搜索用户
           </div>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="closeComposeDialog">取消</el-button>
-        <el-button type="primary" :loading="composeDialog.submitting" @click="submitComposeDialog">
+
+      <footer class="compose-modal__footer">
+        <button class="compose-modal__btn compose-modal__btn--secondary" type="button" @click="closeComposeDialog">
+          取消
+        </button>
+        <button
+          class="compose-modal__btn compose-modal__btn--primary"
+          type="button"
+          :disabled="composeDialog.submitting || (composeDialog.mode === 'single' ? !composeDialog.selectedUserIds.length : (!composeDialog.groupName.trim() || !composeDialog.selectedUserIds.length))"
+          @click="submitComposeDialog"
+        >
+          <span v-if="composeDialog.submitting" class="compose-modal__spinner compose-modal__spinner--light"></span>
           {{ composeDialog.mode === 'single' ? '开始聊天' : '创建并进入' }}
-        </el-button>
-      </template>
+        </button>
+      </footer>
     </el-dialog>
 
-    <el-dialog v-model="contactsState.addDialogVisible" title="添加联系人" width="520px" destroy-on-close>
+    <el-dialog v-model="contactsState.addDialogVisible" title="添加联系人" width="520px" destroy-on-close class="add-contact-dialog">
       <div class="compose-dialog">
         <el-input v-model="contactsState.addKeyword" placeholder="搜索昵称、用户名或账号编号" clearable />
         <div v-if="contactsState.addError" class="compose-dialog__error">{{ contactsState.addError }}</div>
-        <div class="compose-dialog__users">
+        <div class="compose-dialog__users compose-dialog__users--contacts">
           <div v-if="contactsState.addLoading" class="compose-dialog__empty">正在搜索用户…</div>
-          <article v-for="user in contactsState.addUsers" :key="user.userId" class="compose-dialog__user compose-dialog__user--card">
+          <article v-for="user in contactsState.addUsers" :key="user.userId" class="compose-dialog__user compose-dialog__user--result">
             <AvatarBadge :name="user.nickname" :avatar-url="user.avatarUrl" size="lg" />
             <div class="compose-dialog__user-copy">
-              <strong>{{ user.nickname }}</strong>
-              <span>
-                @{{ user.username }}
+              <div class="compose-dialog__user-head">
+                <strong>{{ user.nickname }}</strong>
+                <span class="compose-dialog__status" :class="`is-${getAddContactState(user).tone}`">
+                  {{ getAddContactState(user).label }}
+                </span>
+              </div>
+              <div class="compose-dialog__user-meta">
+                <span>@{{ user.username }}</span>
                 <button class="compose-dialog__mini-link" type="button" @click.stop="openPublicProfile(user.username)">主页</button>
-              </span>
+              </div>
               <p>{{ user.signature || user.userNo }}</p>
             </div>
-            <button class="compose-dialog__inline-action" type="button" @click="submitFriendRequestForUser(user.userId)">
-              {{ user.friendStatus === 'FRIEND' ? '已是好友' : user.pendingRequestId ? '处理中' : '加好友' }}
-            </button>
+            <div class="compose-dialog__result-actions">
+              <button
+                v-if="getAddContactState(user).actionable && user.friendStatus === 'FRIEND'"
+                class="compose-dialog__inline-action compose-dialog__inline-action--secondary"
+                type="button"
+                @click="openChatFromContact(user.userId)"
+              >
+                发起聊天
+              </button>
+              <button
+                v-else-if="getAddContactState(user).actionable"
+                class="compose-dialog__inline-action compose-dialog__inline-action--primary"
+                type="button"
+                @click="submitFriendRequestForUser(user.userId)"
+              >
+                加好友
+              </button>
+              <span v-else class="compose-dialog__result-note" :class="`is-${getAddContactState(user).tone}`">
+                {{ getAddContactState(user).actionLabel }}
+              </span>
+            </div>
           </article>
           <div v-if="!contactsState.addLoading && !contactsState.addUsers.length" class="compose-dialog__empty">没有匹配的用户</div>
         </div>
       </div>
     </el-dialog>
 
-    <el-dialog v-model="globalSearchState.visible" title="全局搜索" width="860px" destroy-on-close class="global-search-dialog">
+    <el-dialog v-model="globalSearchState.visible" title="全局搜索" width="960px" destroy-on-close class="global-search-dialog">
       <div class="search-sheet">
         <div class="search-sheet__hero">
           <div class="search-sheet__hero-copy">
@@ -1819,18 +2022,62 @@ function registerDebugHooks() {
         <el-button type="primary" :disabled="!forwardTargetCount || !forwardDialog.sourceMessageIds.length" :loading="forwardDialog.submitting" @click="submitForwardDialog">确认转发</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="editGroupDialog.visible"
+      :title="editGroupDialog.field === 'name' ? '编辑名称' : '编辑公告'"
+      width="440px"
+      destroy-on-close
+      :show-close="false"
+      class="edit-group-modal"
+    >
+      <header class="edit-group-modal__header">
+        <strong>{{ editGroupDialog.field === 'name' ? '编辑名称' : '编辑公告' }}</strong>
+        <button class="edit-group-modal__close" type="button" aria-label="关闭" @click="editGroupDialog.visible = false">
+          <Close />
+        </button>
+      </header>
+      <div class="edit-group-modal__body">
+        <label class="edit-group-modal__label">
+          {{ editGroupDialog.field === 'name' ? (chatStore.activeConversation?.conversationType === 3 ? '频道名称' : '群聊名称') : (chatStore.activeConversation?.conversationType === 3 ? '频道公告' : '群公告') }}
+        </label>
+        <el-input
+          v-model="editGroupDialog.value"
+          :type="editGroupDialog.field === 'notice' ? 'textarea' : 'text'"
+          :autosize="editGroupDialog.field === 'notice' ? { minRows: 4, maxRows: 8 } : undefined"
+          :maxlength="editGroupDialog.field === 'name' ? 40 : 500"
+          :placeholder="editGroupDialog.field === 'name' ? '输入新的名称' : '输入公告内容'"
+          :disabled="editGroupDialog.saving"
+          class="edit-group-modal__input"
+        />
+      </div>
+      <footer class="edit-group-modal__footer">
+        <button class="edit-group-modal__btn edit-group-modal__btn--secondary" type="button" @click="editGroupDialog.visible = false">
+          取消
+        </button>
+        <button
+          class="edit-group-modal__btn edit-group-modal__btn--primary"
+          type="button"
+          :disabled="editGroupDialog.saving || !editGroupDialog.value.trim()"
+          @click="submitEditGroupDialog"
+        >
+          <span v-if="editGroupDialog.saving" class="edit-group-modal__spinner"></span>
+          保存
+        </button>
+      </footer>
+    </el-dialog>
   </main>
 </template>
 
 <style scoped>
 .chat-page {
   display: grid;
-  grid-template-columns: 332px minmax(0, 1fr);
+  grid-template-columns: clamp(280px, 25vw, 332px) minmax(0, 1fr);
   gap: 0;
   height: 100%;
   min-height: 0;
   border: 1px solid var(--border-default);
-  border-radius: 32px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--surface-panel) 96%, transparent),
@@ -1870,23 +2117,11 @@ function registerDebugHooks() {
   background: var(--chat-stage-base);
 }
 
-.chat-page__stage::before,
 .chat-page__stage::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-
-.chat-page__stage::before {
-  background-image: var(--chat-wallpaper-image);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  opacity: var(--chat-wallpaper-opacity);
-}
-
-.chat-page__stage::after {
   background:
     linear-gradient(180deg, var(--chat-stage-top), transparent 16%),
     linear-gradient(0deg, var(--chat-stage-bottom), transparent 22%),
@@ -1903,7 +2138,7 @@ function registerDebugHooks() {
   padding: 8px 16px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font: 500 0.78rem/1.45 var(--font-body);
+  font: 500 var(--text-sm)/1.45 var(--font-body);
   background: color-mix(in srgb, var(--surface-card) 96%, transparent);
   backdrop-filter: blur(14px);
 }
@@ -1921,10 +2156,34 @@ function registerDebugHooks() {
 }
 
 .chat-page__banner button {
+  min-width: var(--btn-min-size);
+  min-height: var(--btn-min-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
+}
+
+.chat-page__typing {
+  padding: 4px 16px 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  animation: typing-pulse 1.5s ease-in-out infinite;
+}
+
+.chat-page__dissolved {
+  padding: 20px 24px;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-quaternary);
+}
+
+@keyframes typing-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .chat-page__empty {
@@ -1936,23 +2195,11 @@ function registerDebugHooks() {
     var(--chat-stage-base);
 }
 
-.chat-page__empty::before,
 .chat-page__empty::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-
-.chat-page__empty::before {
-  background-image: var(--chat-wallpaper-image);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  opacity: var(--chat-wallpaper-opacity);
-}
-
-.chat-page__empty::after {
   background:
     linear-gradient(180deg, var(--chat-stage-top), transparent 16%),
     linear-gradient(0deg, var(--chat-stage-bottom), transparent 20%);
@@ -1990,7 +2237,7 @@ function registerDebugHooks() {
 
 .chat-page__forward-bar span {
   color: var(--text-quaternary);
-  font: 600 0.7rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1998,7 +2245,7 @@ function registerDebugHooks() {
 .chat-page__forward-bar strong {
   margin-top: 5px;
   color: var(--text-primary);
-  font-size: 0.88rem;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
@@ -2017,18 +2264,110 @@ function registerDebugHooks() {
 
 .chat-page__forward-actions button,
 .compose-dialog__inline-action {
-  padding: 9px 11px;
+  min-height: var(--btn-min-size);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
   background: var(--interactive-secondary-bg);
 }
 
-.compose-dialog__user--card {
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+.compose-dialog__inline-action {
+  font: 600 var(--text-sm)/1 var(--font-body);
 }
 
-.compose-dialog__inline-action {
-  font: 600 0.76rem/1 var(--font-body);
+.compose-dialog__user--result {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  padding: 10px 11px;
+}
+
+.compose-dialog__user-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.compose-dialog__user-head strong {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.compose-dialog__user-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compose-dialog__status,
+.compose-dialog__result-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--interactive-secondary-bg) 88%, transparent);
+  font: 600 var(--text-2xs)/1 var(--font-body);
+  white-space: nowrap;
+}
+
+.compose-dialog__status.is-brand,
+.compose-dialog__result-note.is-brand {
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 20%, var(--border-default));
+  color: var(--interactive-selected-fg);
+}
+
+.compose-dialog__status.is-success,
+.compose-dialog__result-note.is-success {
+  border-color: color-mix(in srgb, var(--status-success) 18%, var(--border-default));
+  color: var(--status-success);
+}
+
+.compose-dialog__status.is-pending,
+.compose-dialog__result-note.is-pending {
+  border-color: color-mix(in srgb, var(--status-warning) 22%, var(--border-default));
+  color: color-mix(in srgb, var(--status-warning) 72%, var(--text-primary));
+}
+
+.compose-dialog__status.is-danger,
+.compose-dialog__result-note.is-danger {
+  border-color: color-mix(in srgb, var(--status-danger) 22%, var(--border-default));
+  color: var(--text-danger);
+}
+
+.compose-dialog__status.is-neutral,
+.compose-dialog__result-note.is-neutral {
+  color: var(--text-tertiary);
+}
+
+.compose-dialog__result-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 84px;
+}
+
+.compose-dialog__inline-action--primary {
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 10%, var(--interactive-secondary-bg));
+  color: var(--interactive-selected-fg);
+}
+
+.compose-dialog__inline-action--secondary {
+  min-width: 84px;
+}
+
+.compose-dialog__result-note {
+  min-width: 84px;
 }
 
 .search-sheet {
@@ -2046,14 +2385,14 @@ function registerDebugHooks() {
 
 .search-sheet__hero-copy strong {
   display: block;
-  font: 620 0.9rem/1.12 var(--font-display);
+  font: 620 var(--text-base)/1.12 var(--font-display);
   letter-spacing: -0.02em;
 }
 
 .search-sheet__hero-copy p {
   margin-top: 4px;
   color: var(--text-tertiary);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   line-height: 1.48;
 }
 
@@ -2064,7 +2403,7 @@ function registerDebugHooks() {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
   color: var(--text-quaternary);
-  font: 600 0.64rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
 }
 
 .search-sheet__summary {
@@ -2072,7 +2411,7 @@ function registerDebugHooks() {
   display: flex;
   align-items: center;
   color: var(--text-tertiary);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   line-height: 1.42;
 }
 
@@ -2086,12 +2425,12 @@ function registerDebugHooks() {
 }
 
 .search-sheet__blank strong {
-  font: 620 0.88rem/1.16 var(--font-display);
+  font: 620 var(--text-base)/1.16 var(--font-display);
 }
 
 .search-sheet__blank p {
   color: var(--text-tertiary);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
@@ -2132,7 +2471,7 @@ function registerDebugHooks() {
 }
 
 .search-sheet__section-head strong {
-  font: 620 0.83rem/1.12 var(--font-display);
+  font: 620 var(--text-sm)/1.12 var(--font-display);
 }
 
 .search-sheet__section-head span {
@@ -2140,7 +2479,7 @@ function registerDebugHooks() {
   border-radius: var(--radius-pill);
   background: var(--interactive-secondary-bg);
   color: var(--text-quaternary);
-  font: 700 0.64rem/1 var(--font-mono);
+  font: 700 var(--text-xs)/1 var(--font-mono);
 }
 
 .search-sheet__row {
@@ -2182,7 +2521,7 @@ function registerDebugHooks() {
 }
 
 .search-sheet__row-copy strong {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.28;
 }
@@ -2190,7 +2529,7 @@ function registerDebugHooks() {
 .search-sheet__row-copy span,
 .search-sheet__row-copy p {
   color: var(--text-tertiary);
-  font-size: 0.71rem;
+  font-size: var(--text-xs);
   line-height: 1.38;
 }
 
@@ -2213,7 +2552,7 @@ function registerDebugHooks() {
 .search-sheet__meta,
 .search-sheet__time {
   color: var(--text-quaternary);
-  font: 600 0.64rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -2227,9 +2566,9 @@ function registerDebugHooks() {
   min-height: 96px;
   padding: 13px;
   border: 1px dashed var(--border-default);
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   color: var(--text-quaternary);
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
   text-align: center;
 }
 
@@ -2264,14 +2603,14 @@ function registerDebugHooks() {
 
 .forward-sheet__summary span {
   color: var(--text-quaternary);
-  font: 600 0.6rem/1 var(--font-mono);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .forward-sheet__summary strong {
   color: var(--text-primary);
-  font: 600 0.76rem/1.2 var(--font-body);
+  font: 600 var(--text-sm)/1.2 var(--font-body);
 }
 
 .forward-sheet__saved {
@@ -2312,14 +2651,14 @@ function registerDebugHooks() {
 }
 
 .forward-sheet__saved-copy strong {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.22;
 }
 
 .forward-sheet__saved-copy span {
   color: var(--text-tertiary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.42;
 }
 
@@ -2330,7 +2669,7 @@ function registerDebugHooks() {
   border: 1px solid var(--border-default);
   background: color-mix(in srgb, var(--interactive-secondary-bg) 70%, transparent);
   color: var(--text-primary);
-  font: 600 0.6rem/1 var(--font-mono);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -2355,6 +2694,11 @@ function registerDebugHooks() {
   gap: 9px;
   max-height: 360px;
   overflow: auto;
+}
+
+.compose-dialog__users--contacts {
+  max-height: 58vh;
+  gap: 8px;
 }
 
 .compose-dialog__user {
@@ -2391,17 +2735,464 @@ function registerDebugHooks() {
 .compose-dialog__user-copy span,
 .compose-dialog__user-copy p {
   color: var(--text-tertiary);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
+}
+
+.compose-dialog__user--result .compose-dialog__user-copy {
+  gap: 4px;
+}
+
+.compose-dialog__user--result .compose-dialog__user-copy p {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 1.34;
+}
+
+.compose-dialog__user--result .compose-dialog__mini-link {
+  flex-shrink: 0;
+}
+
+.compose-dialog__user--result :deep(.avatar-badge) {
+  width: 42px;
+  height: 42px;
+}
+
+.compose-dialog__user--result .compose-dialog__user-head strong {
+  font-size: var(--text-base);
+  line-height: 1.16;
+}
+
+.compose-dialog__user--result .compose-dialog__user-meta span {
+  font-size: var(--text-xs);
+}
+
+.compose-dialog__user--result .compose-dialog__mini-link {
+  padding: 4px 7px;
+  font-size: var(--text-xs);
 }
 
 .compose-dialog__empty,
 .compose-dialog__error {
   color: var(--text-tertiary);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }
 
 .compose-dialog__error {
   color: var(--status-danger);
+}
+
+/* ── Compose modal ── */
+
+:deep(.compose-modal .el-dialog) {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-overlay) 97%, transparent);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+
+:deep(.compose-modal .el-dialog__header) {
+  display: none;
+}
+
+:deep(.compose-modal .el-dialog__body) {
+  padding: 0;
+}
+
+:deep(.compose-modal .el-dialog__footer) {
+  display: none;
+}
+
+.compose-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 24px 16px;
+}
+
+.compose-modal__header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.compose-modal__icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.compose-modal__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.compose-modal__icon--single {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent);
+  color: var(--interactive-primary-bg);
+}
+
+.compose-modal__icon--group {
+  background: color-mix(in srgb, var(--status-success) 12%, transparent);
+  color: var(--status-success);
+}
+
+.compose-modal__icon--channel {
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  color: var(--status-warning);
+}
+
+.compose-modal__header-copy strong {
+  display: block;
+  font: 620 var(--text-lg)/1.12 var(--font-display);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.compose-modal__header-copy p {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+}
+
+.compose-modal__close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.compose-modal__close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.compose-modal__close:hover,
+.compose-modal__close:focus-visible {
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+}
+
+.compose-modal__body {
+  display: grid;
+  gap: 14px;
+  padding: 0 24px;
+  max-height: min(56vh, 460px);
+  overflow-y: auto;
+}
+
+.compose-modal__label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font: 500 var(--text-xs)/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.compose-modal__name-field :deep(.el-input__wrapper) {
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: 0 0 0 1px var(--border-default);
+  padding: 4px 12px;
+  min-height: 42px;
+}
+
+.compose-modal__name-field :deep(.el-input__inner) {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.compose-modal__search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.compose-modal__search-icon {
+  position: absolute;
+  left: 12px;
+  width: 15px;
+  height: 15px;
+  color: var(--text-quaternary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.compose-modal__search-input :deep(.el-input__wrapper) {
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: 0 0 0 1px var(--border-default);
+  padding: 4px 12px 4px 34px;
+  min-height: 40px;
+}
+
+.compose-modal__search-input :deep(.el-input__inner) {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.compose-modal__search-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--interactive-primary-bg) !important;
+}
+
+.compose-modal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.compose-modal__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 80%, var(--surface-card));
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 16%, var(--border-default));
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.compose-modal__chip button {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-tertiary) 14%, transparent);
+  color: var(--text-tertiary);
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.compose-modal__chip button svg {
+  width: 10px;
+  height: 10px;
+}
+
+.compose-modal__chip button:hover {
+  background: color-mix(in srgb, var(--status-danger) 18%, transparent);
+  color: var(--status-danger);
+}
+
+.compose-modal__error {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--status-danger) 6%, var(--surface-card));
+  border: 1px solid color-mix(in srgb, var(--status-danger) 14%, var(--border-default));
+  color: var(--status-danger);
+  font-size: var(--text-sm);
+}
+
+.compose-modal__user-list {
+  display: grid;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0 -24px;
+  padding: 0 24px;
+}
+
+.compose-modal__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  color: var(--text-quaternary);
+  font-size: var(--text-sm);
+}
+
+.compose-modal__status--hint {
+  color: var(--text-tertiary);
+}
+
+.compose-modal__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--interactive-primary-bg);
+  border-radius: 50%;
+  animation: compose-spin 0.6s linear infinite;
+}
+
+.compose-modal__spinner--light {
+  border-color: color-mix(in srgb, var(--interactive-primary-fg) 30%, transparent);
+  border-top-color: var(--interactive-primary-fg);
+}
+
+@keyframes compose-spin {
+  to { transform: rotate(360deg); }
+}
+
+.compose-modal__user {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  width: 100%;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out);
+}
+
+.compose-modal__user:hover {
+  background: color-mix(in srgb, var(--interactive-secondary-bg-hover) 60%, transparent);
+}
+
+.compose-modal__user.is-selected {
+  background: color-mix(in srgb, var(--interactive-selected-bg) 72%, var(--surface-card));
+}
+
+.compose-modal__user-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.compose-modal__user-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compose-modal__user-head strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.compose-modal__user-tag {
+  flex-shrink: 0;
+  color: var(--text-quaternary);
+  font: 500 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.compose-modal__user-copy p {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+.compose-modal__check {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--interactive-primary-bg);
+  color: var(--interactive-primary-fg);
+  flex-shrink: 0;
+}
+
+.compose-modal__check svg {
+  width: 13px;
+  height: 13px;
+}
+
+.compose-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid color-mix(in srgb, var(--border-default) 70%, transparent);
+}
+
+.compose-modal__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-md);
+  font: 500 var(--text-sm)/1 var(--font-sans);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.compose-modal__btn--secondary {
+  background: var(--interactive-secondary-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.compose-modal__btn--secondary:hover {
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.compose-modal__btn--primary {
+  background: var(--interactive-primary-bg);
+  color: var(--interactive-primary-fg);
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--interactive-primary-bg) 24%, transparent),
+    0 6px 16px color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent);
+}
+
+.compose-modal__btn--primary:hover:not(:disabled) {
+  background: var(--interactive-primary-bg-hover);
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--interactive-primary-bg) 30%, transparent),
+    0 8px 20px color-mix(in srgb, var(--interactive-primary-bg) 16%, transparent);
+  transform: translateY(-1px);
+}
+
+.compose-modal__btn--primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--interactive-primary-bg) 20%, transparent);
+}
+
+.compose-modal__btn--primary:disabled {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 40%, var(--surface-panel));
+  box-shadow: none;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 :deep(.forward-dialog .el-dialog) {
@@ -2411,31 +3202,27 @@ function registerDebugHooks() {
   box-shadow: var(--shadow-overlay);
 }
 
+:deep(.add-contact-dialog .el-dialog) {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-overlay) 96%, transparent);
+  box-shadow: var(--shadow-overlay);
+}
+
+:deep(.add-contact-dialog .el-dialog__body) {
+  padding-top: 12px;
+}
+
+:deep(.add-contact-dialog .el-dialog) {
+  min-height: min(520px, 70vh);
+}
+
 :deep(.forward-dialog .el-dialog__header) {
   padding-bottom: 4px;
 }
 
-:deep(.forward-dialog .el-dialog__headerbtn) {
-  width: 34px;
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  color: var(--text-quaternary);
-  transition:
-    border-color var(--motion-fast) var(--motion-ease-out),
-    background var(--motion-fast) var(--motion-ease-out),
-    color var(--motion-fast) var(--motion-ease-out);
-}
-
-:deep(.forward-dialog .el-dialog__headerbtn:hover),
-:deep(.forward-dialog .el-dialog__headerbtn:focus-visible) {
-  border-color: var(--border-default);
-  background: var(--interactive-secondary-bg-hover);
-  color: var(--text-primary);
-}
-
 :deep(.forward-dialog .el-dialog__title) {
-  font: 620 1rem/1.08 var(--font-display);
+  font: 620 var(--text-lg)/1.08 var(--font-display);
   letter-spacing: -0.02em;
 }
 
@@ -2559,7 +3346,7 @@ function registerDebugHooks() {
 .forward-sheet__conversation-state {
   flex-shrink: 0;
   color: var(--text-quaternary);
-  font: 600 0.58rem/1 var(--font-mono);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2594,12 +3381,12 @@ function registerDebugHooks() {
 
 .forward-sheet__empty strong {
   color: var(--text-primary);
-  font: 600 0.78rem/1.2 var(--font-body);
+  font: 600 var(--text-sm)/1.2 var(--font-body);
 }
 
 .forward-sheet__empty p {
   color: var(--text-tertiary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.45;
 }
 
@@ -2609,9 +3396,160 @@ function registerDebugHooks() {
   background: color-mix(in srgb, var(--status-danger) 4%, var(--surface-panel));
 }
 
+/* ── Edit group dialog ── */
+
+:deep(.edit-group-modal .el-dialog) {
+  border-radius: var(--radius-panel);
+  border: 1px solid color-mix(in srgb, var(--border-default) 92%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
+  backdrop-filter: blur(16px) saturate(108%);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+:deep(.edit-group-modal .el-dialog__header),
+:deep(.edit-group-modal .el-dialog__footer) {
+  display: none;
+}
+
+:deep(.edit-group-modal .el-dialog__body) {
+  padding: 0;
+}
+
+.edit-group-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 0;
+}
+
+.edit-group-modal__header strong {
+  font: 620 var(--text-base)/1.08 var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.edit-group-modal__close {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.edit-group-modal__close:hover {
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+}
+
+.edit-group-modal__body {
+  padding: 16px 20px 4px;
+}
+
+.edit-group-modal__label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font: 500 var(--text-xs)/1 var(--font-body);
+}
+
+.edit-group-modal__input {
+  width: 100%;
+}
+
+:deep(.edit-group-modal__input .el-input__wrapper),
+:deep(.edit-group-modal__input .el-textarea__inner) {
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px color-mix(in srgb, var(--border-default) 80%, transparent);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  transition:
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+:deep(.edit-group-modal__input .el-input__wrapper.is-focus),
+:deep(.edit-group-modal__input .el-textarea__inner:focus) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--interactive-primary-bg) 28%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 24%, transparent);
+}
+
+.edit-group-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px 18px;
+}
+
+.edit-group-modal__btn {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  font: 500 var(--text-sm)/1 var(--font-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    opacity var(--motion-fast) var(--motion-ease-out);
+}
+
+.edit-group-modal__btn--secondary {
+  background: var(--interactive-secondary-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.edit-group-modal__btn--secondary:hover {
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+}
+
+.edit-group-modal__btn--primary {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 88%, transparent);
+  color: var(--text-on-brand);
+}
+
+.edit-group-modal__btn--primary:hover:not(:disabled) {
+  background: var(--interactive-primary-bg);
+}
+
+.edit-group-modal__btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.edit-group-modal__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--text-on-brand) 30%, transparent);
+  border-top-color: var(--text-on-brand);
+  border-radius: 50%;
+  animation: eg-spin 0.6s linear infinite;
+}
+
+@keyframes eg-spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 1279px) {
   .chat-page {
-    grid-template-columns: 332px minmax(0, 1fr);
+    grid-template-columns: clamp(280px, 25vw, 332px) minmax(0, 1fr);
   }
 }
 
@@ -2651,6 +3589,44 @@ function registerDebugHooks() {
   .chat-page__forward-bar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .compose-dialog__user--result {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .compose-dialog__result-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  :deep(.compose-modal .el-dialog) {
+    width: calc(100vw - 32px) !important;
+    margin: 16px;
+  }
+
+  .compose-modal__header {
+    padding: 18px 18px 14px;
+  }
+
+  .compose-modal__body {
+    padding: 0 18px;
+    max-height: min(60vh, 400px);
+  }
+
+  .compose-modal__user-list {
+    margin: 0 -18px;
+    padding: 0 18px;
+  }
+
+  .compose-modal__footer {
+    padding: 14px 18px 16px;
+  }
+
+  .compose-modal__user {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    padding: 9px 10px;
   }
 
 }
