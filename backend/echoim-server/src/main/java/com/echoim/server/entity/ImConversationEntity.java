@@ -11,6 +11,7 @@ public class ImConversationEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private String conversationNo;
     private Integer conversationType;
     private String bizKey;
     private Long bizId;
@@ -29,6 +30,14 @@ public class ImConversationEntity {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getConversationNo() {
+        return conversationNo;
+    }
+
+    public void setConversationNo(String conversationNo) {
+        this.conversationNo = conversationNo;
     }
 
     public Integer getConversationType() {

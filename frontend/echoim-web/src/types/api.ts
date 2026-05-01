@@ -33,6 +33,7 @@ export interface ApiResponse<T> {
   message: string
   data: T
   requestId: string | null
+  traceId?: string | null
 }
 
 export interface PageResponse<T> {
@@ -84,6 +85,7 @@ export interface ApiGroupDetail {
 
 export interface ApiConversationItem {
   conversationId: number
+  conversationNo: string
   conversationType: ConversationType
   conversationName: string
   avatarUrl: string | null
@@ -96,6 +98,7 @@ export interface ApiConversationItem {
   groupId: number | null
   latestSeq: number | null
   canSend: boolean | null
+  groupStatus: number | null
   myRole: number | null
   archived?: boolean | null
   manualUnread?: boolean | null
@@ -177,6 +180,9 @@ export type WsMessageType =
   | 'CONVERSATION_CHANGE'
   | 'FORCE_OFFLINE'
   | 'OFFLINE_SYNC'
+  | 'TYPING'
+  | 'USER_ONLINE'
+  | 'USER_OFFLINE'
 
 export interface WsEnvelope<T = unknown> {
   type: WsMessageType

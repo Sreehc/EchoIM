@@ -159,6 +159,7 @@ export interface ChatErrorState {
 
 export interface ConversationSummary {
   conversationId: number
+  conversationNo: string
   conversationType: ConversationType
   conversationName: string
   avatarUrl: string | null
@@ -171,6 +172,7 @@ export interface ConversationSummary {
   groupId: number | null
   latestSeq: number
   canSend: boolean
+  groupStatus: number | null
   myRole: number | null
   archived: boolean
   manualUnread: boolean

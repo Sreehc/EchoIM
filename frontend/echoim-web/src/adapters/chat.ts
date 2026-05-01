@@ -85,6 +85,7 @@ export function adaptConversationSummary(
 ): ConversationSummary {
   return {
     conversationId: Number(item.conversationId),
+    conversationNo: item.conversationNo ?? '',
     conversationType: item.conversationType,
     conversationName: normalizeDisplayText(item.conversationName) || `会话 ${item.conversationId}`,
     avatarUrl: item.avatarUrl ?? null,
@@ -97,6 +98,7 @@ export function adaptConversationSummary(
     groupId: item.groupId == null ? null : Number(item.groupId),
     latestSeq: Number(item.latestSeq ?? 0),
     canSend: item.canSend ?? true,
+    groupStatus: item.groupStatus ?? null,
     myRole: item.myRole == null ? null : Number(item.myRole),
     archived: Boolean(item.archived),
     manualUnread: Boolean(item.manualUnread),

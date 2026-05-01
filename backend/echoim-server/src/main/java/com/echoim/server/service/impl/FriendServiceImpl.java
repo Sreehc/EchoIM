@@ -2,6 +2,7 @@ package com.echoim.server.service.impl;
 
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
+import com.echoim.server.common.util.IdGenerator;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImFriendEntity;
@@ -224,6 +225,7 @@ public class FriendServiceImpl implements FriendService {
         }
 
         ImConversationEntity conversation = new ImConversationEntity();
+        conversation.setConversationNo(IdGenerator.conversationNo());
         conversation.setConversationType(CONVERSATION_TYPE_SINGLE);
         conversation.setBizKey(bizKey);
         conversation.setConversationName(bizKey);

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public class ConversationItemVo {
 
     private Long conversationId;
+    private String conversationNo;
     private Integer conversationType;
     private String conversationName;
     private String avatarUrl;
@@ -17,6 +18,7 @@ public class ConversationItemVo {
     private Long groupId;
     private Long latestSeq;
     private Boolean canSend;
+    private Integer groupStatus;
     private Integer myRole;
     private Boolean archived;
     private Boolean manualUnread;
@@ -29,6 +31,14 @@ public class ConversationItemVo {
 
     public void setConversationId(Long conversationId) {
         this.conversationId = conversationId;
+    }
+
+    public String getConversationNo() {
+        return conversationNo;
+    }
+
+    public void setConversationNo(String conversationNo) {
+        this.conversationNo = conversationNo;
     }
 
     public Integer getConversationType() {
@@ -125,6 +135,14 @@ public class ConversationItemVo {
 
     public void setCanSend(Boolean canSend) {
         this.canSend = canSend;
+    }
+
+    public Integer getGroupStatus() {
+        return groupStatus;
+    }
+
+    public void setGroupStatus(Integer groupStatus) {
+        this.groupStatus = groupStatus;
     }
 
     public Integer getMyRole() {

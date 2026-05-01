@@ -4,18 +4,22 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.echoim.server.common.PageResponse;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
+import com.echoim.server.common.util.IdGenerator;
 import com.echoim.server.dto.conversation.ConversationPageQueryDto;
 import com.echoim.server.dto.conversation.MessagePageQueryDto;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
+import com.echoim.server.entity.ImFileEntity;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
+import com.echoim.server.mapper.ImFileMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.im.service.ImSingleChatService;
 import com.echoim.server.service.conversation.ConversationService;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.friend.FriendService;
 import com.echoim.server.service.message.MessageViewService;
+import com.echoim.server.vo.conversation.ConversationFileVo;
 import com.echoim.server.vo.conversation.ConversationItemVo;
 import com.echoim.server.vo.conversation.MessageItemVo;
 import org.springframework.stereotype.Service;
@@ -37,6 +41,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
     private final ImMessageMapper imMessageMapper;
+    private final ImFileMapper imFileMapper;
     private final ImSingleChatService imSingleChatService;
     private final FileService fileService;
     private final MessageViewService messageViewService;
@@ -45,6 +50,7 @@ public class ConversationServiceImpl implements ConversationService {
     public ConversationServiceImpl(ImConversationMapper imConversationMapper,
                                    ImConversationUserMapper imConversationUserMapper,
                                    ImMessageMapper imMessageMapper,
+                                   ImFileMapper imFileMapper,
                                    ImSingleChatService imSingleChatService,
                                    FileService fileService,
                                    MessageViewService messageViewService,
@@ -52,6 +58,7 @@ public class ConversationServiceImpl implements ConversationService {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
         this.imMessageMapper = imMessageMapper;
+        this.imFileMapper = imFileMapper;
         this.imSingleChatService = imSingleChatService;
         this.fileService = fileService;
         this.messageViewService = messageViewService;
@@ -103,6 +110,28 @@ public class ConversationServiceImpl implements ConversationService {
         }
         fileService.enrichMessages(userId, list);
         messageViewService.enrichMessages(userId, list);
+        return new PageResponse<>(list, pageNo, pageSize, total);
+    }
+
+    @Override
+    public PageResponse<ConversationFileVo> pageConversationFiles(Long userId, Long conversationId, long pageNo, long pageSize) {
+        pageNo = normalizePageNo(pageNo);
+        pageSize = normalizePageSize(pageSize);
+        requireActiveConversation(userId, conversationId);
+        long offset = (pageNo - 1) * pageSize;
+        List<ImFileEntity> files = imFileMapper.selectByConversationId(conversationId, (int) pageSize, (int) offset);
+        long total = imFileMapper.countByConversationId(conversationId);
+        List<ConversationFileVo> list = files.stream().map(f -> {
+            ConversationFileVo vo = new ConversationFileVo();
+            vo.setFileId(f.getId());
+            vo.setFileName(f.getFileName());
+            vo.setFileExt(f.getFileExt());
+            vo.setContentType(f.getContentType());
+            vo.setFileSize(f.getFileSize());
+            vo.setUrl(f.getUrl());
+            vo.setCreatedAt(f.getCreatedAt());
+            return vo;
+        }).toList();
         return new PageResponse<>(list, pageNo, pageSize, total);
     }
 
@@ -211,6 +240,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         ImConversationEntity conversation = new ImConversationEntity();
+        conversation.setConversationNo(IdGenerator.conversationNo());
         conversation.setConversationType(CONVERSATION_TYPE_SINGLE);
         conversation.setBizKey(bizKey);
         conversation.setConversationName(bizKey);
@@ -231,6 +261,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         ImConversationEntity conversation = new ImConversationEntity();
+        conversation.setConversationNo(IdGenerator.conversationNo());
         conversation.setConversationType(CONVERSATION_TYPE_SINGLE);
         conversation.setBizKey(bizKey);
         conversation.setConversationName("Saved Messages");

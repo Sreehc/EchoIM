@@ -2,6 +2,7 @@ package com.echoim.server.service.impl;
 
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
+import com.echoim.server.common.util.IdGenerator;
 import com.echoim.server.dto.group.AddGroupMembersRequestDto;
 import com.echoim.server.dto.group.CreateGroupRequestDto;
 import com.echoim.server.dto.group.UpdateGroupMemberRoleRequestDto;
@@ -80,7 +81,8 @@ public class GroupServiceImpl implements GroupService {
         int conversationType = normalizeConversationType(requestDto.getConversationType());
 
         ImGroupEntity group = new ImGroupEntity();
-        group.setGroupNo(generateGroupNo());
+        group.setGroupNo(conversationType == CONVERSATION_TYPE_CHANNEL
+                ? IdGenerator.channelNo() : IdGenerator.groupNo());
         group.setGroupName(requestDto.getGroupName().trim());
         group.setOwnerUserId(currentUserId);
         group.setConversationType(conversationType);
@@ -103,6 +105,7 @@ public class GroupServiceImpl implements GroupService {
         vo.setGroupNo(group.getGroupNo());
         vo.setGroupName(group.getGroupName());
         vo.setConversationId(conversation.getId());
+        vo.setConversationNo(conversation.getConversationNo());
         vo.setMemberCount(memberIds.size());
         vo.setConversationType(conversationType);
         return vo;
@@ -299,6 +302,7 @@ public class GroupServiceImpl implements GroupService {
             return existing;
         }
         ImConversationEntity conversation = new ImConversationEntity();
+        conversation.setConversationNo(IdGenerator.conversationNo());
         conversation.setConversationType(group.getConversationType());
         conversation.setBizKey(buildCollectiveBizKey(group));
         conversation.setBizId(group.getId());
@@ -381,7 +385,7 @@ public class GroupServiceImpl implements GroupService {
     }
 
     private String generateGroupNo() {
-        return "G" + System.currentTimeMillis() + UUID.randomUUID().toString().replace("-", "").substring(0, 6);
+        return IdGenerator.groupNo();
     }
 
     private int normalizeConversationType(Integer conversationType) {

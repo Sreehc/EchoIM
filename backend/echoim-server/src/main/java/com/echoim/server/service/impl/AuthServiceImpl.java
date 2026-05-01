@@ -6,6 +6,7 @@ import com.echoim.server.common.audit.AuditLogService;
 import com.echoim.server.common.constant.ErrorCode;
 import com.echoim.server.common.exception.BizException;
 import com.echoim.server.common.auth.LoginUser;
+import com.echoim.server.common.util.IdGenerator;
 import com.echoim.server.common.util.UsernameRules;
 import com.echoim.server.config.AuthProperties;
 import com.echoim.server.dto.auth.LoginRequestDto;
@@ -128,15 +129,12 @@ public class AuthServiceImpl implements AuthService {
         }
 
         ImUserEntity entity = new ImUserEntity();
-        entity.setUserNo("TMP_" + System.nanoTime());
+        entity.setUserNo(IdGenerator.userNo());
         entity.setUsername(normalizedUsername);
         entity.setPasswordHash(passwordEncoder.encode(requestDto.getPassword()));
         entity.setNickname(requestDto.getNickname());
         entity.setStatus(USER_STATUS_NORMAL);
         imUserMapper.insert(entity);
-
-        entity.setUserNo("E" + entity.getId());
-        imUserMapper.updateById(entity);
 
         RegisterResponseVo responseVo = new RegisterResponseVo();
         responseVo.setUserId(entity.getId());

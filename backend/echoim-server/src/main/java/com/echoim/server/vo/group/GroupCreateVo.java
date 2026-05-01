@@ -6,6 +6,7 @@ public class GroupCreateVo {
     private String groupNo;
     private String groupName;
     private Long conversationId;
+    private String conversationNo;
     private Integer memberCount;
     private Integer conversationType;
 
@@ -39,6 +40,14 @@ public class GroupCreateVo {
 
     public void setConversationId(Long conversationId) {
         this.conversationId = conversationId;
+    }
+
+    public String getConversationNo() {
+        return conversationNo;
+    }
+
+    public void setConversationNo(String conversationNo) {
+        this.conversationNo = conversationNo;
     }
 
     public Integer getMemberCount() {
