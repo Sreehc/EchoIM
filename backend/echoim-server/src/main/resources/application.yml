@@ -53,7 +53,7 @@ mybatis-plus:
 echoim:
   jwt:
     secret: ${ECHOIM_JWT_SECRET:}
-    expire-seconds: 7200
+    expire-seconds: 43200
   auth:
     mail-from: ${SPRING_MAIL_FROM:${SPRING_MAIL_USERNAME:}}
     code-expire-seconds: ${ECHOIM_AUTH_CODE_EXPIRE_SECONDS:600}

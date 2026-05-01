@@ -720,7 +720,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function handleWsEnvelope(envelope: WsEnvelope) {
+  async function handleWsEnvelope(envelope: WsEnvelope) {
     if (envelope.type === 'ACK') {
       const payload = envelope.data as WsAckPayload
       recordDebugEvent(`recv:ACK:${payload.ackType}:${payload.status}`)
@@ -741,6 +741,19 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (envelope.type === 'FORCE_OFFLINE') {
+      const offlineData = envelope.data as { code?: number; message?: string } | undefined
+      const TOKEN_EXPIRED_CODE = 40102
+
+      if (offlineData?.code === TOKEN_EXPIRED_CODE) {
+        try {
+          await authStore.refreshSession()
+          await connectRealtime()
+          return
+        } catch {
+          // refresh failed, fall through to logout
+        }
+      }
+
       authStore.clearSession()
       resetState()
       window.location.assign('/login')

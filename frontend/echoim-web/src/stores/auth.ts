@@ -35,7 +35,7 @@ import { STORAGE_KEYS } from '@/utils/storage'
 import { normalizeDisplayText } from '@/utils/text'
 
 type SessionPersistence = 'local' | 'session' | 'none'
-const REFRESH_LEAD_TIME_MS = 5 * 60 * 1000
+const REFRESH_LEAD_TIME_MS = 10 * 60 * 1000
 const MIN_SESSION_VALIDITY_MS = 90 * 1000
 
 const initialSessionState = readPersistedSession()

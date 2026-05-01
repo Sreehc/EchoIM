@@ -31,6 +31,12 @@ import java.util.Map;
 @Component
 public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
 
+    /**
+     * Grace period after JWT expires before forcing the WS session offline.
+     * Gives the frontend time to refresh the token and re-authenticate.
+     */
+    private static final long SESSION_EXPIRY_GRACE_MILLIS = 5 * 60 * 1000L;
+
     private final ObjectMapper objectMapper;
     private final TokenService tokenService;
     private final ImOnlineService imOnlineService;
@@ -236,7 +242,7 @@ public class ImTextFrameHandler extends SimpleChannelInboundHandler<TextWebSocke
 
     private boolean isSessionExpired(LoginUser loginUser) {
         Long expireAtMillis = loginUser.getExpireAtMillis();
-        return expireAtMillis != null && expireAtMillis <= System.currentTimeMillis();
+        return expireAtMillis != null && expireAtMillis + SESSION_EXPIRY_GRACE_MILLIS <= System.currentTimeMillis();
     }
 
     private String currentNodeId() {
