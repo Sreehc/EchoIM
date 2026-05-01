@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowLeft, Close, MoreFilled, Search, User } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowUp, Close, MoreFilled, Search, User } from '@element-plus/icons-vue'
 import type { ConversationProfile, ConversationSummary } from '@/types/chat'
 import AvatarBadge from './AvatarBadge.vue'
 
@@ -63,7 +63,7 @@ watch(
           :name="conversation?.conversationName"
           :avatar-url="conversation?.avatarUrl"
           :type="conversation?.conversationType === 1 ? 'user' : conversation?.conversationType === 2 ? 'group' : 'channel'"
-          size="md"
+          size="lg"
         />
         <div class="chat-topbar__copy">
           <div class="chat-topbar__title-row">
@@ -94,7 +94,7 @@ watch(
           aria-label="上一条匹配消息"
           @click="emit('navigateSearchMatch', -1)"
         >
-          上一个
+          <ArrowUp />
         </button>
         <button
           class="chat-topbar__search-nav"
@@ -103,7 +103,7 @@ watch(
           aria-label="下一条匹配消息"
           @click="emit('navigateSearchMatch', 1)"
         >
-          下一个
+          <ArrowDown />
         </button>
         <button class="chat-topbar__search-close" type="button" aria-label="关闭会话内搜索" @click="emit('closeSearch')">
           <Close />
@@ -175,8 +175,8 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 70px;
-  height: 70px;
+  min-height: 64px;
+  height: 64px;
   padding: 10px 20px;
   border-bottom: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
@@ -188,7 +188,7 @@ watch(
 .chat-topbar__actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .chat-topbar__main {
@@ -202,13 +202,13 @@ watch(
 }
 
 .chat-topbar__icon {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
 }
 
 .chat-topbar__identity {
   min-width: 0;
-  gap: 14px;
+  gap: 12px;
 }
 
 .chat-topbar__copy {
@@ -230,7 +230,7 @@ watch(
 .chat-topbar__identity strong {
   display: block;
   color: var(--text-primary);
-  font-size: 0.96rem;
+  font-size: var(--text-lg);
   line-height: 1.12;
   font-weight: 600;
   letter-spacing: -0.018em;
@@ -239,7 +239,7 @@ watch(
 .chat-topbar__identity p {
   margin-top: 4px;
   color: var(--text-tertiary);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   line-height: 1.28;
   letter-spacing: 0.01em;
 }
@@ -248,59 +248,57 @@ watch(
   display: grid;
   place-items: center;
   border-radius: var(--radius-control);
-  border: 1px solid var(--border-default);
-  background: var(--interactive-secondary-bg);
-  color: var(--interactive-secondary-fg);
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
   transition:
     background var(--motion-fast) var(--motion-ease-out),
-    color var(--motion-fast) var(--motion-ease-out),
-    border-color var(--motion-fast) var(--motion-ease-out);
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.chat-topbar__icon :deep(svg) {
+  width: 18px;
+  height: 18px;
 }
 
 .chat-topbar__icon:hover,
 .chat-topbar__icon:focus-visible {
-  background: var(--interactive-secondary-bg-hover);
-  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 80%, transparent);
   color: var(--text-primary);
 }
 
 .chat-topbar__icon.is-active {
-  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, var(--interactive-secondary-bg));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, transparent);
   color: var(--interactive-selected-fg);
-  border-color: var(--border-brand);
 }
 
 .chat-topbar__search-shell {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: clamp(460px, 52vw, 680px);
+  gap: 4px;
+  width: clamp(380px, 44vw, 560px);
   max-width: 100%;
-  min-height: 48px;
-  padding: 5px;
-  border: 1px solid var(--border-default);
+  height: 36px;
+  padding: 3px 4px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-  box-shadow: var(--shadow-sm);
+  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 .chat-topbar__search-input {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 260px;
-  flex: 1 1 340px;
-  padding: 0 14px;
-  min-height: 100%;
-  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--border-default));
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+  gap: 6px;
+  min-width: 160px;
+  flex: 1 1 260px;
+  padding: 0 10px;
+  height: 100%;
 }
 
 .chat-topbar__search-input > svg {
-  width: 13px;
-  height: 13px;
-  color: var(--text-tertiary);
+  width: 14px;
+  height: 14px;
+  color: var(--text-quaternary);
   flex-shrink: 0;
 }
 
@@ -324,15 +322,16 @@ watch(
 
 .chat-topbar__search-input :deep(.el-input__inner) {
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .chat-topbar__search-count {
-  min-width: 3.75rem;
-  color: var(--text-tertiary);
-  font: 600 0.72rem/1.2 var(--font-mono);
-  letter-spacing: 0.05em;
+  min-width: 3rem;
+  color: var(--text-quaternary);
+  font: 600 var(--text-xs)/1 var(--font-mono);
+  letter-spacing: 0.04em;
   text-align: right;
+  white-space: nowrap;
 }
 
 .chat-topbar__search-nav,
@@ -340,58 +339,53 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
-  padding: 0 13px;
-  border: 1px solid var(--border-default);
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--interactive-secondary-bg);
-  color: var(--text-primary);
-  font: 600 0.72rem/1 var(--font-body);
+  background: transparent;
+  color: var(--text-tertiary);
   transition:
     background var(--motion-fast) var(--motion-ease-out),
-    border-color var(--motion-fast) var(--motion-ease-out);
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
-.chat-topbar__search-nav {
-  min-width: 76px;
+.chat-topbar__search-nav :deep(svg) {
+  width: 14px;
+  height: 14px;
 }
 
 .chat-topbar__search-nav:hover:not(:disabled),
 .chat-topbar__search-nav:focus-visible:not(:disabled),
 .chat-topbar__search-close:hover,
 .chat-topbar__search-close:focus-visible {
-  background: var(--interactive-secondary-bg-hover);
-  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 72%, transparent);
+  color: var(--text-secondary);
 }
 
 .chat-topbar__search-nav:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-.chat-topbar__search-close {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-}
-
 .chat-topbar__search-close :deep(svg) {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
 }
 
 @media (max-width: 767px) {
   .chat-topbar {
     padding-inline: 16px;
-    min-height: 66px;
-    height: 66px;
+    min-height: 60px;
+    height: 60px;
   }
 
   .chat-topbar__search-shell {
     width: auto;
-    max-width: calc(100vw - 124px);
-    gap: 6px;
-    padding-inline: 5px;
+    max-width: calc(100vw - 90px);
+    gap: 3px;
+    padding: 2px 3px;
   }
 
   .chat-topbar__search-count {
@@ -400,17 +394,17 @@ watch(
 
   .chat-topbar__search-input {
     min-width: 0;
-    padding-inline: 12px;
+    padding-inline: 10px;
   }
 
   .chat-topbar__search-nav {
-    min-width: 64px;
-    padding-inline: 10px;
-    font-size: 0.66rem;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
   }
 
   .chat-topbar__actions {
-    gap: 8px;
+    gap: 6px;
   }
 }
 </style>

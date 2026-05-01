@@ -347,7 +347,7 @@ function jumpToMessage(messageId: number) {
   position: relative;
   z-index: 1;
   min-height: 0;
-  padding: 12px 22px 6px;
+  padding: 6px 22px 6px;
   background: transparent;
 }
 
@@ -359,7 +359,7 @@ function jumpToMessage(messageId: number) {
 .message-pane__skeleton {
   display: grid;
   gap: 3px;
-  width: min(740px, 100%);
+  width: min(700px, 100%);
   margin: 0 auto;
 }
 
@@ -380,28 +380,28 @@ function jumpToMessage(messageId: number) {
 
 .message-pane__history-label {
   color: var(--text-quaternary);
-  font: 600 0.62rem/1 var(--font-mono);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .message-pane__history-end {
   color: var(--text-quaternary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.4;
 }
 
 .message-pane__history-tip,
 .message-pane__history-error {
   color: var(--text-quaternary);
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
 }
 
 .message-pane__history :deep(.el-button) {
-  min-height: 28px;
+  min-height: var(--btn-min-size);
   padding: 0 2px;
   color: var(--text-secondary);
-  font: 600 0.72rem/1 var(--font-body);
+  font: 600 var(--text-xs)/1 var(--font-body);
   letter-spacing: -0.01em;
 }
 
@@ -430,7 +430,7 @@ function jumpToMessage(messageId: number) {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface-card) 82%, transparent);
   color: var(--text-secondary);
-  font: 600 0.64rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.05em;
 }
 

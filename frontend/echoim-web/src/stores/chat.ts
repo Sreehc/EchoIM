@@ -22,7 +22,7 @@ import {
   updateConversationTop,
 } from '@/services/conversations'
 import { createGroup as createGroupRequest, fetchGroupDetail, fetchGroupMembers } from '@/services/groups'
-import { HttpError } from '@/services/http'
+import { getJson, HttpError } from '@/services/http'
 import { editMessage as editMessageRequest, reactMessage as reactMessageRequest, recallMessage as recallMessageRequest } from '@/services/messages'
 import { EchoWsClient } from '@/services/ws'
 import { useAuthStore } from '@/stores/auth'
@@ -94,6 +94,13 @@ export const useChatStore = defineStore('chat', () => {
   })
   const initialized = ref(false)
   const debugEvents = ref<string[]>([])
+
+  // Typing indicator state: conversationId → Set of userIds currently typing
+  const typingUsers = ref<Record<number, Set<number>>>({})
+  const typingTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  // Online status tracking: userId → online
+  const onlineUsers = ref<Set<number>>(new Set())
 
   let bootstrapPromise: Promise<void> | null = null
   let wsClient: EchoWsClient | null = null
@@ -803,6 +810,22 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
+    if (envelope.type === 'TYPING') {
+      const payload = envelope.data as { conversationId: number; userId: number }
+      if (payload?.conversationId && payload?.userId) {
+        handleTypingEvent(payload.conversationId, payload.userId)
+      }
+      return
+    }
+
+    if (envelope.type === 'USER_ONLINE' || envelope.type === 'USER_OFFLINE') {
+      const payload = envelope.data as { userId: number; online: boolean }
+      if (payload?.userId) {
+        handlePresenceEvent(payload.userId, payload.online)
+      }
+      return
+    }
+
     if (
       envelope.type === 'CALL_INVITE' ||
       envelope.type === 'CALL_ACCEPT' ||
@@ -852,6 +875,69 @@ export const useChatStore = defineStore('chat', () => {
       updateMessageReceipt(Number(payload.conversationId), Number(payload.messageId), {
         delivered: true,
       }, clientMsgId)
+    }
+  }
+
+  function handleTypingEvent(conversationId: number, userId: number) {
+    const key = `${conversationId}:${userId}`
+    const current = typingUsers.value[conversationId] ?? new Set<number>()
+    current.add(userId)
+    typingUsers.value = { ...typingUsers.value, [conversationId]: current }
+
+    // Clear after 3 seconds of inactivity
+    if (typingTimers.value[key]) {
+      clearTimeout(typingTimers.value[key])
+    }
+    typingTimers.value[key] = setTimeout(() => {
+      const set = typingUsers.value[conversationId]
+      if (set) {
+        set.delete(userId)
+        typingUsers.value = { ...typingUsers.value, [conversationId]: new Set(set) }
+      }
+      delete typingTimers.value[key]
+    }, 3000)
+  }
+
+  function sendTyping(conversationId: number) {
+    wsClient?.sendTyping(conversationId)
+  }
+
+  function getTypingUserIds(conversationId: number): number[] {
+    return Array.from(typingUsers.value[conversationId] ?? [])
+  }
+
+  function handlePresenceEvent(userId: number, online: boolean) {
+    const next = new Set(onlineUsers.value)
+    if (online) {
+      next.add(userId)
+    } else {
+      next.delete(userId)
+    }
+    onlineUsers.value = next
+  }
+
+  function isUserOnline(userId: number): boolean {
+    return onlineUsers.value.has(userId)
+  }
+
+  async function fetchOnlineStatus(userIds: number[]) {
+    if (!userIds.length) return
+    try {
+      const params = userIds.map((id) => `userIds=${id}`).join('&')
+      const res = await getJson<Record<number, boolean>>(`/api/im/online-status?${params}`)
+      if (res.code === 0 && res.data) {
+        const next = new Set(onlineUsers.value)
+        for (const [id, online] of Object.entries(res.data)) {
+          if (online) {
+            next.add(Number(id))
+          } else {
+            next.delete(Number(id))
+          }
+        }
+        onlineUsers.value = next
+      }
+    } catch {
+      // best-effort; ignore failures
     }
   }
 
@@ -1102,6 +1188,14 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value = items.map((item) => adaptConversationSummary(item))
 
     syncAllProfiles()
+
+    // Fetch online status for single-chat peers
+    const peerIds = items
+      .filter((item) => item.conversationType === 1 && item.peerUserId)
+      .map((item) => item.peerUserId as number)
+    if (peerIds.length) {
+      void fetchOnlineStatus(peerIds)
+    }
   }
 
   function upsertConversation(conversation: ConversationSummary) {
@@ -1429,6 +1523,11 @@ export const useChatStore = defineStore('chat', () => {
     clearNoticeMessage,
     clearSendError,
     clearSyncError,
+    sendTyping,
+    getTypingUserIds,
+    onlineUsers,
+    isUserOnline,
+    fetchOnlineStatus,
     resetState,
   }
 })

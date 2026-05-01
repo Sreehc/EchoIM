@@ -184,6 +184,8 @@ function formatDuration(durationSeconds: number) {
 
 .call-overlay.is-minimized {
   width: min(280px, calc(100vw - 28px));
+  max-height: 120px;
+  overflow: hidden;
 }
 
 .call-overlay__header,
@@ -197,13 +199,14 @@ function formatDuration(durationSeconds: number) {
 
 .call-overlay__eyebrow {
   color: var(--text-quaternary);
-  font: 600 0.74rem/1 var(--font-body);
+  font: 600 var(--text-xs)/1 var(--font-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .call-overlay__ghost,
 .call-overlay__action {
+  min-height: var(--btn-min-size);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--interactive-secondary-bg) 88%, transparent);
@@ -222,6 +225,7 @@ function formatDuration(durationSeconds: number) {
 }
 
 .call-overlay__ghost {
+  min-height: var(--btn-min-size);
   padding: 8px 12px;
 }
 
@@ -239,6 +243,22 @@ function formatDuration(durationSeconds: number) {
   font-weight: 700;
 }
 
+.call-overlay__mini {
+  min-width: 0;
+}
+
+.call-overlay__mini strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-overlay__mini p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .call-overlay__copy p,
 .call-overlay__mini p {
   margin: 4px 0 0;
@@ -248,7 +268,7 @@ function formatDuration(durationSeconds: number) {
 .call-overlay__error {
   margin: 0;
   color: var(--status-danger);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 
 .call-overlay__actions {

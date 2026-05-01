@@ -85,8 +85,8 @@ const emit = defineEmits<{
   overflow: hidden;
   box-shadow: none;
   border-left: 1px solid var(--border-default);
-  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
-  backdrop-filter: blur(16px) saturate(108%);
+  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
+  backdrop-filter: blur(12px) saturate(106%);
 }
 
 :global(.conversation-profile-drawer__body),
@@ -100,7 +100,7 @@ const emit = defineEmits<{
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
-  backdrop-filter: blur(16px) saturate(108%);
+  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
+  backdrop-filter: blur(12px) saturate(106%);
 }
 </style>

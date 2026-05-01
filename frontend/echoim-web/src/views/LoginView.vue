@@ -620,6 +620,18 @@ function handlePasswordEvent(event: Event) {
     color-mix(in srgb, var(--surface-overlay) 98%, transparent);
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(16px);
+  animation: card-enter 0.28s var(--motion-ease-out);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .login-card::before {
@@ -672,14 +684,14 @@ function handlePasswordEvent(event: Event) {
 }
 
 .login-card__brand strong {
-  font: 620 1.42rem/0.96 var(--font-display);
+  font: 620 var(--text-2xl)/0.96 var(--font-display);
   letter-spacing: -0.04em;
 }
 
 .login-card__brand span {
   margin-top: 5px;
   color: var(--text-tertiary);
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -688,14 +700,14 @@ function handlePasswordEvent(event: Event) {
 .login-card__intro {
   margin-top: -2px;
   color: var(--text-secondary);
-  font-size: 0.83rem;
+  font-size: var(--text-sm);
   line-height: 1.58;
   max-width: 24rem;
 }
 
 .theme-toggle {
-  width: 36px;
-  height: 36px;
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
   display: grid;
   place-items: center;
   border: 1px solid var(--border-default);
@@ -743,7 +755,7 @@ function handlePasswordEvent(event: Event) {
 
 .login-account__copy strong {
   display: block;
-  font-size: 0.89rem;
+  font-size: var(--text-base);
   font-weight: 600;
   line-height: 1.24;
 }
@@ -752,13 +764,13 @@ function handlePasswordEvent(event: Event) {
   display: block;
   margin-top: 4px;
   color: var(--text-quaternary);
-  font: 500 0.68rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
 
 .login-account__remove {
-  width: 28px;
-  height: 28px;
+  width: var(--btn-min-size);
+  height: var(--btn-min-size);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -768,12 +780,24 @@ function handlePasswordEvent(event: Event) {
 .login-card__form {
   display: grid;
   gap: 0;
+  animation: form-swap 0.22s var(--motion-ease-out);
+}
+
+@keyframes form-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .login-card__hint {
   margin-top: -2px;
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   line-height: 1.46;
 }
 
@@ -805,7 +829,7 @@ function handlePasswordEvent(event: Event) {
 .login-card__account-preview span {
   margin-top: 4px;
   color: var(--text-quaternary);
-  font: 500 0.68rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
 
@@ -818,11 +842,14 @@ function handlePasswordEvent(event: Event) {
 }
 
 .login-card__link {
+  min-height: var(--btn-min-size);
+  display: inline-flex;
+  align-items: center;
   border: 0;
   padding: 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   line-height: 1.4;
   transition: color var(--motion-fast) var(--motion-ease-out);
@@ -866,9 +893,9 @@ function handlePasswordEvent(event: Event) {
 }
 
 .login-check__box {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--border-strong) 88%, transparent);
@@ -886,8 +913,8 @@ function handlePasswordEvent(event: Event) {
 }
 
 .login-check__mark {
-  width: 7px;
-  height: 3px;
+  width: 9px;
+  height: 4px;
   border-left: 1.6px solid transparent;
   border-bottom: 1.6px solid transparent;
   transform: rotate(-45deg) translateY(-1px);
@@ -901,7 +928,7 @@ function handlePasswordEvent(event: Event) {
 }
 
 .login-check__copy {
-  font-size: 0.79rem;
+  font-size: var(--text-sm);
   line-height: 1.24;
   flex: 1;
 }
@@ -910,7 +937,7 @@ function handlePasswordEvent(event: Event) {
   padding: 10px 12px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
-  font-size: 0.79rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 

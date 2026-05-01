@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Bell, Close } from '@element-plus/icons-vue'
 import type { ConversationProfile, ConversationSummary } from '@/types/chat'
+import { fetchConversationFiles, type ConversationFileItem } from '@/services/conversations'
 import AvatarBadge from './AvatarBadge.vue'
 import ChatStatePanel from './ChatStatePanel.vue'
 
@@ -80,14 +81,71 @@ const actionCards = computed<
     value: '执行',
   },
 ])
+
+// ── Shared files ──
+const sharedFiles = ref<ConversationFileItem[]>([])
+const filesLoading = ref(false)
+const filesTotal = ref(0)
+const filesPageNo = ref(1)
+const filesPageSize = 20
+
+async function loadFiles(page = 1) {
+  const id = props.conversation?.conversationId
+  if (!id) return
+  filesLoading.value = true
+  try {
+    const res = await fetchConversationFiles(id, page, filesPageSize)
+    if (res.code === 0 && res.data) {
+      sharedFiles.value = res.data.list ?? []
+      filesTotal.value = res.data.total ?? 0
+      filesPageNo.value = page
+    }
+  } catch {
+    // silently ignore — file list is non-critical
+  } finally {
+    filesLoading.value = false
+  }
+}
+
+watch(() => props.conversation?.conversationId, (id) => {
+  if (id) loadFiles()
+  else { sharedFiles.value = []; filesTotal.value = 0 }
+})
+
+onMounted(() => {
+  if (props.conversation?.conversationId) loadFiles()
+})
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
+
+function fileIcon(ext: string): string {
+  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg']
+  const videoExts = ['mp4', 'mov', 'avi', 'mkv', 'webm']
+  const audioExts = ['mp3', 'wav', 'ogg', 'aac', 'm4a']
+  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz']
+  const e = ext.toLowerCase()
+  if (imageExts.includes(e)) return '🖼️'
+  if (videoExts.includes(e)) return '🎬'
+  if (audioExts.includes(e)) return '🎵'
+  if (archiveExts.includes(e)) return '📦'
+  if (e === 'pdf') return '📄'
+  if (['doc', 'docx'].includes(e)) return '📝'
+  if (['xls', 'xlsx'].includes(e)) return '📊'
+  if (['ppt', 'pptx'].includes(e)) return '📎'
+  return '📁'
+}
+
 </script>
 
 <template>
   <div class="profile-panel">
     <div class="profile-panel__toolbar">
-      <div>
-        <strong>会话详情</strong>
-      </div>
+      <strong>会话详情</strong>
       <button class="profile-panel__close" type="button" aria-label="关闭详情" @click="emit('close')">
         <Close />
       </button>
@@ -95,200 +153,173 @@ const actionCards = computed<
 
     <el-scrollbar class="profile-panel__body">
       <div v-if="profile" class="profile-content" data-testid="conversation-profile">
+
+        <!-- Hero: centered avatar + name -->
         <section class="profile-hero">
-          <div class="profile-hero__glow"></div>
           <AvatarBadge
             class="profile-hero__avatar"
             :name="conversation?.conversationName"
             :avatar-url="conversation?.avatarUrl"
             :type="conversation?.conversationType === 1 ? 'user' : conversation?.conversationType === 2 ? 'group' : 'channel'"
-            size="lg"
+            size="xl"
           />
-          <div class="profile-hero__copy">
-            <strong>{{ conversation?.conversationName }}</strong>
-            <p>{{ profile.subtitle }}</p>
-          </div>
+          <strong class="profile-hero__name">{{ conversation?.conversationName }}</strong>
+          <p class="profile-hero__sub">{{ profile.subtitle }}</p>
           <div class="profile-hero__tags">
             <span v-for="tag in spotlightTags" :key="tag">{{ tag }}</span>
           </div>
         </section>
 
-        <div class="profile-reading-panel">
-          <section v-if="profile.signature" class="profile-card profile-card--copy">
-            <div class="profile-card__header">
-              <span>个性签名</span>
-              <small>资料</small>
+        <!-- Members grid (group / channel) -->
+        <section v-if="profile.members?.length" class="profile-section">
+          <div class="profile-section__header">
+            <span>成员</span>
+            <small>{{ profile.members.length }} 人</small>
+          </div>
+          <div class="profile-members-grid">
+            <div
+              v-for="member in profile.members.slice(0, 30)"
+              :key="member.userId"
+              class="profile-members-grid__item"
+            >
+              <AvatarBadge
+                :name="member.nickname"
+                :avatar-url="member.avatarUrl"
+                size="md"
+                type="user"
+              />
+              <span class="profile-members-grid__name">{{ member.nickname }}</span>
+              <span v-if="member.role !== 2" class="profile-members-grid__role">
+                {{ member.role === 1 ? '群主' : '管理' }}
+              </span>
             </div>
-            <p>{{ profile.signature }}</p>
-          </section>
+          </div>
+        </section>
 
-          <section v-if="profile.notice" class="profile-card profile-card--notice">
-            <div class="profile-card__header">
-              <span>{{ conversation?.conversationType === 3 ? '频道公告' : '群公告' }}</span>
-              <small>最新内容</small>
-            </div>
-            <p>{{ profile.notice }}</p>
-          </section>
+        <!-- Signature -->
+        <section v-if="profile.signature" class="profile-section">
+          <div class="profile-section__header">
+            <span>个性签名</span>
+          </div>
+          <p class="profile-section__text">{{ profile.signature }}</p>
+        </section>
 
-          <section v-if="profile.fields.length" class="profile-card">
-            <div class="profile-card__header">
-              <span>资料字段</span>
-              <small>基础信息</small>
+        <!-- Notice -->
+        <section v-if="profile.notice" class="profile-section">
+          <div class="profile-section__header">
+            <span>{{ conversation?.conversationType === 3 ? '频道公告' : '群公告' }}</span>
+          </div>
+          <p class="profile-section__text profile-section__text--notice">{{ profile.notice }}</p>
+        </section>
+
+        <!-- Info fields -->
+        <section v-if="profile.fields.length" class="profile-section">
+          <div class="profile-section__header">
+            <span>{{ conversation?.conversationType === 1 ? '个人信息' : '资料' }}</span>
+          </div>
+          <dl class="profile-fields">
+            <div v-for="field in profile.fields" :key="field.key" class="profile-field">
+              <dt>{{ field.label }}</dt>
+              <dd>{{ field.value }}</dd>
             </div>
-            <dl class="profile-grid">
-              <div v-for="field in profile.fields" :key="field.key">
-                <dt>{{ field.label }}</dt>
-                <dd>{{ field.value }}</dd>
+          </dl>
+        </section>
+
+        <!-- Shared files -->
+        <section v-if="sharedFiles.length || filesLoading" class="profile-section">
+          <div class="profile-section__header">
+            <span>共享文件</span>
+            <small v-if="filesTotal > 0">{{ filesTotal }} 个</small>
+          </div>
+          <div v-if="filesLoading && !sharedFiles.length" class="profile-files__loading">
+            <span>加载中…</span>
+          </div>
+          <ul v-else class="profile-files">
+            <li
+              v-for="file in sharedFiles"
+              :key="file.fileId"
+              class="profile-files__item"
+            >
+              <span class="profile-files__icon">{{ fileIcon(file.fileExt) }}</span>
+              <div class="profile-files__info">
+                <a
+                  :href="file.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="profile-files__name"
+                  :title="file.fileName"
+                >{{ file.fileName }}</a>
+                <span class="profile-files__meta">{{ formatFileSize(file.fileSize) }}</span>
               </div>
-            </dl>
-          </section>
+            </li>
+          </ul>
+          <button
+            v-if="filesTotal > sharedFiles.length"
+            class="profile-files__more"
+            type="button"
+            @click="loadFiles(filesPageNo + 1)"
+          >
+            加载更多
+          </button>
+        </section>
 
-          <section v-if="profile.publicProfilePath" class="profile-card">
-            <div class="profile-card__header">
-              <span>公开主页</span>
-              <small>@username</small>
-            </div>
-            <button class="profile-action" type="button" @click="emit('open-public-profile', profile.publicProfilePath)">
-              <div class="profile-action__copy">
-                <span>站内入口</span>
-                <strong>查看公开主页</strong>
-                <p>用公开链接查看这个用户对外展示的基础资料。</p>
-              </div>
+        <!-- Public profile link -->
+        <section v-if="profile.publicProfilePath" class="profile-section">
+          <button class="profile-link-row" type="button" @click="emit('open-public-profile', profile.publicProfilePath)">
+            <span>查看公开主页</span>
+            <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </section>
+
+        <!-- Quick actions -->
+        <section class="profile-section">
+          <div class="profile-segment">
+            <button
+              class="profile-segment__btn"
+              :class="{ 'is-active': conversation?.isMute }"
+              type="button"
+              @click="emit('action', 'toggle-mute')"
+            >
+              <Bell class="profile-segment__icon" />
+              <span>免打扰</span>
             </button>
-          </section>
+            <button
+              class="profile-segment__btn"
+              :class="{ 'is-active': conversation?.isTop }"
+              type="button"
+              @click="emit('action', 'toggle-top')"
+            >
+              <svg class="profile-segment__icon" viewBox="0 0 16 16" fill="none"><path d="M4 10L8 3L12 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 8H10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span>置顶</span>
+            </button>
+          </div>
+        </section>
 
-          <section class="profile-card">
-            <div class="profile-card__header">
-              <span>快捷操作</span>
-              <small>当前会话</small>
-            </div>
-            <ul class="profile-actions">
-              <li v-for="action in actionCards" :key="action.command">
-                <button class="profile-action" type="button" @click="emit('action', action.command)">
-                  <div class="profile-action__copy">
-                    <span>{{ action.eyebrow }}</span>
-                    <strong>{{ action.label }}</strong>
-                    <p>{{ action.description }}</p>
-                  </div>
-                  <div class="profile-action__meta">
-                    <span>{{ action.value }}</span>
-                    <Bell />
-                  </div>
-                </button>
-              </li>
-            </ul>
-          </section>
+        <!-- Governance (group / channel) -->
+        <section v-if="profile.group" class="profile-section">
+          <div class="profile-section__header">
+            <span>管理</span>
+          </div>
+          <div class="profile-rows">
+            <button v-if="profile.group.canEditMeta" class="profile-row-action" type="button" @click="emit('update-group-meta')">
+              <span>编辑资料</span>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button v-if="profile.group.canManageMembers" class="profile-row-action" type="button" @click="emit('add-members')">
+              <span>邀请成员</span>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button v-if="profile.group.canLeave" class="profile-row-action is-danger" type="button" @click="emit('leave-group')">
+              <span>退出会话</span>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button v-if="profile.group.canDissolve" class="profile-row-action is-danger" type="button" @click="emit('dissolve-group')">
+              <span>解散会话</span>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </section>
 
-          <section v-if="profile.group" class="profile-card">
-            <div class="profile-card__header">
-              <span>治理操作</span>
-              <small>管理权限</small>
-            </div>
-            <div class="profile-governance">
-              <button
-                v-if="profile.group.canEditMeta"
-                class="profile-action"
-                type="button"
-                @click="emit('update-group-meta')"
-              >
-                <div class="profile-action__copy">
-                  <span>基础信息</span>
-                  <strong>更新名称</strong>
-                  <p>同步群名或频道名到会话资料与列表摘要。</p>
-                </div>
-              </button>
-              <button
-                v-if="profile.group.canEditMeta"
-                class="profile-action"
-                type="button"
-                @click="emit('update-group-notice')"
-              >
-                <div class="profile-action__copy">
-                  <span>公告内容</span>
-                  <strong>更新公告</strong>
-                  <p>群主和管理员可以维护对所有成员可见的公告。</p>
-                </div>
-              </button>
-              <button
-                v-if="profile.group.canManageMembers"
-                class="profile-action"
-                type="button"
-                @click="emit('add-members')"
-              >
-                <div class="profile-action__copy">
-                  <span>成员操作</span>
-                  <strong>邀请成员</strong>
-                  <p>快速把最近搜索到的用户拉入当前群组或频道。</p>
-                </div>
-              </button>
-              <button
-                v-if="profile.group.canLeave"
-                class="profile-action is-danger"
-                type="button"
-                @click="emit('leave-group')"
-              >
-                <div class="profile-action__copy">
-                  <span>成员状态</span>
-                  <strong>退出当前会话</strong>
-                  <p>离开后保留会话历史，但不再参与新消息协作。</p>
-                </div>
-              </button>
-              <button
-                v-if="profile.group.canDissolve"
-                class="profile-action is-danger"
-                type="button"
-                @click="emit('dissolve-group')"
-              >
-                <div class="profile-action__copy">
-                  <span>群主权限</span>
-                  <strong>解散会话</strong>
-                  <p>仅群主或频道创建者可执行，操作不可撤回。</p>
-                </div>
-              </button>
-            </div>
-          </section>
-
-          <section v-if="profile.members?.length" class="profile-card profile-card--members">
-            <div class="profile-card__header">
-              <span>成员列表</span>
-              <small>{{ profile.members.length }} 人</small>
-            </div>
-            <div class="profile-members">
-              <article v-for="member in profile.members" :key="member.userId" class="profile-member">
-                <AvatarBadge
-                  :name="member.nickname"
-                  :avatar-url="member.avatarUrl"
-                  size="md"
-                />
-                <div class="profile-member__copy">
-                  <strong>{{ member.nickname }}</strong>
-                  <span>#{{ member.userNo }}</span>
-                </div>
-                <div class="profile-member__actions">
-                  <span class="profile-member__role">
-                    {{ member.role === 1 ? '群主' : member.role === 3 ? '管理员' : '成员' }}
-                  </span>
-                  <button
-                    v-if="profile.group?.canManageRoles && member.role !== 1"
-                    class="profile-member__button"
-                    type="button"
-                    @click="emit('promote-member', { userId: member.userId, role: member.role === 3 ? 2 : 3 })"
-                  >
-                    {{ member.role === 3 ? '撤销管理员' : '设为管理员' }}
-                  </button>
-                  <button
-                    v-if="profile.group?.canManageMembers && member.role !== 1"
-                    class="profile-member__button is-danger"
-                    type="button"
-                    @click="emit('remove-member', member.userId)"
-                  >
-                    移除
-                  </button>
-                </div>
-              </article>
-            </div>
-          </section>
-        </div>
       </div>
 
       <ChatStatePanel
@@ -315,15 +346,17 @@ const actionCards = computed<
 </template>
 
 <style scoped>
+/* ── Panel shell ── */
+
 .profile-panel {
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px;
+  padding: 14px 16px;
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent), transparent 30%),
-    transparent;
+    radial-gradient(circle at top right, color-mix(in srgb, var(--interactive-focus-ring) 28%, transparent), transparent 32%),
+    var(--surface-card);
   overflow: hidden;
 }
 
@@ -336,90 +369,90 @@ const actionCards = computed<
 }
 
 .profile-panel__toolbar strong {
-  display: block;
-  margin-top: 0;
-  font: 620 0.92rem/1.08 var(--font-display);
+  font: 620 var(--text-base)/1.08 var(--font-display);
   letter-spacing: -0.02em;
 }
 
 .profile-panel__body {
   min-height: 0;
+  overflow-x: hidden;
 }
 
 .profile-panel__close {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--border-default);
+  border: 0;
   border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--surface-panel) 82%, transparent);
-  color: var(--text-secondary);
+  background: transparent;
+  color: var(--text-tertiary);
   transition:
     background var(--motion-fast) var(--motion-ease-out),
-    border-color var(--motion-fast) var(--motion-ease-out),
     color var(--motion-fast) var(--motion-ease-out);
 }
 
 .profile-panel__close:hover,
 .profile-panel__close:focus-visible {
   background: var(--interactive-secondary-bg-hover);
-  border-color: var(--border-strong);
   color: var(--text-primary);
 }
 
 .profile-content {
   display: grid;
-  gap: 10px;
+  gap: 14px;
+  overflow-x: hidden;
 }
 
-.profile-hero,
-.profile-reading-panel {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-panel);
-  background: var(--surface-card);
-}
+/* ── Hero ── */
 
 .profile-hero {
-  padding: 20px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px 14px 14px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--border-default);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 78%, transparent), transparent 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 60%, transparent), transparent 100%),
     var(--surface-card);
+  overflow: hidden;
+  position: relative;
 }
 
-.profile-hero__glow {
+.profile-hero::after {
+  content: '';
   position: absolute;
-  inset: auto -14% -26% auto;
-  width: 132px;
-  height: 132px;
+  inset: auto -20% -30% auto;
+  width: 140px;
+  height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--interactive-focus-ring) 42%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--interactive-focus-ring) 36%, transparent), transparent 70%);
   pointer-events: none;
 }
 
 .profile-hero__avatar {
-  margin-bottom: 12px;
-}
-
-.profile-hero__copy {
+  margin-bottom: 10px;
   position: relative;
   z-index: 1;
 }
 
-.profile-hero__copy strong {
-  display: block;
-  font: 620 1.02rem/1.06 var(--font-display);
-  letter-spacing: -0.03em;
+.profile-hero__name {
+  position: relative;
+  z-index: 1;
+  font: 620 var(--text-base)/1.12 var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
-.profile-hero__copy p {
-  margin-top: 6px;
-  max-width: 22rem;
-  color: var(--text-secondary);
-  font-size: 0.79rem;
-  line-height: 1.48;
+.profile-hero__sub {
+  position: relative;
+  z-index: 1;
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1.3;
 }
 
 .profile-hero__tags {
@@ -427,309 +460,394 @@ const actionCards = computed<
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
 }
 
 .profile-hero__tags span {
-  padding: 6px 9px;
+  padding: 5px 10px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-default);
   background: color-mix(in srgb, var(--interactive-secondary-bg) 72%, transparent);
-  color: var(--text-primary);
-  font: 600 0.62rem/1 var(--font-mono);
+  color: var(--text-secondary);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
-.profile-reading-panel {
-  display: grid;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 52%, transparent), transparent 22%),
-    var(--surface-card);
+/* ── Sections ── */
+
+.profile-section {
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.profile-reading-panel > .profile-card {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.profile-reading-panel > .profile-card + .profile-card {
-  border-top: 1px solid color-mix(in srgb, var(--border-default) 84%, transparent);
-}
-
-.profile-card {
-  padding: 15px;
-}
-
-.profile-card--copy p,
-.profile-card--notice p {
-  white-space: pre-wrap;
-  color: var(--text-primary);
-  font-size: 0.79rem;
-  line-height: 1.56;
-}
-
-.profile-card--copy p,
-.profile-card--notice p {
-  padding: 12px 13px;
-  border-radius: var(--radius-control);
-  border: 1px solid color-mix(in srgb, var(--border-default) 74%, transparent);
-  background: color-mix(in srgb, var(--surface-panel) 58%, transparent);
-}
-
-.profile-card--notice {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--interactive-focus-ring) 12%, transparent), transparent 88%),
-    transparent;
-}
-
-.profile-card__header {
+.profile-section__header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.profile-card--members .profile-card__header {
-  margin-bottom: 12px;
-}
-
-.profile-card__header span,
-.profile-card__header small {
-  display: block;
-}
-
-.profile-card__header span {
+.profile-section__header span {
   color: var(--text-primary);
-  font: 620 0.79rem/1.08 var(--font-display);
+  font: 620 var(--text-xs)/1.08 var(--font-display);
   letter-spacing: -0.01em;
 }
 
-.profile-card__header small {
+.profile-section__header small {
   color: var(--text-quaternary);
-  font: 600 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
-.profile-card__header small::before {
-  content: '/ ';
-  opacity: 0.72;
+.profile-section__text {
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--border-default) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 60%, transparent);
 }
 
-.profile-grid,
-.profile-actions {
+.profile-section__text--notice {
+  border-color: color-mix(in srgb, var(--interactive-focus-ring) 18%, var(--border-default));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--interactive-focus-ring) 8%, transparent), transparent 100%),
+    color-mix(in srgb, var(--surface-panel) 60%, transparent);
+}
+
+/* ── Members grid ── */
+
+.profile-members-grid {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 10px 6px;
+  padding: 2px 0 4px;
+}
+
+.profile-members-grid__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  position: relative;
+  min-width: 0;
+}
+
+.profile-members-grid__name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.profile-members-grid__role {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  padding: 2px 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 88%, white);
+  color: var(--text-on-brand);
+  font: 600 9px/1 var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* ── Personal info fields ── */
+
+.profile-fields {
+  display: grid;
+  gap: 0;
   margin: 0;
 }
 
-.profile-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.profile-field {
+  padding: 8px 0;
 }
 
-.profile-grid div {
-  padding: 12px;
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--surface-panel) 70%, transparent);
-  border: 1px solid var(--border-default);
+.profile-field + .profile-field {
+  border-top: 1px solid color-mix(in srgb, var(--border-default) 50%, transparent);
 }
 
-.profile-grid dt {
-  margin-bottom: 5px;
-  color: var(--text-quaternary);
-  font: 600 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.profile-field dt {
+  margin-bottom: 3px;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.2;
 }
 
-.profile-grid dd {
+.profile-field dd {
   margin: 0;
   color: var(--text-primary);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
   line-height: 1.4;
+  word-break: break-all;
 }
 
-.profile-actions {
-  list-style: none;
-  padding: 0;
-}
+/* ── Link row ── */
 
-.profile-actions li {
-  display: block;
-}
-
-.profile-action {
+.profile-link-row {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 13px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--surface-panel) 66%, transparent);
-  color: inherit;
-  text-align: left;
-  transition:
-    border-color var(--motion-fast) var(--motion-ease-out),
-    background var(--motion-fast) var(--motion-ease-out);
-}
-
-.profile-action:hover,
-.profile-action:focus-visible {
-  border-color: var(--border-strong);
-  background: var(--interactive-secondary-bg-hover);
-}
-
-.profile-action.is-danger {
-  border-color: color-mix(in srgb, var(--status-danger) 10%, var(--border-default));
-}
-
-.profile-action.is-danger:hover,
-.profile-action.is-danger:focus-visible {
-  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
-  background: color-mix(in srgb, var(--status-danger) 4%, var(--interactive-secondary-bg-hover));
-}
-
-.profile-action__copy span {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--text-tertiary);
-  font: 600 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.profile-action__copy strong {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.22;
-}
-
-.profile-action__copy p {
-  margin-top: 4px;
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  line-height: 1.42;
-}
-
-.profile-action__meta {
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-  flex-shrink: 0;
-  min-width: 54px;
-}
-
-.profile-action__meta span {
-  padding: 5px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-default);
-  background: color-mix(in srgb, var(--interactive-secondary-bg) 72%, transparent);
-  color: var(--text-primary);
-  font: 600 0.6rem/1 var(--font-mono);
-  letter-spacing: 0.04em;
-}
-
-.profile-action__meta svg {
-  width: 15px;
-  height: 15px;
-  color: var(--text-tertiary);
-}
-
-.profile-governance,
-.profile-members {
-  display: grid;
-  gap: 8px;
-}
-
-.profile-member {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: center;
-  padding: 12px;
-  border-radius: var(--radius-control);
+  padding: 8px 10px;
   border: 1px solid var(--border-default);
-  background: color-mix(in srgb, var(--surface-panel) 66%, transparent);
-}
-
-.profile-member__copy strong,
-.profile-member__copy span {
-  display: block;
-}
-
-.profile-member__copy strong {
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.profile-member__copy span {
-  margin-top: 3px;
-  color: var(--text-quaternary);
-  font: 600 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.06em;
-}
-
-.profile-member__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.profile-member__role,
-.profile-member__button {
-  padding: 5px 8px;
-  border-radius: var(--radius-pill);
-  font: 600 0.6rem/1 var(--font-mono);
-  letter-spacing: 0.04em;
-}
-
-.profile-member__role {
-  border: 1px solid var(--border-default);
-  background: color-mix(in srgb, var(--interactive-secondary-bg) 68%, transparent);
-}
-
-.profile-member__button {
-  border: 1px solid var(--border-default);
-  background: transparent;
-  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 60%, transparent);
+  color: var(--text-primary);
+  font: 500 var(--text-xs)/1 var(--font-sans);
+  cursor: pointer;
   transition:
-    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.profile-link-row:hover {
+  background: var(--interactive-secondary-bg-hover);
+  border-color: var(--border-strong);
+}
+
+.profile-link-row svg {
+  width: 12px;
+  height: 12px;
+  color: var(--text-quaternary);
+}
+
+/* ── Segmented control ── */
+
+.profile-segment {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-panel) 60%, transparent);
+}
+
+.profile-segment__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: 500 var(--text-xs)/1 var(--font-sans);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
     background var(--motion-fast) var(--motion-ease-out),
     color var(--motion-fast) var(--motion-ease-out);
 }
 
-.profile-member__button:hover,
-.profile-member__button:focus-visible {
-  border-color: var(--border-strong);
+.profile-segment__btn + .profile-segment__btn {
+  border-left: 1px solid color-mix(in srgb, var(--border-default) 60%, transparent);
+}
+
+.profile-segment__btn:hover:not(:disabled) {
   background: var(--interactive-secondary-bg-hover);
   color: var(--text-primary);
 }
 
-.profile-member__button.is-danger {
+.profile-segment__btn.is-active {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--surface-card));
+  color: var(--interactive-primary-bg);
+}
+
+.profile-segment__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.profile-segment__icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+/* ── Row actions (governance) ── */
+
+.profile-rows {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-row-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 var(--text-xs)/1 var(--font-sans);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.profile-row-action:hover,
+.profile-row-action:focus-visible {
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+}
+
+.profile-row-action svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-quaternary);
+  flex-shrink: 0;
+}
+
+.profile-row-action.is-danger {
   color: var(--status-danger);
 }
 
-.profile-member__button.is-danger:hover,
-.profile-member__button.is-danger:focus-visible {
-  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
-  background: color-mix(in srgb, var(--status-danger) 4%, var(--interactive-secondary-bg-hover));
+.profile-row-action.is-danger:hover {
+  background: color-mix(in srgb, var(--status-danger) 6%, transparent);
   color: var(--status-danger);
 }
+
+.profile-row-action.is-danger svg {
+  color: var(--status-danger);
+}
+
+/* ── Shared files ── */
+
+.profile-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.profile-files__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  transition: background var(--motion-fast) var(--motion-ease-out);
+}
+
+.profile-files__item:hover {
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.profile-files__icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  width: 20px;
+  text-align: center;
+}
+
+.profile-files__info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-files__name {
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-decoration: none;
+}
+
+.profile-files__name:hover {
+  color: var(--interactive-primary-bg);
+  text-decoration: underline;
+}
+
+.profile-files__meta {
+  color: var(--text-quaternary);
+  font: 500 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.profile-files__loading {
+  padding: 12px 0;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.profile-files__more {
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--interactive-primary-bg);
+  font: 500 var(--text-xs)/1 var(--font-sans);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease-out);
+}
+
+.profile-files__more:hover {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 8%, transparent);
+}
+
+/* ── Mobile ── */
 
 @media (max-width: 767px) {
   .profile-panel {
-    padding: 14px;
+    padding: 10px 12px;
   }
 
-  .profile-grid {
-    grid-template-columns: 1fr;
+  .profile-hero {
+    padding: 14px 12px 12px;
+  }
+
+  .profile-segment__btn {
+    min-height: 32px;
+    padding: 0 6px;
+    font-size: var(--text-2xs);
+    gap: 3px;
+  }
+
+  .profile-segment__icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .profile-field dd {
+    font-size: var(--text-xs);
+  }
+
+  .profile-members-grid {
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 6px 4px;
   }
 }
 </style>

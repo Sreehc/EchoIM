@@ -1,4 +1,5 @@
 import type { ApiResponse } from '@/types/api'
+import { reportHttpError } from './errorReporter'
 
 const UNAUTHORIZED_CODES = new Set([401, 40100, 40101, 40102])
 
@@ -122,6 +123,7 @@ export async function requestJson<T>(path: string, init: RequestJsonInit): Promi
       handleUnauthorized()
     }
 
+    reportHttpError(message, payload?.traceId)
     throw new HttpError(message, {
       code,
       requestId: payload?.requestId ?? null,

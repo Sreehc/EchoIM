@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ArrowLeft, CirclePlus, Lock, MessageBox, MoreFilled, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowLeft, CirclePlus, Delete, EditPen, Lock, MessageBox, MoreFilled } from '@element-plus/icons-vue'
 import type { FriendListItem, FriendRequestItem } from '@/types/chat'
 import AvatarBadge from './AvatarBadge.vue'
 import ChatStatePanel from './ChatStatePanel.vue'
@@ -31,6 +31,8 @@ const emit = defineEmits<{
   'reject-request': [requestId: number]
 }>()
 
+const pendingRequests = computed(() => props.requests.filter((item) => item.status === 0))
+
 const visibleItems = computed(() => {
   const keyword = props.keyword.trim().toLowerCase()
   const source =
@@ -38,7 +40,7 @@ const visibleItems = computed(() => {
       ? props.friends
       : props.activeTab === 'blocked'
         ? props.blocked
-        : props.requests
+        : pendingRequests.value
 
   if (!keyword) return source
 
@@ -60,7 +62,15 @@ const visibleItems = computed(() => {
 })
 
 function requestCountBadge(item: FriendRequestItem) {
+  if (item.status === 1) return '已通过'
+  if (item.status === 2) return '已拒绝'
   return item.direction === 'INBOUND' ? '待处理' : '已发送'
+}
+
+function requestCountBadgeClass(item: FriendRequestItem) {
+  if (item.status === 1) return 'is-success'
+  if (item.status === 2) return 'is-danger'
+  return item.direction === 'INBOUND' ? 'is-pending' : 'is-sent'
 }
 </script>
 
@@ -72,7 +82,6 @@ function requestCountBadge(item: FriendRequestItem) {
       </button>
       <div class="contacts-panel__copy">
         <strong>联系人</strong>
-        <p>好友、申请与黑名单都集中在同一条侧轨里处理。</p>
       </div>
       <button class="contacts-panel__add" type="button" aria-label="添加联系人" @click="emit('open-add-contact')">
         <CirclePlus />
@@ -83,7 +92,7 @@ function requestCountBadge(item: FriendRequestItem) {
       <button
         v-for="tab in [
           { key: 'friends', label: `好友 ${friends.length}` },
-          { key: 'requests', label: `申请 ${requests.length}` },
+          { key: 'requests', label: `申请 ${pendingRequests.length}` },
           { key: 'blocked', label: `黑名单 ${blocked.length}` },
         ]"
         :key="tab.key"
@@ -115,104 +124,181 @@ function requestCountBadge(item: FriendRequestItem) {
         :description="errorMessage"
         role="alert"
       />
-      <div v-else-if="visibleItems.length" class="contacts-panel__list">
-        <article
-          v-for="item in visibleItems"
-          :key="'requestId' in item ? `request-${item.requestId}` : `friend-${item.friendUserId}`"
-          class="contacts-card"
-        >
-          <div class="contacts-card__main">
+      <template v-else-if="activeTab === 'friends' && friends.length">
+        <div v-if="!keyword" class="contacts-carousel">
+          <div class="contacts-carousel__header">
+            <span>好友</span>
+            <small>{{ friends.length }} 人</small>
+          </div>
+          <div class="contacts-carousel__track">
+            <button
+              v-for="friend in friends.slice(0, 20)"
+              :key="friend.friendUserId"
+              class="contacts-carousel__item"
+              type="button"
+              @click="emit('open-chat', friend.friendUserId)"
+            >
+              <AvatarBadge
+                class="contacts-carousel__avatar"
+                :name="friend.displayName"
+                :avatar-url="friend.avatarUrl"
+                size="lg"
+                type="user"
+              />
+              <span class="contacts-carousel__name">{{ friend.displayName }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="contacts-list">
+          <div class="contacts-list__header">
+            <span>全部好友</span>
+            <small>{{ visibleItems.length }}</small>
+          </div>
+          <article
+            v-for="item in visibleItems"
+            :key="`friend-${item.friendUserId}`"
+            class="contacts-row"
+          >
             <AvatarBadge
-              :name="'requestId' in item ? item.nickname : item.displayName"
+              class="contacts-row__avatar"
+              :name="item.displayName"
               :avatar-url="item.avatarUrl"
               size="lg"
+              type="user"
             />
-            <div class="contacts-card__copy">
-              <div class="contacts-card__title">
-                <strong>{{ 'requestId' in item ? item.nickname : item.displayName }}</strong>
-                <span>{{ 'requestId' in item ? requestCountBadge(item) : `#${item.userNo}` }}</span>
-              </div>
-              <p v-if="'requestId' in item">{{ item.applyMsg || '这条申请没有附言。' }}</p>
-              <p v-else>{{ item.remark ? `备注：${item.remark}` : item.nickname }}</p>
+            <div class="contacts-row__copy">
+              <strong>{{ item.displayName }}</strong>
+              <p>{{ item.remark ? `备注：${item.remark}` : `@${item.nickname}` }}</p>
             </div>
-          </div>
-
-          <div v-if="'requestId' in item" class="contacts-card__actions">
-            <button
-              v-if="item.direction === 'INBOUND' && item.status === 0"
-              class="contacts-card__action is-primary"
-              type="button"
-              @click="emit('approve-request', item.requestId)"
-            >
-              通过
-            </button>
-            <button
-              v-else
-              class="contacts-card__action"
-              type="button"
-              @click="emit('open-chat', item.direction === 'INBOUND' ? item.fromUserId : item.toUserId)"
-            >
-              <MessageBox />
-              发起聊天
-            </button>
-            <el-dropdown v-if="item.direction === 'INBOUND' && item.status === 0" trigger="click" placement="bottom-end">
-              <button class="contacts-card__more" type="button" aria-label="更多操作">
-                <MoreFilled />
+            <div class="contacts-row__actions">
+              <button
+                class="contacts-row__btn"
+                type="button"
+                @click="emit('open-chat', item.friendUserId)"
+              >
+                <MessageBox />
               </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="emit('open-chat', item.fromUserId)">
-                    发起聊天
-                  </el-dropdown-item>
-                  <el-dropdown-item class="is-danger" @click="emit('reject-request', item.requestId)">
-                    拒绝申请
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-
-          <div v-else class="contacts-card__actions">
-            <button class="contacts-card__action" type="button" @click="emit('open-chat', item.friendUserId)">
-              <MessageBox />
-              聊天
-            </button>
-            <el-dropdown v-if="activeTab === 'friends'" trigger="click" placement="bottom-end">
-              <button class="contacts-card__more" type="button" aria-label="更多操作">
-                <MoreFilled />
+              <el-dropdown trigger="click" placement="bottom-end" popper-class="contacts-dropdown">
+                <button class="contacts-row__btn" type="button" aria-label="更多操作">
+                  <MoreFilled />
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="emit('update-remark', item)">
+                      <EditPen />
+                      备注
+                    </el-dropdown-item>
+                    <el-dropdown-item @click="emit('block-friend', item.friendUserId)">
+                      <Lock />
+                      拉黑
+                    </el-dropdown-item>
+                    <el-dropdown-item class="is-danger" @click="emit('delete-friend', item.friendUserId)">
+                      <Delete />
+                      删除好友
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </article>
+        </div>
+      </template>
+      <template v-else-if="activeTab === 'requests' && visibleItems.length">
+        <div class="contacts-list">
+          <article
+            v-for="item in visibleItems"
+            :key="`request-${item.requestId}`"
+            class="contacts-row contacts-row--request"
+          >
+            <AvatarBadge
+              class="contacts-row__avatar"
+              :name="item.nickname"
+              :avatar-url="item.avatarUrl"
+              size="lg"
+              type="user"
+            />
+            <div class="contacts-row__copy">
+              <div class="contacts-row__head">
+                <strong>{{ item.nickname }}</strong>
+                <span class="contacts-row__badge" :class="requestCountBadgeClass(item)">
+                  {{ requestCountBadge(item) }}
+                </span>
+              </div>
+              <p>{{ item.applyMsg || '这条申请没有附言。' }}</p>
+            </div>
+            <div class="contacts-row__actions">
+              <button
+                v-if="item.direction === 'INBOUND' && item.status === 0"
+                class="contacts-row__btn contacts-row__btn--primary"
+                type="button"
+                @click="emit('approve-request', item.requestId)"
+              >
+                通过
               </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="emit('update-remark', item)">
-                    <SwitchButton />
-                    备注
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="emit('block-friend', item.friendUserId)">
-                    <Lock />
-                    拉黑
-                  </el-dropdown-item>
-                  <el-dropdown-item class="is-danger" @click="emit('delete-friend', item.friendUserId)">
-                    删除好友
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <button
-              v-if="activeTab === 'blocked'"
-              class="contacts-card__action is-primary"
-              type="button"
-              @click="emit('unblock-friend', item.friendUserId)"
-            >
-              解除拉黑
-            </button>
-          </div>
-        </article>
-      </div>
+              <button
+                class="contacts-row__btn"
+                type="button"
+                @click="emit('open-chat', item.direction === 'INBOUND' ? item.fromUserId : item.toUserId)"
+              >
+                <MessageBox />
+              </button>
+              <el-dropdown
+                v-if="item.direction === 'INBOUND' && item.status === 0"
+                trigger="click"
+                placement="bottom-end"
+                popper-class="contacts-dropdown"
+              >
+                <button class="contacts-row__btn" type="button" aria-label="更多操作">
+                  <MoreFilled />
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item class="is-danger" @click="emit('reject-request', item.requestId)">
+                      <Delete />
+                      拒绝申请
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </article>
+        </div>
+      </template>
+      <template v-else-if="activeTab === 'blocked' && visibleItems.length">
+        <div class="contacts-list">
+          <article
+            v-for="item in visibleItems"
+            :key="`blocked-${item.friendUserId}`"
+            class="contacts-row"
+          >
+            <AvatarBadge
+              class="contacts-row__avatar"
+              :name="item.displayName"
+              :avatar-url="item.avatarUrl"
+              size="lg"
+              type="user"
+            />
+            <div class="contacts-row__copy">
+              <strong>{{ item.displayName }}</strong>
+              <p>{{ item.remark ? `备注：${item.remark}` : `@${item.nickname}` }}</p>
+            </div>
+            <div class="contacts-row__actions">
+              <button
+                class="contacts-row__btn contacts-row__btn--primary"
+                type="button"
+                @click="emit('unblock-friend', item.friendUserId)"
+              >
+                解除
+              </button>
+            </div>
+          </article>
+        </div>
+      </template>
       <ChatStatePanel
         v-else
         compact
         :title="activeTab === 'friends' ? '还没有联系人' : activeTab === 'requests' ? '还没有申请记录' : '黑名单为空'"
-        :description="activeTab === 'friends' ? '从这里开始补齐联系人闭环。' : '切换到别的分组继续操作。'"
+        description=""
       />
     </el-scrollbar>
   </section>
@@ -222,10 +308,10 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-panel {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   height: 100%;
   min-height: 0;
-  padding: 22px 20px 20px;
+  padding: 18px 18px 16px;
   background:
     radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--interactive-focus-ring) 52%, transparent), transparent 28%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 96%, transparent), transparent);
@@ -234,26 +320,18 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-panel__hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
+  gap: 10px;
+  align-items: center;
 }
 
 .contacts-panel__copy strong {
   display: block;
-  font: var(--font-title-md);
-}
-
-.contacts-panel__copy p {
-  margin-top: 4px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  line-height: 1.46;
+  font: 620 1rem/1.04 var(--font-display);
 }
 
 .contacts-panel__back,
 .contacts-panel__add,
-.contacts-panel__switch,
-.contacts-card__action {
+.contacts-panel__switch {
   transition:
     transform var(--motion-fast) ease,
     border-color var(--motion-fast) ease,
@@ -262,23 +340,22 @@ function requestCountBadge(item: FriendRequestItem) {
 }
 
 .contacts-panel__back,
-.contacts-panel__switch,
-.contacts-card__action {
+.contacts-panel__switch {
   border: 1px solid var(--border-default);
   background: var(--interactive-secondary-bg);
   color: var(--text-primary);
 }
 
 .contacts-panel__back {
-  width: 44px;
-  height: 44px;
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
   border-radius: var(--radius-control);
 }
 
 .contacts-panel__add {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
+  width: var(--btn-icon-size);
+  min-width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -293,21 +370,20 @@ function requestCountBadge(item: FriendRequestItem) {
 .contacts-panel__add:hover,
 .contacts-panel__add:focus-visible,
 .contacts-panel__switch:hover,
-.contacts-panel__switch:focus-visible,
-.contacts-card__action:hover,
-.contacts-card__action:focus-visible {
+.contacts-panel__switch:focus-visible {
   transform: none;
 }
 
 .contacts-panel__switcher {
   display: flex;
   gap: 8px;
+  padding-top: 2px;
 }
 
 .contacts-panel__switch {
-  padding: 10px 14px;
+  padding: 9px 14px;
   border-radius: var(--radius-pill);
-  font: 600 0.68rem/1 var(--font-body);
+  font: 600 var(--text-xs)/1 var(--font-body);
   letter-spacing: 0.01em;
 }
 
@@ -321,112 +397,294 @@ function requestCountBadge(item: FriendRequestItem) {
   min-height: 0;
 }
 
-.contacts-panel__list,
 .contacts-panel__skeletons {
   display: grid;
-  gap: 12px;
-}
-
-.contacts-card {
-  display: grid;
-  gap: 12px;
-  padding: 15px 16px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface-card) 96%, transparent);
-  box-shadow: var(--shadow-xs);
-}
-
-.contacts-card__main {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.contacts-card__main :deep(.avatar-badge) {
-  width: 54px;
-  height: 54px;
-}
-
-.contacts-card__copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.contacts-card__title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
 }
 
-.contacts-card__title strong {
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  line-height: 1.2;
+/* ── Online friends carousel ── */
+
+.contacts-carousel {
+  margin-bottom: 14px;
 }
 
-.contacts-card__title span {
-  padding: 5px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--interactive-secondary-bg);
+.contacts-carousel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.contacts-carousel__header span {
+  color: var(--text-primary);
+  font: 620 var(--text-sm)/1.08 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.contacts-carousel__header small {
   color: var(--text-quaternary);
-  font: 600 0.66rem/1 var(--font-mono);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
-.contacts-card__copy p {
-  margin-top: 6px;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.46;
+.contacts-carousel__track {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  scrollbar-width: none;
 }
 
-.contacts-card__actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+.contacts-carousel__track::-webkit-scrollbar {
+  display: none;
 }
 
-.contacts-card__action {
-  width: 100%;
-  min-height: 40px;
-  display: inline-flex;
+.contacts-carousel__item {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 12px;
-  border-radius: var(--radius-control);
-  font: 600 0.72rem/1 var(--font-body);
+  gap: 6px;
+  min-width: 64px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.contacts-carousel__item:hover {
+  background: color-mix(in srgb, var(--interactive-secondary-bg-hover) 50%, transparent);
+  transform: translateY(-1px);
+}
+
+.contacts-carousel__avatar {
+  flex-shrink: 0;
+}
+
+.contacts-carousel__name {
+  max-width: 60px;
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.2;
   text-align: center;
 }
 
-.contacts-card__more {
-  width: 40px;
-  height: 40px;
+/* ── Contact list ── */
+
+.contacts-list {
+  display: grid;
+  gap: 2px;
+}
+
+.contacts-list__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px 8px;
+}
+
+.contacts-list__header span {
+  color: var(--text-primary);
+  font: 620 var(--text-sm)/1.08 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.contacts-list__header small {
+  color: var(--text-quaternary);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+/* ── Contact row ── */
+
+.contacts-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out);
+}
+
+.contacts-row:hover {
+  background: color-mix(in srgb, var(--interactive-secondary-bg-hover) 50%, transparent);
+}
+
+.contacts-row__avatar {
+  flex-shrink: 0;
+}
+
+.contacts-row__copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.contacts-row__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contacts-row__copy strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.contacts-row__copy p {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+.contacts-row__badge {
+  flex-shrink: 0;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-quaternary);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.contacts-row__badge.is-pending {
+  color: var(--status-warning);
+}
+
+.contacts-row__badge.is-sent {
+  color: var(--interactive-selected-fg);
+}
+
+.contacts-row__badge.is-success {
+  color: var(--status-success);
+}
+
+.contacts-row__badge.is-danger {
+  color: var(--text-danger);
+}
+
+.contacts-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.contacts-row__btn {
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--border-default);
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--interactive-secondary-bg);
-  color: var(--text-secondary);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
-.contacts-card__action :deep(svg) {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+.contacts-row__btn svg {
+  width: 16px;
+  height: 16px;
 }
 
-.contacts-card__action.is-primary {
-  border-color: color-mix(in srgb, var(--status-success) 18%, var(--border-default));
-  background: color-mix(in srgb, var(--status-success) 12%, var(--interactive-secondary-bg));
+.contacts-row__btn:hover,
+.contacts-row__btn:focus-visible {
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
 }
 
-.contacts-card__action.is-danger {
-  border-color: color-mix(in srgb, var(--status-danger) 18%, var(--border-default));
-  background: color-mix(in srgb, var(--status-danger) 10%, var(--interactive-secondary-bg));
+.contacts-row__btn--primary {
+  width: auto;
+  padding: 0 12px;
+  min-height: 28px;
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 24%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 10%, var(--interactive-secondary-bg));
+  color: var(--interactive-primary-bg);
+  font: 600 var(--text-xs)/1 var(--font-sans);
+}
+
+.contacts-row__btn--primary:hover {
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 36%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 16%, var(--interactive-secondary-bg));
+}
+
+:deep(.contacts-dropdown) {
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 92%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-overlay) 96%, rgba(18, 22, 30, 0.08));
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu) {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu__item) {
+  min-width: 148px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu__item:hover),
+:deep(.contacts-dropdown .el-dropdown-menu__item:focus-visible) {
+  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, transparent);
+  color: var(--text-primary);
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu__item [class*='el-icon']),
+:deep(.contacts-dropdown .el-dropdown-menu__item svg) {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  color: var(--text-tertiary);
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu__item.is-danger) {
+  color: var(--text-danger);
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu__item.is-danger:hover),
+:deep(.contacts-dropdown .el-dropdown-menu__item.is-danger:focus-visible) {
+  background: color-mix(in srgb, var(--status-danger) 10%, var(--surface-panel));
+}
+
+:deep(.contacts-dropdown .el-dropdown-menu__item.is-danger [class*='el-icon']),
+:deep(.contacts-dropdown .el-dropdown-menu__item.is-danger svg) {
+  color: currentColor;
 }
 
 @media (max-width: 767px) {
@@ -437,6 +695,7 @@ function requestCountBadge(item: FriendRequestItem) {
 
   .contacts-panel__hero {
     grid-template-columns: auto 1fr;
+    gap: 8px;
   }
 
   .contacts-panel__add {
@@ -444,8 +703,19 @@ function requestCountBadge(item: FriendRequestItem) {
     justify-content: center;
   }
 
-  .contacts-card__actions {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .contacts-carousel__item {
+    min-width: 56px;
+  }
+
+  .contacts-carousel__name {
+    max-width: 52px;
+    font-size: var(--text-2xs);
+  }
+
+  .contacts-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    padding: 9px 10px;
+    gap: 10px;
   }
 }
 </style>

@@ -50,6 +50,7 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
       <span v-if="initials" class="avatar-badge__initials">{{ initials }}</span>
       <component :is="type === 'user' ? User : UserFilled" v-else class="avatar-badge__icon" />
     </template>
+    <span v-if="online && type === 'user'" class="avatar-badge__online" aria-label="在线" />
   </div>
 </template>
 
@@ -71,25 +72,25 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
 .avatar-badge.size-sm {
   width: 28px;
   height: 28px;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
 }
 
 .avatar-badge.size-md {
   width: 38px;
   height: 38px;
-  font-size: 0.84rem;
+  font-size: var(--text-base);
 }
 
 .avatar-badge.size-lg {
   width: 44px;
   height: 44px;
-  font-size: 0.92rem;
+  font-size: var(--text-base);
 }
 
 .avatar-badge.size-xl {
   width: 52px;
   height: 52px;
-  font-size: 0.98rem;
+  font-size: var(--text-lg);
 }
 
 .avatar-badge__image {
@@ -106,65 +107,92 @@ const toneClass = computed(() => `tone-${toneIndex.value}`)
 
 .avatar-badge__initials {
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-badge__online {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--surface-card);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.size-sm .avatar-badge__online {
+  width: 8px;
+  height: 8px;
+  border-width: 1.5px;
+}
+
+.size-xl .avatar-badge__online {
+  width: 12px;
+  height: 12px;
+  border-width: 2.5px;
 }
 
 .type-user.tone-0 {
-  background: linear-gradient(135deg, #97abc1 0%, #75879d 100%);
+  background: linear-gradient(135deg, #8da0bc 0%, #6d809a 100%);
 }
 
 .type-user.tone-1 {
-  background: linear-gradient(135deg, #96afc3 0%, #768ea2 100%);
+  background: linear-gradient(135deg, #b09a87 0%, #8e7b6b 100%);
 }
 
 .type-user.tone-2 {
-  background: linear-gradient(135deg, #95ada5 0%, #718781 100%);
+  background: linear-gradient(135deg, #82a08b 0%, #65826e 100%);
 }
 
 .type-user.tone-3 {
-  background: linear-gradient(135deg, #a3a1c4 0%, #7f7ea1 100%);
+  background: linear-gradient(135deg, #9e94b8 0%, #7e7599 100%);
 }
 
 .type-user.tone-4 {
-  background: linear-gradient(135deg, #a4abb3 0%, #818892 100%);
+  background: linear-gradient(135deg, #a69688 0%, #887969 100%);
 }
 
 .type-group.tone-0 {
-  background: linear-gradient(135deg, #6d7e98 0%, #586881 100%);
+  background: linear-gradient(135deg, #6a7e98 0%, #546881 100%);
 }
 
 .type-group.tone-1 {
-  background: linear-gradient(135deg, #6f7f90 0%, #5a6877 100%);
+  background: linear-gradient(135deg, #7d8a6e 0%, #646f58 100%);
 }
 
 .type-group.tone-2 {
-  background: linear-gradient(135deg, #708080 0%, #5b6969 100%);
+  background: linear-gradient(135deg, #658688 0%, #4f6d6f 100%);
 }
 
 .type-group.tone-3 {
-  background: linear-gradient(135deg, #787598 0%, #625f7d 100%);
+  background: linear-gradient(135deg, #8a7590 0%, #6e5d76 100%);
 }
 
 .type-group.tone-4 {
-  background: linear-gradient(135deg, #737983 0%, #5e656f 100%);
+  background: linear-gradient(135deg, #857e74 0%, #6b655c 100%);
 }
 
 .type-channel.tone-0 {
-  background: linear-gradient(135deg, #56799d 0%, #3f5f83 100%);
+  background: linear-gradient(135deg, #4e7198 0%, #3a5a7e 100%);
 }
 
 .type-channel.tone-1 {
-  background: linear-gradient(135deg, #4d7692 0%, #3d6077 100%);
+  background: linear-gradient(135deg, #50847e 0%, #3d6b66 100%);
 }
 
 .type-channel.tone-2 {
-  background: linear-gradient(135deg, #547b88 0%, #41626d 100%);
+  background: linear-gradient(135deg, #6b6290 0%, #534c75 100%);
 }
 
 .type-channel.tone-3 {
-  background: linear-gradient(135deg, #5f7198 0%, #485982 100%);
+  background: linear-gradient(135deg, #7a7058 0%, #605843 100%);
 }
 
 .type-channel.tone-4 {
-  background: linear-gradient(135deg, #546f86 0%, #415969 100%);
+  background: linear-gradient(135deg, #487472 0%, #365b5a 100%);
 }
 </style>

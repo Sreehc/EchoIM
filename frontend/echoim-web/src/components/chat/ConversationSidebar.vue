@@ -207,31 +207,23 @@ const settingsSections = [
   {
     key: 'appearance',
     title: '外观',
-    description: '主题、界面气质和阅读观感。',
   },
   {
     key: 'chat',
     title: '聊天偏好',
-    description: '输入习惯、列表密度和消息呈现。',
   },
   {
     key: 'notifications',
     title: '通知',
-    description: '桌面提醒与浏览器权限状态。',
   },
   {
     key: 'security',
     title: '账号安全',
-    description: '邮箱、设备、密码和安全记录。',
   },
 ] as const satisfies ReadonlyArray<{
   key: SettingsSection
   title: string
-  description: string
 }>
-const activeSettingsMeta = computed(
-  () => settingsSections.find((item) => item.key === props.settingsSection) ?? settingsSections[0],
-)
 const trustedDeviceCount = computed(() => props.trustedDevices?.length ?? 0)
 const securityEventCount = computed(() => props.securityEvents?.length ?? 0)
 const securityOverview = computed(() => {
@@ -1109,8 +1101,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               class="sidebar-global-menu__identity"
               type="button"
               role="menuitem"
-              data-testid="sidebar-menu-profile-settings"
-              @click="openPanel('settings')"
+              data-testid="sidebar-menu-profile-center"
+              @click="openPanel('me')"
             >
               <AvatarBadge
                 :name="currentUser?.nickname"
@@ -1324,6 +1316,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
                 size="lg"
               />
               <div class="sidebar-profile-card__copy">
+                <p class="sidebar-profile-card__eyebrow">个人资料</p>
                 <strong>{{ currentProfile?.nickname ?? currentUser?.nickname ?? '未登录' }}</strong>
                 <p>@{{ currentProfile?.username ?? currentUser?.username ?? 'echo_demo_01' }}</p>
                 <span>{{ currentProfile?.signature || '写一段签名，让联系人快速识别你。' }}</span>
@@ -1344,37 +1337,19 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               <el-button type="primary" class="sidebar-profile-card__action" data-testid="profile-edit" @click="startProfileEditing">
                 编辑资料
               </el-button>
-              <el-button class="sidebar-profile-card__action" @click="copyPublicProfileLink">复制公开链接</el-button>
-              <el-button class="sidebar-profile-card__action" @click="openPanel('settings')">进入设置</el-button>
+              <div class="sidebar-profile-card__secondary-actions">
+                <el-button class="sidebar-profile-card__action sidebar-profile-card__action--secondary" @click="copyPublicProfileLink">
+                  复制公开链接
+                </el-button>
+                <el-button class="sidebar-profile-card__action sidebar-profile-card__action--secondary" @click="openPanel('settings')">
+                  进入设置
+                </el-button>
+              </div>
             </div>
           </section>
 
           <div v-if="profileNotice" class="sidebar-notice sidebar-notice--success">{{ profileNotice }}</div>
           <div v-if="profileError" class="sidebar-notice sidebar-notice--error">{{ profileError }}</div>
-
-          <div class="sidebar-section">
-            <div class="sidebar-section__head">
-              <strong>账号信息</strong>
-            </div>
-            <div class="info-grid">
-              <article>
-                <span>账号编号</span>
-                <strong>{{ currentProfile?.userNo ?? '加载中' }}</strong>
-              </article>
-              <article>
-                <span>用户名</span>
-                <strong>@{{ currentProfile?.username ?? currentUser?.username ?? '加载中' }}</strong>
-              </article>
-              <article>
-                <span>手机号</span>
-                <strong>{{ currentProfile?.phone || '未设置' }}</strong>
-              </article>
-              <article>
-                <span>邮箱</span>
-                <strong>{{ currentProfile?.email || '未设置' }}</strong>
-              </article>
-            </div>
-          </div>
 
           <ChatStatePanel
             v-if="profileLoading && !currentProfile"
@@ -1385,19 +1360,17 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
         </div>
 
         <div v-else class="sidebar-detail sidebar-detail--settings" data-testid="sidebar-panel-settings">
-          <section class="settings-hero">
-            <div class="settings-hero__copy">
-              <span>Workspace Preferences</span>
-              <strong>{{ activeSettingsMeta.title }}</strong>
-              <p>{{ activeSettingsMeta.description }}</p>
+          <section class="settings-header">
+            <div class="settings-header__title">
+              <strong>设置</strong>
             </div>
-            <div class="settings-hero__identity">
+            <div class="settings-header__account">
               <AvatarBadge
                 :name="currentProfile?.nickname ?? currentUser?.nickname"
                 :avatar-url="currentProfile?.avatarUrl ?? currentUser?.avatarUrl"
                 size="md"
               />
-              <div class="settings-hero__identity-copy">
+              <div class="settings-header__account-copy">
                 <small>当前账号</small>
                 <strong>{{ currentProfile?.nickname ?? currentUser?.nickname ?? '未登录' }}</strong>
                 <p>@{{ currentProfile?.username ?? currentUser?.username ?? 'echo_demo_01' }}</p>
@@ -1405,11 +1378,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             </div>
           </section>
 
-          <section class="settings-nav" aria-label="设置分组">
-            <div class="settings-nav__head">
-              <strong>设置分组</strong>
-              <span>选择一个区域继续调整界面、通知和账号安全。</span>
-            </div>
+          <section class="settings-switcher" aria-label="设置分组">
             <div class="settings-tabs">
               <button
                 v-for="section in settingsSections"
@@ -1421,7 +1390,6 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
                 @click="updateSettingsSection(section.key)"
               >
                 <strong>{{ section.title }}</strong>
-                <span>{{ section.description }}</span>
               </button>
             </div>
           </section>
@@ -1431,10 +1399,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             {{ passwordForm.localError || emailForm.localError || profileError }}
           </div>
 
-          <div v-if="settingsSection === 'appearance'" class="sidebar-section">
-            <div class="sidebar-section__head">
+          <div v-if="settingsSection === 'appearance'" class="settings-panel">
+            <div class="settings-panel__head">
               <strong>外观</strong>
-              <p>控制主题明暗与整体阅读气质。</p>
             </div>
             <div class="theme-card theme-card--stacked">
               <button
@@ -1468,10 +1435,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             </div>
           </div>
 
-          <div v-else-if="settingsSection === 'chat'" class="sidebar-section">
-            <div class="sidebar-section__head">
+          <div v-else-if="settingsSection === 'chat'" class="settings-panel">
+            <div class="settings-panel__head">
               <strong>聊天偏好</strong>
-              <p>输入习惯、信息密度和消息阅读节奏。</p>
             </div>
             <div class="settings-list settings-list--grouped">
               <label class="settings-item">
@@ -1508,28 +1474,30 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
           </div>
 
           <div v-else-if="settingsSection === 'notifications'" class="sidebar-stack">
-            <div class="sidebar-section">
-              <div class="sidebar-section__head">
+            <div class="settings-panel">
+              <div class="settings-panel__head">
                 <strong>通知</strong>
-                <p>管理桌面提醒状态和浏览器权限。</p>
               </div>
-              <article class="settings-item settings-item--stacked">
-                <div>
+              <article class="settings-item settings-item--stacked settings-item--status">
+                <div class="settings-item__status-copy">
                   <strong>桌面通知</strong>
                   <p>{{ notificationPromptCopy.description }}</p>
                 </div>
-                <span class="settings-tag">{{ notificationStatusLabel }}</span>
+                <span class="settings-tag settings-tag--status">{{ notificationStatusLabel }}</span>
               </article>
-              <div class="sidebar-actions">
+              <div class="settings-actions settings-actions--stacked">
                 <el-button
                   v-if="notificationPermission !== 'granted' && notificationPermission !== 'unsupported'"
                   type="primary"
+                  class="settings-actions__primary"
                   :loading="notificationRequesting"
                   @click="requestDesktopNotifications"
                 >
                   {{ notificationPromptCopy.title }}
                 </el-button>
-                <el-button v-if="notificationPermission !== 'unsupported'" plain @click="dismissNotificationPrompt">忽略提醒</el-button>
+                <el-button v-if="notificationPermission !== 'unsupported'" plain class="settings-actions__secondary" @click="dismissNotificationPrompt">
+                  忽略提醒
+                </el-button>
               </div>
             </div>
           </div>
@@ -1540,46 +1508,34 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             </div>
 
             <div class="security-overview" :class="`is-${securityOverview.tone}`">
-              <div class="security-overview__copy">
-                <span>{{ securityOverview.eyebrow }}</span>
-                <strong>{{ securityOverview.title }}</strong>
-                <p>{{ securityOverview.description }}</p>
-              </div>
-              <div class="security-overview__status">
-                <span class="settings-tag" :class="{ 'is-failure': !currentProfile?.email, 'is-success': !!currentProfile?.email }">
-                  {{ securityOverview.primaryLabel }}
-                </span>
+              <div class="security-overview__header">
+                <div class="security-overview__copy">
+                  <span>{{ securityOverview.eyebrow }}</span>
+                  <strong>{{ securityOverview.title }}</strong>
+                </div>
+                <div class="security-overview__status">
+                  <span class="settings-tag" :class="{ 'is-failure': !currentProfile?.email, 'is-success': !!currentProfile?.email }">
+                    {{ securityOverview.primaryLabel }}
+                  </span>
+                </div>
               </div>
               <div class="security-metrics">
-                <article>
-                  <span>受信设备</span>
-                  <strong>{{ trustedDevicesLoading ? '同步中' : `${trustedDeviceCount} 台` }}</strong>
-                </article>
-                <article>
-                  <span>安全记录</span>
-                  <strong>{{ securityEventsLoading ? '同步中' : `${securityEventCount} 条` }}</strong>
-                </article>
                 <article>
                   <span>当前邮箱</span>
                   <strong>{{ currentProfile?.email || '未绑定' }}</strong>
                 </article>
-              </div>
-            </div>
-
-            <div class="security-risk-summary" :class="{ 'is-quiet': !securityRiskSummary.hasSignals }">
-              <div class="security-risk-summary__copy">
-                <span>{{ securityRiskSummary.windowLabel }}</span>
-                <strong>{{ securityRiskSummary.headline }}</strong>
-              </div>
-              <div class="security-risk-summary__stats">
-                <span class="security-risk-pill is-critical">
-                  <em>高风险</em>
-                  <strong>{{ securityRiskSummary.criticalCount }}</strong>
-                </span>
-                <span class="security-risk-pill is-warning">
-                  <em>敏感变更</em>
-                  <strong>{{ securityRiskSummary.warningCount }}</strong>
-                </span>
+                <article>
+                  <span>高风险</span>
+                  <strong>{{ securityEventsLoading ? '同步中' : `${securityRiskSummary.criticalCount} 条` }}</strong>
+                </article>
+                <article>
+                  <span>敏感变更</span>
+                  <strong>{{ securityEventsLoading ? '同步中' : `${securityRiskSummary.warningCount} 条` }}</strong>
+                </article>
+                <article>
+                  <span>受信设备</span>
+                  <strong>{{ trustedDevicesLoading ? '同步中' : `${trustedDeviceCount} 台` }}</strong>
+                </article>
               </div>
             </div>
 
@@ -1587,155 +1543,182 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               <header class="security-alerts__head">
                 <span>异常提醒</span>
                 <strong>优先确认这些关键安全事件</strong>
-                <p>{{ securityRiskSummary.windowLabel }}：高风险 {{ securityRiskSummary.criticalCount }} 条，敏感变更 {{ securityRiskSummary.warningCount }} 条</p>
               </header>
               <div class="security-alerts__list">
                 <article
-                  v-for="event in criticalSecurityAlerts"
+                  v-for="event in criticalSecurityAlerts.slice(0, 2)"
                   :key="event.eventId"
-                  class="security-alert"
+                  class="security-alert security-alert--compact"
                   :class="[`is-${event.riskTone}`, `status-${event.statusTone}`]"
                 >
                   <div class="security-alert__topline">
-                    <span class="security-alert__eyebrow">{{ event.alertLabel }}</span>
+                    <div class="security-alert__headline">
+                      <span class="security-alert__eyebrow">{{ event.alertLabel }}</span>
+                      <strong>{{ event.title }}</strong>
+                    </div>
                     <time>{{ event.timeLabel }}</time>
                   </div>
-                  <strong>{{ event.title }}</strong>
                   <p>{{ event.alertDescription }}</p>
                   <div class="security-alert__badges">
                     <span class="security-event__badge" :class="`is-${event.riskTone}`">{{ event.riskLabel }}</span>
                     <span class="security-event__badge security-event__badge--status" :class="`is-${event.statusTone}`">{{ event.statusLabel }}</span>
                   </div>
-                  <div v-if="event.meta.length" class="security-event__meta">
-                    <span v-for="item in event.meta" :key="item">{{ item }}</span>
-                  </div>
                 </article>
+              </div>
+              <div v-if="criticalSecurityAlerts.length > 2" class="security-alerts__footer">
+                其余 {{ criticalSecurityAlerts.length - 2 }} 条异常已收进下方安全记录。
               </div>
             </section>
 
-            <div class="sidebar-section sidebar-section--security-primary">
-              <div class="sidebar-section__head">
-                <strong>邮箱安全</strong>
-                <p>绑定邮箱后，可用于找回密码和设备信任。</p>
+            <div class="settings-panel security-operations">
+              <div class="settings-panel__head">
+                <strong>安全操作</strong>
               </div>
-              <div class="security-card security-card--hero">
-                <div class="security-card__icon">
-                  <Lock />
-                </div>
-                <div>
-                  <strong>{{ currentProfile?.email ? '更换安全邮箱' : '绑定安全邮箱' }}</strong>
-                  <p>{{ currentProfile?.email || '未绑定' }}</p>
-                </div>
-              </div>
-              <el-form label-position="top" class="profile-form">
-                <el-form-item label="邮箱">
-                  <el-input v-model="emailForm.email" placeholder="name@example.com" />
-                </el-form-item>
-                <el-form-item label="当前密码">
-                  <el-input v-model="emailForm.currentPassword" show-password />
-                </el-form-item>
-                <el-form-item label="验证码">
-                  <div class="security-inline">
-                    <el-input v-model="emailForm.code" placeholder="6 位验证码" />
-                    <el-button plain :loading="emailBindingLoading" @click="sendEmailBindCode">发送验证码</el-button>
-                  </div>
-                </el-form-item>
-              </el-form>
-              <div class="sidebar-actions">
-                <el-button type="primary" :loading="emailBindingLoading" @click="submitEmailBind">保存邮箱</el-button>
-              </div>
-            </div>
 
-            <div class="sidebar-section sidebar-section--security-support">
-              <div class="sidebar-section__head">
-                <strong>受信设备</strong>
-                <p>查看保留登录状态的设备，并随时撤销。</p>
-              </div>
-              <div v-if="trustedDevicesLoading" class="settings-empty">正在加载设备…</div>
-              <div v-else-if="trustedDevices?.length" class="settings-list settings-list--grouped">
-                <article v-for="device in trustedDevices" :key="device.deviceId" class="settings-item settings-item--stacked">
-                  <div>
-                    <strong>{{ device.deviceName }}</strong>
-                    <p>{{ device.lastUsedAt || '未使用' }}</p>
-                    <p>{{ device.expireAt || '无过期时间' }}</p>
+              <details class="security-disclosure" :open="!currentProfile?.email">
+                <summary class="security-disclosure__summary">
+                  <div class="security-disclosure__lead">
+                    <span class="security-disclosure__icon"><Lock /></span>
+                    <div class="security-disclosure__copy">
+                      <strong>邮箱安全</strong>
+                      <p>{{ currentProfile?.email ? currentProfile.email : '绑定安全邮箱' }}</p>
+                    </div>
                   </div>
-                  <el-button text type="danger" @click="emit('revoke-trusted-device', { deviceId: device.deviceId, deviceFingerprint: device.deviceFingerprint })">移除</el-button>
-                </article>
-              </div>
-              <div v-else class="settings-empty">暂无受信设备</div>
-              <div class="sidebar-actions">
-                <el-button plain @click="emit('refresh-trusted-devices')">刷新</el-button>
-                <el-button plain type="danger" @click="emit('revoke-all-trusted-devices')">全部移除</el-button>
-              </div>
-            </div>
+                  <span class="security-disclosure__meta">{{ currentProfile?.email ? '已绑定' : '未绑定' }}</span>
+                </summary>
+                <div class="security-disclosure__body">
+                  <el-form label-position="top" class="profile-form">
+                    <el-form-item label="邮箱">
+                      <el-input v-model="emailForm.email" placeholder="name@example.com" />
+                    </el-form-item>
+                    <el-form-item label="当前密码">
+                      <el-input v-model="emailForm.currentPassword" show-password />
+                    </el-form-item>
+                    <el-form-item label="验证码">
+                      <div class="security-inline">
+                        <el-input v-model="emailForm.code" placeholder="6 位验证码" />
+                        <el-button plain :loading="emailBindingLoading" @click="sendEmailBindCode">发送验证码</el-button>
+                      </div>
+                    </el-form-item>
+                  </el-form>
+                  <div class="sidebar-actions">
+                    <el-button type="primary" :loading="emailBindingLoading" @click="submitEmailBind">保存邮箱</el-button>
+                  </div>
+                </div>
+              </details>
 
-            <div class="sidebar-section sidebar-section--security-support">
-              <div class="sidebar-section__head">
-                <strong>安全记录</strong>
-                <p>最近的账号活动、设备变更与验证记录。</p>
-              </div>
-              <div v-if="securityEventsLoading" class="settings-empty">正在加载记录…</div>
-              <div v-else-if="groupedSecurityEvents.length" class="security-timeline">
-                <section v-for="group in groupedSecurityEvents" :key="group.key" class="security-timeline__group">
-                  <header class="security-timeline__group-head">
-                    <span>{{ group.label }}</span>
-                  </header>
-                  <div class="security-timeline__list">
-                    <article v-for="event in group.items" :key="event.eventId" class="security-event" :class="[`is-${event.riskTone}`, `status-${event.statusTone}`]">
-                      <div class="security-event__rail" aria-hidden="true">
-                        <span class="security-event__dot"></span>
+              <details class="security-disclosure">
+                <summary class="security-disclosure__summary">
+                  <div class="security-disclosure__lead">
+                    <span class="security-disclosure__icon"><Guide /></span>
+                    <div class="security-disclosure__copy">
+                      <strong>受信设备</strong>
+                      <p>{{ trustedDevicesLoading ? '设备同步中' : trustedDeviceCount ? `${trustedDeviceCount} 台设备保留登录状态` : '暂无受信设备' }}</p>
+                    </div>
+                  </div>
+                  <span class="security-disclosure__meta">{{ trustedDevicesLoading ? '同步中' : `${trustedDeviceCount} 台` }}</span>
+                </summary>
+                <div class="security-disclosure__body">
+                  <div v-if="trustedDevicesLoading" class="settings-empty">正在加载设备…</div>
+                  <div v-else-if="trustedDevices?.length" class="settings-list settings-list--grouped">
+                    <article v-for="device in trustedDevices" :key="device.deviceId" class="settings-item settings-item--stacked">
+                      <div>
+                        <strong>{{ device.deviceName }}</strong>
+                        <p>{{ device.lastUsedAt || '未使用' }}</p>
+                        <p>{{ device.expireAt || '无过期时间' }}</p>
                       </div>
-                      <div class="security-event__body">
-                        <div class="security-event__head">
-                          <strong>{{ event.title }}</strong>
-                          <time>{{ event.timeLabel }}</time>
-                        </div>
-                        <div class="security-event__badges">
-                          <span class="security-event__badge" :class="`is-${event.riskTone}`">{{ event.riskLabel }}</span>
-                          <span class="security-event__badge security-event__badge--status" :class="`is-${event.statusTone}`">{{ event.statusLabel }}</span>
-                        </div>
-                        <p>{{ event.detail }}</p>
-                        <div v-if="event.meta.length" class="security-event__meta">
-                          <span v-for="item in event.meta" :key="item">{{ item }}</span>
-                        </div>
-                      </div>
+                      <el-button text type="danger" @click="emit('revoke-trusted-device', { deviceId: device.deviceId, deviceFingerprint: device.deviceFingerprint })">
+                        移除
+                      </el-button>
                     </article>
                   </div>
-                </section>
-              </div>
-              <div v-else class="settings-empty">暂无记录</div>
+                  <div v-else class="settings-empty">暂无受信设备</div>
+                  <div class="security-actions" :class="{ 'security-actions--split': !!trustedDevices?.length, 'security-actions--single': !trustedDevices?.length }">
+                    <el-button plain class="security-actions__secondary" @click="emit('refresh-trusted-devices')">刷新</el-button>
+                    <el-button
+                      v-if="trustedDevices?.length"
+                      plain
+                      type="danger"
+                      class="security-actions__danger"
+                      @click="emit('revoke-all-trusted-devices')"
+                    >
+                      全部移除
+                    </el-button>
+                  </div>
+                </div>
+              </details>
+
+              <details class="security-disclosure">
+                <summary class="security-disclosure__summary">
+                  <div class="security-disclosure__lead">
+                    <span class="security-disclosure__icon"><Lock /></span>
+                    <div class="security-disclosure__copy">
+                      <strong>密码与退出</strong>
+                      <p>修改登录密码，或退出当前账号</p>
+                    </div>
+                  </div>
+                  <span class="security-disclosure__meta">账户操作</span>
+                </summary>
+                <div class="security-disclosure__body">
+                  <el-form label-position="top" class="profile-form">
+                    <el-form-item label="旧密码">
+                      <el-input v-model="passwordForm.oldPassword" show-password />
+                    </el-form-item>
+                    <el-form-item label="新密码">
+                      <el-input v-model="passwordForm.newPassword" show-password />
+                    </el-form-item>
+                    <el-form-item label="确认新密码">
+                      <el-input v-model="passwordForm.confirmPassword" show-password @keyup.enter="submitPassword" />
+                    </el-form-item>
+                  </el-form>
+                  <div class="security-actions security-actions--split">
+                    <el-button type="primary" class="security-actions__primary" :loading="passwordSaving" @click="submitPassword">更新密码</el-button>
+                    <el-button plain class="security-actions__secondary" data-testid="sidebar-logout" @click="handleLogout">退出登录</el-button>
+                  </div>
+                </div>
+              </details>
             </div>
 
-            <div class="sidebar-section sidebar-section--security-danger">
-              <div class="sidebar-section__head">
-                <strong>密码与退出</strong>
-                <p>更新密码，并在需要时退出当前账号。</p>
-              </div>
-              <div class="security-card">
-                <div class="security-card__icon">
-                  <Lock />
+            <details class="settings-panel security-history">
+              <summary class="security-history__summary">
+                <div class="settings-panel__head">
+                  <strong>安全记录</strong>
+                  <span class="security-history__meta">{{ securityEventsLoading ? '同步中' : `${securityEventCount} 条` }}</span>
                 </div>
-                <div>
-                  <strong>修改登录密码</strong>
-                  <p>更新后需要使用新密码登录。</p>
+              </summary>
+              <div class="security-history__body">
+                <div v-if="securityEventsLoading" class="settings-empty">正在加载记录…</div>
+                <div v-else-if="groupedSecurityEvents.length" class="security-timeline">
+                  <section v-for="group in groupedSecurityEvents" :key="group.key" class="security-timeline__group">
+                    <header class="security-timeline__group-head">
+                      <span>{{ group.label }}</span>
+                    </header>
+                    <div class="security-timeline__list">
+                      <article v-for="event in group.items" :key="event.eventId" class="security-event" :class="[`is-${event.riskTone}`, `status-${event.statusTone}`]">
+                        <div class="security-event__rail" aria-hidden="true">
+                          <span class="security-event__dot"></span>
+                        </div>
+                        <div class="security-event__body">
+                          <div class="security-event__head">
+                            <strong>{{ event.title }}</strong>
+                            <time>{{ event.timeLabel }}</time>
+                          </div>
+                          <div class="security-event__badges">
+                            <span class="security-event__badge" :class="`is-${event.riskTone}`">{{ event.riskLabel }}</span>
+                            <span class="security-event__badge security-event__badge--status" :class="`is-${event.statusTone}`">{{ event.statusLabel }}</span>
+                          </div>
+                          <p>{{ event.detail }}</p>
+                          <div v-if="event.meta.length" class="security-event__meta">
+                            <span v-for="item in event.meta" :key="item">{{ item }}</span>
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </section>
                 </div>
+                <div v-else class="settings-empty">暂无记录</div>
               </div>
-              <el-form label-position="top" class="profile-form">
-                <el-form-item label="旧密码">
-                  <el-input v-model="passwordForm.oldPassword" show-password />
-                </el-form-item>
-                <el-form-item label="新密码">
-                  <el-input v-model="passwordForm.newPassword" show-password />
-                </el-form-item>
-                <el-form-item label="确认新密码">
-                  <el-input v-model="passwordForm.confirmPassword" show-password @keyup.enter="submitPassword" />
-                </el-form-item>
-              </el-form>
-              <div class="sidebar-actions">
-                <el-button type="primary" :loading="passwordSaving" @click="submitPassword">更新密码</el-button>
-                <el-button plain data-testid="sidebar-logout" @click="handleLogout">退出登录</el-button>
-              </div>
-            </div>
+            </details>
           </div>
         </div>
       </el-scrollbar>
@@ -1886,14 +1869,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-panel__identity-copy strong {
   color: var(--text-primary);
-  font: 600 0.92rem/1.1 var(--font-body);
+  font: 600 var(--text-base)/1.1 var(--font-body);
   letter-spacing: -0.012em;
 }
 
 .sidebar-panel__identity-copy span {
   margin-top: 4px;
   color: var(--text-quaternary);
-  font: 500 0.7rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.03em;
 }
 
@@ -1947,7 +1930,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface-card) 82%, transparent);
   color: var(--text-secondary);
-  font: 600 0.7rem/1 var(--font-body);
+  font: 600 var(--text-xs)/1 var(--font-body);
   letter-spacing: 0.01em;
   transition:
     background var(--motion-fast) var(--motion-ease-out),
@@ -2102,7 +2085,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: block;
   max-width: 100%;
   color: var(--text-primary);
-  font: 700 0.98rem/1.08 var(--font-display);
+  font: 700 var(--text-lg)/1.08 var(--font-display);
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
@@ -2110,7 +2093,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-panel__notice p {
   margin-top: 5px;
   color: color-mix(in srgb, var(--text-secondary) 82%, var(--text-tertiary));
-  font: 400 0.85rem/1.28 var(--font-body);
+  font: 400 var(--text-base)/1.28 var(--font-body);
   letter-spacing: -0.01em;
 }
 
@@ -2167,8 +2150,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-panel__skeletons,
 .sidebar-detail {
-  gap: 12px;
-  padding: 4px 18px 24px;
+  gap: 10px;
+  padding: 4px 18px 18px;
 }
 
 .sidebar-context-menu {
@@ -2230,7 +2213,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-context-menu__label {
-  font-size: 0.86rem;
+  font-size: var(--text-base);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -2261,7 +2244,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   background: transparent;
   color: var(--text-primary);
   text-align: left;
-  font-size: 0.84rem;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
@@ -2332,7 +2315,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--text-primary);
-  font-size: 0.88rem;
+  font-size: var(--text-base);
   font-weight: 600;
   line-height: 1.18;
 }
@@ -2343,7 +2326,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--text-quaternary);
-  font: 500 0.72rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
 }
 
 .sidebar-global-menu__group {
@@ -2394,25 +2377,25 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .sidebar-global-menu__label {
   color: var(--text-primary);
-  font-size: 0.84rem;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
 .sidebar-global-menu__label small {
   margin-left: 6px;
   color: var(--text-quaternary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
 .sidebar-global-menu__meta {
   color: var(--text-quaternary);
-  font: 500 0.68rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
 }
 
 .sidebar-global-menu__remove {
   color: var(--text-danger);
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
   font-weight: 700;
 }
 
@@ -2447,7 +2430,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .profile-form__hint {
   margin-top: 8px;
   color: var(--text-quaternary);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   line-height: 1.5;
 }
 
@@ -2477,14 +2460,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .profile-avatar-field__copy strong {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--text-base);
   line-height: 1.25;
 }
 
 .profile-avatar-field__copy p {
   margin-top: 4px;
   color: var(--text-quaternary);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   line-height: 1.45;
 }
 
@@ -2528,9 +2511,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .sidebar-profile-card,
-.settings-hero,
-.settings-nav,
-.sidebar-section {
+.sidebar-section,
+.settings-panel {
   display: grid;
   gap: 12px;
   padding: 16px;
@@ -2538,152 +2520,148 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   background: color-mix(in srgb, var(--surface-card) 94%, transparent);
   border: 1px solid var(--border-default);
   box-shadow: none;
+  animation: settings-panel-enter 0.2s var(--motion-ease-out);
+}
+
+@keyframes settings-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sidebar-detail--settings {
   gap: 12px;
 }
 
+.settings-header {
+  display: grid;
+  gap: 12px;
+  padding: 4px 2px 0;
+}
+
+.settings-header__title strong,
+.settings-panel__head strong {
+  display: block;
+  color: var(--text-primary);
+  font: 620 var(--text-lg)/1.08 var(--font-display);
+}
+
+.settings-header__account {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+}
+
+.settings-header__account :deep(.avatar-badge) {
+  width: 42px;
+  height: 42px;
+}
+
+.settings-header__account-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-header__account-copy small {
+  color: var(--text-quaternary);
+  font: 600 var(--text-2xs)/1 var(--font-body);
+  letter-spacing: 0.02em;
+}
+
+.settings-header__account-copy strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  line-height: 1.16;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.settings-header__account-copy p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font: 500 var(--text-xs)/1.12 var(--font-mono);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .sidebar-profile-card {
-  gap: 16px;
+  gap: 14px;
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent), transparent 42%),
     color-mix(in srgb, var(--surface-raised) 94%, transparent);
 }
 
-.sidebar-profile-card__main,
-.settings-hero {
-  align-items: start;
-  gap: 16px;
-}
-
 .sidebar-profile-card__main {
   grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
 }
 
 .sidebar-profile-card :deep(.avatar-badge) {
-  width: 82px;
-  height: 82px;
+  width: 88px;
+  height: 88px;
 }
 
-.sidebar-profile-card__copy,
-.settings-hero__copy,
-.settings-hero__identity-copy {
+.sidebar-profile-card__copy {
   min-width: 0;
 }
 
-.sidebar-profile-card__copy strong,
-.settings-hero__copy strong {
-  display: block;
-  font: 620 1.06rem/1.02 var(--font-display);
-}
-
-.sidebar-profile-card__copy p,
-.settings-hero__copy span,
-.settings-hero__identity p {
-  margin-top: 5px;
+.sidebar-profile-card__eyebrow {
+  margin: 2px 0 8px;
   color: var(--text-quaternary);
-  font: 500 0.7rem/1.1 var(--font-mono);
+  font: 600 var(--text-sm)/1 var(--font-body);
+  letter-spacing: 0.02em;
 }
 
-.settings-hero__copy span {
-  margin-top: 0;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.sidebar-profile-card__copy strong {
+  display: block;
+  font: 620 1.02rem/1.08 var(--font-display);
+  letter-spacing: -0.01em;
 }
 
-.sidebar-profile-card__copy span,
-.settings-hero__copy p {
+.sidebar-profile-card__copy p {
+  margin-top: 8px;
+  color: var(--text-quaternary);
+  font: 500 var(--text-xs)/1.2 var(--font-mono);
+}
+
+.sidebar-profile-card__copy span {
   display: block;
   margin-top: 8px;
   color: var(--text-secondary);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: var(--text-base);
+  line-height: 1.62;
 }
 
-.settings-hero {
-  gap: 12px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--interactive-primary-bg) 8%, transparent), transparent 58%),
-    color-mix(in srgb, var(--surface-raised) 94%, transparent);
-}
-
-.settings-hero__identity {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--border-default) 92%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
-}
-
-.settings-hero__identity :deep(.avatar-badge) {
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-}
-
-.settings-hero__identity-copy {
-  display: grid;
-  gap: 2px;
-}
-
-.settings-hero__identity-copy small {
-  color: var(--text-quaternary);
-  font: 600 0.58rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.settings-hero__identity strong {
-  display: block;
-  font-size: 0.82rem;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-hero__identity p {
-  margin-top: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-nav {
-  gap: 10px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 58%, transparent), transparent 100%),
-    color-mix(in srgb, var(--surface-raised) 94%, transparent);
-}
-
-.settings-nav__head {
-  display: grid;
-  gap: 5px;
-}
-
-.settings-nav__head strong {
-  display: block;
-  font: 620 0.82rem/1.08 var(--font-display);
-}
-
-.settings-nav__head span {
-  color: var(--text-quaternary);
-  font-size: 0.72rem;
-  line-height: 1.45;
+.sidebar-profile-card__copy span {
+  max-width: 24ch;
 }
 
 .sidebar-profile-card__meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .sidebar-profile-card__meta article {
   min-width: 0;
-  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px 14px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
@@ -2692,57 +2670,165 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-profile-card__meta span {
   display: block;
   color: var(--text-quaternary);
-  font: 500 0.64rem/1 var(--font-mono);
-  text-transform: uppercase;
+  font: 500 var(--text-xs)/1.1 var(--font-body);
+  letter-spacing: 0.01em;
 }
 
 .sidebar-profile-card__meta strong {
   display: block;
-  margin-top: 9px;
-  font-size: 0.84rem;
-  line-height: 1.3;
+  font-size: var(--text-lg);
+  line-height: 1.24;
   overflow-wrap: anywhere;
 }
 
 .sidebar-profile-card__actions,
 .sidebar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 .sidebar-profile-card__action {
-  flex: 1 1 148px;
-  min-height: 42px;
-  border-radius: 14px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
+  margin: 0;
+  border: 1px solid var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.sidebar-profile-card__action:hover,
+.sidebar-profile-card__action:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.sidebar-profile-card__secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.sidebar-profile-card__secondary-actions > * {
+  min-width: 0;
+}
+
+.sidebar-profile-card__action--secondary {
+  min-height: 40px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+  color: var(--text-secondary);
+}
+
+.sidebar-profile-card__action--secondary:hover,
+.sidebar-profile-card__action--secondary:focus-visible {
+  border-color: var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
+}
+
+.sidebar-profile-card__actions :deep(.el-button) {
+  margin: 0;
+  padding-inline: 18px;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+
+.sidebar-profile-card__actions :deep(.el-button--primary) {
+  border-color: var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.sidebar-profile-card__actions :deep(.el-button--primary:hover),
+.sidebar-profile-card__actions :deep(.el-button--primary:focus-visible) {
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-profile-card__actions :deep(.el-button > span) {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.sidebar-profile-card__secondary-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .sidebar-section__head span {
   display: block;
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 var(--text-xs)/1 var(--font-body);
+  letter-spacing: 0.02em;
+}
+
+.settings-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0;
 }
 
 .sidebar-section__head strong {
   display: block;
-  font: 620 0.88rem/1.08 var(--font-display);
+  font: 620 var(--text-base)/1.08 var(--font-display);
 }
 
-.sidebar-section__head p {
-  margin: 4px 0 0;
+.sidebar-section__head p,
+.settings-panel__head p {
+  margin: 0;
   color: var(--text-secondary);
-  font-size: 0.73rem;
-  line-height: 1.45;
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.sidebar-info-list {
+  display: grid;
+  gap: 12px;
+}
+
+.sidebar-info-list__item {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+}
+
+.sidebar-info-list__item span {
+  display: block;
+  color: var(--text-quaternary);
+  font: 500 var(--text-xs)/1.1 var(--font-body);
+  letter-spacing: 0.01em;
+}
+
+.sidebar-info-list__item strong {
+  display: block;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .info-grid article,
@@ -2762,14 +2848,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .info-grid span {
   display: block;
   color: var(--text-quaternary);
-  font: 500 0.64rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
   text-transform: uppercase;
 }
 
 .info-grid strong {
   display: block;
   margin-top: 8px;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -2785,16 +2871,20 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   gap: 8px;
 }
 
+.settings-switcher {
+  display: grid;
+}
+
 .settings-tabs__item {
   display: grid;
-  gap: 4px;
-  min-height: 64px;
-  padding: 11px 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--interactive-secondary-bg) 88%, transparent);
+  align-items: center;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-panel) 72%, transparent);
   color: var(--text-secondary);
-  text-align: left;
+  text-align: center;
   transition:
     background var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out),
@@ -2805,36 +2895,25 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-tabs__item strong {
   display: block;
   color: var(--text-primary);
-  font-size: 0.78rem;
-  line-height: 1.15;
-}
-
-.settings-tabs__item span {
-  display: block;
-  color: var(--text-tertiary);
-  font-size: 0.68rem;
-  line-height: 1.38;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 1.2;
 }
 
 .settings-tabs__item:hover,
 .settings-tabs__item:focus-visible {
-  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, transparent);
-  border-color: color-mix(in srgb, var(--border-strong) 92%, transparent);
+  background: color-mix(in srgb, var(--interactive-selected-bg) 82%, var(--surface-panel));
+  border-color: color-mix(in srgb, var(--border-brand) 82%, transparent);
   color: var(--text-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-focus-ring) 18%, transparent);
 }
 
 .settings-tabs__item.is-active {
-  background: color-mix(in srgb, var(--interactive-selected-bg) 92%, var(--surface-panel));
-  border-color: color-mix(in srgb, var(--interactive-primary-bg) 22%, var(--border-strong));
+  background: color-mix(in srgb, var(--interactive-selected-bg) 86%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 26%, var(--border-brand));
   color: var(--text-primary);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 3px color-mix(in srgb, var(--interactive-focus-ring) 26%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--interactive-focus-ring) 18%, transparent);
 }
 
 .theme-card,
@@ -2873,6 +2952,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border: 0;
   border-radius: 0;
   background: transparent;
+  padding: 12px 14px;
 }
 
 .theme-card--stacked .theme-card__option + .theme-card__option,
@@ -2881,13 +2961,13 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 }
 
 .theme-card__option {
-  min-height: 78px;
+  min-height: 56px;
 }
 
 .theme-card__icon,
 .security-card__icon {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2899,9 +2979,8 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .theme-card__copy {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   flex: 1;
-  min-height: 48px;
   align-content: center;
 }
 
@@ -2909,7 +2988,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-item strong,
 .security-card strong {
   display: block;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }
 
 .settings-item > div:first-child,
@@ -2925,7 +3004,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .settings-item p,
 .security-card p {
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.44;
 }
 
@@ -2955,32 +3034,107 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .settings-item {
   align-items: center;
-  min-height: 84px;
+  min-height: 56px;
 }
 
 .settings-item--stacked {
   align-items: start;
 }
 
+.settings-item--status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px 14px 12px;
+}
+
+.settings-item__status-copy {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.settings-item__status-copy strong {
+  font-size: var(--text-base);
+  line-height: 1.18;
+}
+
+.settings-item__status-copy p {
+  max-width: 24ch;
+  font-size: var(--text-sm);
+  line-height: 1.56;
+}
+
+.settings-actions {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.settings-actions--stacked {
+  grid-template-columns: 1fr;
+}
+
+.settings-actions :deep(.el-button) {
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+
+.settings-actions :deep(.el-button--primary) {
+  border-color: var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.settings-actions :deep(.el-button--primary:hover),
+.settings-actions :deep(.el-button--primary:focus-visible) {
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.settings-actions__primary:deep(.el-button),
+.settings-actions__secondary:deep(.el-button) {
+  width: 100%;
+}
+
+.settings-tag--status {
+  min-width: 72px;
+  min-height: 28px;
+  justify-self: end;
+}
+
 .settings-empty {
   padding: 10px 2px 0;
   color: var(--text-secondary);
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
 }
 
 .sidebar-stack--security {
-  gap: 12px;
+  gap: 10px;
 }
 
 .security-overview {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid var(--border-default);
-  border-radius: 18px;
+  border-radius: var(--radius-panel);
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--interactive-primary-bg) 7%, transparent), transparent 62%),
     color-mix(in srgb, var(--surface-raised) 95%, transparent);
+}
+
+.security-overview__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .security-overview.is-warning {
@@ -2996,18 +3150,18 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-overview__copy span {
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .security-overview__copy strong {
-  font: 620 0.92rem/1.08 var(--font-display);
+  font: 620 var(--text-base)/1.08 var(--font-display);
 }
 
 .security-overview__copy p {
   color: var(--text-secondary);
-  font-size: 0.73rem;
+  font-size: var(--text-xs);
   line-height: 1.46;
 }
 
@@ -3018,22 +3172,22 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .security-metrics article {
   min-width: 0;
-  padding: 12px 13px;
+  padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-panel) 86%, transparent);
 }
 
 .security-metrics span {
   display: block;
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3041,93 +3195,37 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .security-metrics strong {
   display: block;
   margin-top: 8px;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   line-height: 1.34;
   overflow-wrap: anywhere;
 }
 
-.security-risk-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 13px 14px;
+.security-overview__contact {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
   border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
-  border-radius: 16px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--surface-panel) 84%, transparent);
 }
 
-.security-risk-summary.is-quiet {
-  background: color-mix(in srgb, var(--surface-subtle) 78%, var(--surface-panel));
-}
-
-.security-risk-summary__copy {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.security-risk-summary__copy span {
+.security-overview__contact span {
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 var(--text-xs)/1 var(--font-body);
 }
 
-.security-risk-summary__copy strong {
-  font-size: 0.78rem;
-  line-height: 1.32;
-}
-
-.security-risk-summary__stats {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.security-risk-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-secondary-bg) 88%, transparent);
-}
-
-.security-risk-pill em {
-  color: var(--text-quaternary);
-  font-style: normal;
-  font: 600 0.72rem/1 var(--font-mono);
-  letter-spacing: 0.04em;
-}
-
-.security-risk-pill strong {
-  font: 700 0.72rem/1 var(--font-mono);
-  color: var(--text-primary);
-}
-
-.security-risk-pill.is-critical {
-  border-color: color-mix(in srgb, var(--status-danger) 20%, var(--border-default));
-}
-
-.security-risk-pill.is-critical strong {
-  color: var(--text-danger);
-}
-
-.security-risk-pill.is-warning {
-  border-color: color-mix(in srgb, var(--status-warning) 24%, var(--border-default));
+.security-overview__contact strong {
+  font-size: var(--text-base);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .security-alerts {
   display: grid;
-  gap: 10px;
-  padding: 16px;
+  gap: 8px;
+  padding: 14px;
   border: 1px solid color-mix(in srgb, var(--status-danger) 12%, var(--border-default));
-  border-radius: 18px;
+  border-radius: var(--radius-panel);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--status-danger) 5%, transparent), transparent 34%),
     color-mix(in srgb, var(--surface-raised) 95%, transparent);
@@ -3140,19 +3238,13 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-alerts__head span {
   color: var(--text-danger);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .security-alerts__head strong {
-  font: 620 0.88rem/1.08 var(--font-display);
-}
-
-.security-alerts__head p {
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  line-height: 1.42;
+  font: 620 var(--text-base)/1.08 var(--font-display);
 }
 
 .security-alerts__list {
@@ -3185,14 +3277,20 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-alert__topline {
   display: flex;
-  align-items: baseline;
+  align-items: start;
   justify-content: space-between;
   gap: 12px;
 }
 
+.security-alert__headline {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
 .security-alert__eyebrow {
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3200,19 +3298,37 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .security-alert__topline time {
   flex-shrink: 0;
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
 
 .security-alert strong {
-  font-size: 0.82rem;
+  font-size: var(--text-base);
   line-height: 1.24;
 }
 
 .security-alert p {
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.46;
+}
+
+.security-alert--compact {
+  gap: 8px;
+  padding: 12px;
+}
+
+.security-alert--compact p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.security-alerts__footer {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1.4;
 }
 
 .security-alert__badges {
@@ -3244,14 +3360,161 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
     color-mix(in srgb, var(--surface-card) 94%, transparent);
 }
 
+.security-operations {
+  gap: 10px;
+}
+
+.security-disclosure,
+.security-history {
+  border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-panel) 84%, transparent);
+}
+
+.security-disclosure[open],
+.security-history[open] {
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+}
+
+.security-disclosure__summary,
+.security-history__summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.security-disclosure__summary::-webkit-details-marker,
+.security-history__summary::-webkit-details-marker {
+  display: none;
+}
+
+.security-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.security-disclosure__lead {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.security-disclosure__icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--interactive-focus-ring) 36%, transparent);
+  color: var(--text-tertiary);
+}
+
+.security-disclosure__icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.security-disclosure__copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.security-disclosure__copy strong {
+  font-size: var(--text-base);
+  line-height: 1.18;
+}
+
+.security-disclosure__copy p {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.42;
+}
+
+.security-disclosure__meta,
+.security-history__meta {
+  color: var(--text-tertiary);
+  font: 600 var(--text-xs)/1 var(--font-mono);
+  white-space: nowrap;
+}
+
+.security-disclosure__body,
+.security-history__body {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.security-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.security-actions--single {
+  grid-template-columns: 1fr;
+}
+
+.security-actions--split {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
+  align-items: center;
+}
+
+.security-actions :deep(.el-button) {
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+
+.security-actions__secondary:deep(.el-button) {
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+}
+
+.security-actions :deep(.el-button--primary) {
+  border-color: var(--border-default);
+  background: var(--interactive-secondary-bg);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.security-actions :deep(.el-button--primary:hover),
+.security-actions :deep(.el-button--primary:focus-visible) {
+  border-color: var(--border-strong);
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.security-actions__danger:deep(.el-button) {
+  border-color: color-mix(in srgb, var(--status-danger) 28%, var(--border-default));
+  background: color-mix(in srgb, var(--status-danger) 10%, var(--surface-card));
+  color: var(--text-danger);
+}
+
+.security-history {
+  padding: 0;
+}
+
+.security-history__summary {
+  padding: 14px;
+}
+
+.security-history__summary .settings-panel__head {
+  margin-bottom: 0;
+}
+
 .security-timeline {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .security-timeline__group {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .security-timeline__group-head {
@@ -3269,7 +3532,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-timeline__group-head span {
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3283,9 +3546,9 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr);
   gap: 10px;
-  padding: 12px 13px;
+  padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--border-default) 84%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-panel) 84%, transparent);
 }
 
@@ -3340,14 +3603,14 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-event__head strong {
   min-width: 0;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   line-height: 1.24;
 }
 
 .security-event__head time {
   flex-shrink: 0;
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.06em;
 }
 
@@ -3366,7 +3629,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border: 1px solid var(--border-default);
   background: color-mix(in srgb, var(--interactive-secondary-bg) 92%, transparent);
   color: var(--text-secondary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -3392,7 +3655,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 
 .security-event__body p {
   color: var(--text-secondary);
-  font-size: 0.71rem;
+  font-size: var(--text-xs);
   line-height: 1.46;
 }
 
@@ -3410,7 +3673,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-secondary-bg) 76%, transparent);
   color: var(--text-quaternary);
-  font: 600 0.72rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
 }
 
 .security-inline {
@@ -3430,7 +3693,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-secondary-bg) 92%, transparent);
   color: var(--text-secondary);
-  font: 600 0.64rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -3493,7 +3756,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
 .sidebar-notice {
   padding: 12px 14px;
   border-radius: 14px;
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
   line-height: 1.46;
 }
 
@@ -3532,22 +3795,49 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
     grid-template-columns: 1fr;
   }
 
-  .sidebar-profile-card__main {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-
   .security-metrics {
     grid-template-columns: 1fr;
   }
 
   .sidebar-profile-card :deep(.avatar-badge) {
-    width: 74px;
-    height: 74px;
+    width: 72px;
+    height: 72px;
   }
 
   .sidebar-profile-card__meta,
   .settings-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-profile-card__actions {
+    gap: 10px;
+  }
+
+  .sidebar-profile-card__secondary-actions {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .settings-header {
+    padding-top: 0;
+  }
+
+  .settings-header__account {
+    grid-template-columns: 40px minmax(0, 1fr);
+    padding: 11px 12px;
+  }
+
+  .settings-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel__head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .security-actions--split {
     grid-template-columns: 1fr;
   }
 }

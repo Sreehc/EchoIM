@@ -45,6 +45,8 @@ export class EchoWsClient {
   private manualClose = false
   private reconnectPausedForTest = false
   private status: ConnectionStatus = 'disconnected'
+  private messageBuffer: WsEnvelope[] = []
+  private flushTimer: number | null = null
 
   constructor(options: EchoWsClientOptions) {
     this.options = options
@@ -141,6 +143,10 @@ export class EchoWsClient {
     this.send('CALL_ICE_CANDIDATE', data, clientMsgId)
   }
 
+  sendTyping(conversationId: number) {
+    this.send('TYPING', { conversationId })
+  }
+
   private async openSocket(isReconnect: boolean) {
     const options = this.connectOptions
     if (!options) return
@@ -214,7 +220,8 @@ export class EchoWsClient {
           return
         }
 
-        this.options.onEnvelope(message)
+        // Batch non-critical messages to reduce UI re-renders
+        this.enqueueMessage(message)
       }
 
       const handleClose = () => {
@@ -291,6 +298,13 @@ export class EchoWsClient {
       window.clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
+
+    if (this.flushTimer) {
+      window.cancelAnimationFrame(this.flushTimer)
+      this.flushTimer = null
+    }
+
+    this.messageBuffer.length = 0
   }
 
   private send(type: WsMessageType, data: unknown, clientMsgId?: string) {
@@ -326,5 +340,23 @@ export class EchoWsClient {
   private setStatus(status: ConnectionStatus) {
     this.status = status
     this.options.onStatusChange(status)
+  }
+
+  private enqueueMessage(message: WsEnvelope) {
+    this.messageBuffer.push(message)
+    if (!this.flushTimer) {
+      this.flushTimer = window.requestAnimationFrame(() => {
+        this.flushTimer = null
+        this.flushMessages()
+      })
+    }
+  }
+
+  private flushMessages() {
+    if (this.messageBuffer.length === 0) return
+    const batch = this.messageBuffer.splice(0)
+    for (const message of batch) {
+      this.options.onEnvelope(message)
+    }
   }
 }

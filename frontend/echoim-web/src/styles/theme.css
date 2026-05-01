@@ -39,11 +39,9 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent), transparent 18%),
-    radial-gradient(circle at 82% 2%, color-mix(in srgb, var(--interactive-primary-bg) 5%, transparent), transparent 14%),
-    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--surface-subtle) 94%, transparent), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
-  opacity: 0.62;
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--interactive-focus-ring) 40%, transparent), transparent 22%),
+    radial-gradient(circle at 80% 88%, color-mix(in srgb, var(--surface-subtle) 80%, transparent), transparent 26%);
+  opacity: 0.5;
 }
 
 body::after {
@@ -51,10 +49,8 @@ body::after {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-inverse) 14%, transparent), transparent 18%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.012), transparent 26%, transparent 74%, rgba(255, 255, 255, 0.012));
-  opacity: 0.14;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  opacity: 0.3;
 }
 
 button,
@@ -104,5 +100,12 @@ ul {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --btn-min-size: 44px;
+    --btn-icon-size: 44px;
   }
 }

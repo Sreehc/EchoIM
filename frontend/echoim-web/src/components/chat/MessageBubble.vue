@@ -87,12 +87,12 @@ const statusMeta = computed(() => {
           : 'sent',
   }
 })
-const channelViewLabel = computed(() => {
+const channelViewCount = computed(() => {
   if (!isSelf.value || props.conversationType !== 3 || props.message.sendStatus !== 1) {
-    return ''
+    return null
   }
 
-  return `${props.message.viewCount ?? 0} 人看过`
+  return props.message.viewCount ?? 0
 })
 const attachmentMeta = computed(() => {
   if (props.message.msgType === 'STICKER') {
@@ -351,10 +351,23 @@ onUnmounted(() => {
       class="message-row__avatar"
       :name="senderName"
       :seed="message.fromUserId"
-      size="sm"
+      size="md"
       type="user"
     />
     <div v-else-if="!isSystem && !isSelf && conversationType !== 1" class="message-row__avatar-spacer"></div>
+    <button
+      v-if="forwardSelectionMode && !isSystem"
+      class="message-row__selector"
+      :class="{ 'is-selected': selectedForForward }"
+      type="button"
+      :aria-pressed="selectedForForward"
+      :aria-label="selectedForForward ? '取消选择这条消息' : '选择这条消息用于转发'"
+      @click="emit('toggle-forward-selection')"
+    >
+      <span class="message-row__selector-circle" aria-hidden="true">
+        <span class="message-row__selector-check">✓</span>
+      </span>
+    </button>
     <div
       class="message-bubble"
       :class="{
@@ -366,15 +379,6 @@ onUnmounted(() => {
         'is-search-active': searchActive,
       }"
     >
-      <button
-        v-if="forwardSelectionMode && !isSystem"
-        class="message-bubble__selector"
-        :class="{ 'is-selected': selectedForForward }"
-        type="button"
-        @click="emit('toggle-forward-selection')"
-      >
-        {{ selectedForForward ? '已选' : '选择' }}
-      </button>
       <span v-if="showSenderLabel" class="message-bubble__sender">{{ senderName }}</span>
       <button
         v-if="message.replySource && !message.recalled"
@@ -410,7 +414,7 @@ onUnmounted(() => {
           <img
             v-if="message.file?.downloadUrl"
             class="message-bubble__image"
-            :src="message.file.downloadUrl"
+            v-lazy-image="message.file.downloadUrl"
             :alt="attachmentMeta?.title || '图片消息'"
           />
           <div v-else class="message-bubble__preview">
@@ -473,7 +477,13 @@ onUnmounted(() => {
           <span class="message-bubble__meta message-bubble__meta--inline">
             <span>{{ formatMessageTime(message.sentAt) }}</span>
             <span v-if="message.edited && !message.recalled" class="message-bubble__edited">已编辑</span>
-            <span v-if="channelViewLabel" class="message-bubble__views">{{ channelViewLabel }}</span>
+            <span v-if="channelViewCount !== null" class="message-bubble__views">
+              <svg class="message-bubble__views-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M1.5 8s2.6-4.5 6.5-4.5S14.5 8 14.5 8s-2.6 4.5-6.5 4.5S1.5 8 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+              </svg>
+              <span>{{ channelViewCount }}</span>
+            </span>
             <span
               v-else-if="isSelf"
               class="message-bubble__status"
@@ -502,7 +512,13 @@ onUnmounted(() => {
       >
         <span>{{ formatMessageTime(message.sentAt) }}</span>
         <span v-if="message.edited && !message.recalled" class="message-bubble__edited">已编辑</span>
-        <span v-if="channelViewLabel" class="message-bubble__views">{{ channelViewLabel }}</span>
+        <span v-if="channelViewCount !== null" class="message-bubble__views">
+          <svg class="message-bubble__views-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.5 8s2.6-4.5 6.5-4.5S14.5 8 14.5 8s-2.6 4.5-6.5 4.5S1.5 8 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          </svg>
+          <span>{{ channelViewCount }}</span>
+        </span>
         <span
           v-else-if="isSelf"
           class="message-bubble__status"
@@ -604,18 +620,95 @@ onUnmounted(() => {
 }
 
 .message-row__avatar-spacer {
-  width: 28px;
+  width: 34px;
   flex-shrink: 0;
+}
+
+.message-row__selector {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-quaternary);
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out);
+}
+
+.message-row__selector:hover {
+  transform: translateY(-1px);
+  color: var(--interactive-primary-bg);
+}
+
+.message-row__selector:focus-visible {
+  outline: none;
+}
+
+.message-row__selector-circle {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid color-mix(in srgb, var(--interactive-primary-bg) 18%, var(--border-strong));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
+  box-shadow: var(--shadow-xs);
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+}
+
+.message-row__selector-check {
+  opacity: 0;
+  transform: scale(0.72);
+  color: var(--text-on-brand);
+  font: 700 var(--text-xs)/1 var(--font-mono);
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+}
+
+.message-row__selector:hover .message-row__selector-circle {
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 44%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 7%, var(--surface-card));
+}
+
+.message-row__selector:focus-visible .message-row__selector-circle {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-primary-bg) 18%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--interactive-focus-ring) 58%, transparent);
+}
+
+.message-row__selector.is-selected .message-row__selector-circle {
+  border-color: var(--interactive-primary-bg);
+  background: var(--interactive-primary-bg);
+  box-shadow:
+    0 10px 20px color-mix(in srgb, var(--interactive-primary-bg) 22%, transparent),
+    var(--shadow-xs);
+}
+
+.message-row__selector.is-selected .message-row__selector-check {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .message-bubble {
   position: relative;
-  max-width: min(62ch, 74%);
+  max-width: min(56ch, 68%);
   padding: 10px 13px 9px;
   border: 1px solid var(--chat-bubble-peer-border);
   border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble) 12px;
   background: var(--chat-bubble-peer-bg);
   box-shadow: var(--shadow-xs);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
 }
 
 .message-bubble.is-compact {
@@ -657,7 +750,7 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   color: var(--text-tertiary);
-  font: 500 0.72rem/1.1 var(--font-mono);
+  font: 500 var(--text-xs)/1.1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -665,38 +758,21 @@ onUnmounted(() => {
   display: inline-block;
   margin-bottom: 4px;
   color: var(--text-quaternary);
-  font: 600 0.7rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.message-bubble__selector {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 5px 9px;
-  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 14%, var(--border-default));
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-card) 76%, transparent);
-  color: var(--text-secondary);
-  font: 600 0.72rem/1 var(--font-body);
-}
-
-.message-bubble__selector.is-selected {
-  border-color: color-mix(in srgb, var(--interactive-primary-bg) 26%, var(--border-default));
-  background: color-mix(in srgb, var(--interactive-primary-bg) 14%, var(--surface-card));
-  color: var(--interactive-selected-fg);
 }
 
 .message-bubble p {
   margin: 0;
   white-space: pre-wrap;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   line-height: 1.58;
   letter-spacing: -0.008em;
 }
 
 .message-bubble__text-layout {
+  display: block;
   color: var(--text-primary);
 }
 
@@ -719,20 +795,20 @@ onUnmounted(() => {
   gap: 4px;
   margin-top: 4px;
   color: color-mix(in srgb, var(--text-tertiary) 84%, transparent);
-  font: 500 0.72rem/1 var(--font-mono);
+  font: 500 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
 }
 
 .message-bubble__meta--inline {
   margin-top: 0;
   margin-left: 7px;
-  vertical-align: bottom;
+  white-space: nowrap;
 }
 
 .message-bubble__forward {
   margin-bottom: 5px;
   color: var(--text-tertiary);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1.38;
 }
 
@@ -745,7 +821,7 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--interactive-primary-bg) 4%, var(--surface-panel));
   color: var(--text-secondary);
   text-align: left;
-  font: 500 0.75rem/1.42 var(--font-body);
+  font: 500 var(--text-xs)/1.42 var(--font-body);
 }
 
 .message-bubble__status {
@@ -753,7 +829,7 @@ onUnmounted(() => {
   display: inline-flex;
   justify-content: flex-end;
   color: color-mix(in srgb, var(--text-tertiary) 72%, transparent);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   font-weight: 700;
   letter-spacing: -0.18em;
 }
@@ -781,6 +857,9 @@ onUnmounted(() => {
 }
 
 .message-bubble__retry {
+  min-height: var(--btn-min-size);
+  display: inline-flex;
+  align-items: center;
   padding: 0;
   border: 0;
   background: transparent;
@@ -798,9 +877,18 @@ onUnmounted(() => {
 }
 
 .message-bubble__views {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: color-mix(in srgb, var(--text-tertiary) 84%, transparent);
-  font: 600 0.7rem/1 var(--font-mono);
+  font: 600 var(--text-xs)/1 var(--font-mono);
   letter-spacing: 0.03em;
+}
+
+.message-bubble__views-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 .message-bubble__editor {
@@ -819,7 +907,7 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   color: var(--interactive-primary-bg);
-  font: 600 0.78rem/1 var(--font-body);
+  font: 600 var(--text-sm)/1 var(--font-body);
 }
 
 .message-bubble__editor-actions button:disabled,
@@ -869,13 +957,13 @@ onUnmounted(() => {
 .message-bubble__file strong {
   display: block;
   margin-bottom: 2px;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   line-height: 1.2;
 }
 
 .message-bubble__file p {
   color: var(--text-secondary);
-  font-size: 0.76rem;
+  font-size: var(--text-sm);
 }
 
 .message-bubble__download {
@@ -884,7 +972,7 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   color: var(--interactive-primary-bg);
-  font: 600 0.76rem/1 var(--font-body);
+  font: 600 var(--text-sm)/1 var(--font-body);
 }
 
 .message-bubble__file--image {
@@ -932,57 +1020,71 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--surface-subtle));
   color: var(--interactive-selected-fg);
-  font: 700 0.68rem/1 var(--font-mono);
+  font: 700 var(--text-xs)/1 var(--font-mono);
 }
 
 .message-bubble__reactions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 7px;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .message-bubble__reaction,
 .message-bubble__reaction-pick {
-  border: 1px solid var(--border-subtle);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 86%, transparent);
 }
 
 .message-bubble__reaction {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 4px;
+  padding: 2px 8px;
   color: var(--text-primary);
-  font-size: 0.72rem;
+  font-size: var(--text-base);
+  line-height: 1;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out);
+}
+
+.message-bubble__reaction:hover {
+  background: color-mix(in srgb, var(--interactive-selected-bg) 80%, transparent);
 }
 
 .message-bubble__reaction.is-active {
-  border-color: color-mix(in srgb, var(--interactive-primary-bg) 38%, var(--border-subtle));
-  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 14%, transparent);
+  color: var(--interactive-selected-fg);
 }
 
 .message-bubble__reaction strong {
-  font: 700 0.68rem/1 var(--font-mono);
+  font: 700 var(--text-xs)/1 var(--font-mono);
 }
 
 .message-bubble__reaction-menu {
   display: flex;
-  gap: 8px;
-  padding-bottom: 10px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
+  gap: 6px;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 84%, transparent);
 }
 
 .message-bubble__reaction-pick {
-  min-width: 32px;
-  height: 32px;
+  min-width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  padding: 0 10px;
+  padding: 0 6px;
   color: var(--text-primary);
-  font-size: 0.96rem;
+  font-size: var(--text-lg);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease-out);
+}
+
+.message-bubble__reaction-pick:hover {
+  background: color-mix(in srgb, var(--interactive-selected-bg) 80%, transparent);
 }
 
 .message-bubble__context-menu {
@@ -1006,7 +1108,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--text-primary);
   text-align: left;
-  font: 600 0.78rem/1.2 var(--font-body);
+  font: 600 var(--text-sm)/1.2 var(--font-body);
 }
 
 .message-bubble__context-item:hover,
@@ -1035,6 +1137,17 @@ onUnmounted(() => {
 }
 
 @media (max-width: 767px) {
+  .message-row__selector {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .message-row__selector-circle {
+    width: 22px;
+    height: 22px;
+  }
+
   .message-bubble {
     max-width: 92%;
   }

@@ -203,11 +203,12 @@ onMounted(() => {
 .public-profile {
   min-height: 100dvh;
   display: grid;
-  place-items: center;
+  align-content: center;
   padding: 32px 16px;
   background:
-    radial-gradient(circle at 14% 14%, color-mix(in srgb, var(--interactive-primary-bg) 6%, transparent), transparent 22%),
-    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--interactive-focus-ring) 44%, transparent), transparent 20%),
+    radial-gradient(circle at 14% 14%, color-mix(in srgb, var(--interactive-primary-bg) 8%, transparent), transparent 26%),
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--interactive-focus-ring) 50%, transparent), transparent 22%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--surface-subtle) 60%, transparent), transparent 30%),
     linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-inverse) 8%, transparent)),
     var(--surface-canvas);
 }
@@ -279,7 +280,7 @@ onMounted(() => {
 
 .public-profile__card-head strong {
   color: var(--text-primary);
-  font: 600 1rem/1.08 var(--font-body);
+  font: 600 var(--text-lg)/1.08 var(--font-body);
   letter-spacing: -0.02em;
 }
 
@@ -297,7 +298,7 @@ onMounted(() => {
 }
 
 .public-profile__grid dt {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-quaternary);
 }
 
@@ -322,7 +323,11 @@ onMounted(() => {
 .public-profile__secondary,
 .public-profile__ghost {
   border-radius: var(--radius-pill);
-  padding: 11px 18px;
+  min-height: var(--btn-min-size);
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-default);
   background: var(--interactive-secondary-bg);
   color: var(--interactive-secondary-fg);
@@ -334,6 +339,7 @@ onMounted(() => {
 }
 
 .public-profile__primary {
+  min-width: 120px;
   background: var(--interactive-primary-bg);
   border-color: transparent;
   color: var(--interactive-primary-fg);

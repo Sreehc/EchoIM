@@ -44,7 +44,7 @@ const emit = defineEmits<{
 }
 
 .state-panel--compact {
-  min-height: 260px;
+  min-height: 200px;
 }
 
 .state-panel__eyebrow {
@@ -62,7 +62,7 @@ const emit = defineEmits<{
 .state-panel p {
   max-width: 30ch;
   color: var(--text-tertiary);
-  font-size: 0.88rem;
+  font-size: var(--text-base);
   line-height: 1.5;
 }
 
@@ -73,7 +73,7 @@ const emit = defineEmits<{
   border-radius: var(--radius-pill);
   background: var(--interactive-secondary-bg);
   color: var(--text-primary);
-  font-size: 0.84rem;
+  font-size: var(--text-base);
   font-weight: 600;
   transition:
     border-color var(--motion-fast) var(--motion-ease-out),

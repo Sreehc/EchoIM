@@ -82,6 +82,22 @@ export function createSavedConversation() {
   return postJson<ApiConversationItem>('/api/conversations/saved')
 }
 
+export interface ConversationFileItem {
+  fileId: number
+  fileName: string
+  fileExt: string
+  contentType: string
+  fileSize: number
+  url: string
+  createdAt: string
+}
+
+export function fetchConversationFiles(conversationId: number, pageNo = 1, pageSize = 20) {
+  return getJson<PageResponse<ConversationFileItem>>(
+    `/api/conversations/${conversationId}/files?pageNo=${pageNo}&pageSize=${pageSize}`,
+  )
+}
+
 export function fetchImInfo() {
   return getJson<ApiImInfo>('/api/im/info')
 }

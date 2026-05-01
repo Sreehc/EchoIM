@@ -71,10 +71,21 @@
   --control-height-lg: 46px;
   --control-height-xl: 54px;
 
+  --text-2xs: 0.62rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.875rem;
+  --text-lg: 0.96rem;
+  --text-xl: 1.12rem;
+  --text-2xl: 1.42rem;
+
   --font-title-lg: 640 1.9rem/0.94 var(--font-display);
   --font-title-md: 620 1.12rem/1.02 var(--font-display);
   --font-title-sm: 620 0.92rem/1.12 var(--font-display);
   --font-eyebrow: 600 0.66rem/1 var(--font-mono);
+
+  --btn-min-size: 40px;
+  --btn-icon-size: 40px;
 
   --motion-fast: var(--motion-duration-fast);
   --motion-base: var(--motion-duration-base);
@@ -130,17 +141,15 @@
   --chat-stage-bottom: rgba(240, 244, 249, 0.92);
   --chat-stage-glow: rgba(79, 110, 232, 0.06);
 
-  --chat-wallpaper-image: url('/wallpapers/windy-hill-light.svg');
-  --chat-wallpaper-opacity: 0.028;
 }
 
 :root[data-theme='dark'] {
   --surface-canvas: #0d1627;
   --surface-subtle: #101b30;
-  --surface-panel: rgba(17, 28, 49, 0.86);
-  --surface-card: rgba(23, 35, 57, 0.92);
-  --surface-raised: #1d2a43;
-  --surface-overlay: rgba(24, 37, 59, 0.96);
+  --surface-panel: rgba(13, 21, 40, 0.80);
+  --surface-card: rgba(28, 43, 72, 0.90);
+  --surface-raised: #2d4468;
+  --surface-overlay: rgba(32, 48, 78, 0.96);
   --surface-inverse: #f8fafc;
 
   --text-primary: #eef2f7;
@@ -181,7 +190,4 @@
   --chat-stage-top: rgba(18, 30, 51, 0.26);
   --chat-stage-bottom: rgba(10, 18, 31, 0.48);
   --chat-stage-glow: rgba(144, 168, 255, 0.08);
-
-  --chat-wallpaper-image: url('/wallpapers/windy-hill-dark.svg');
-  --chat-wallpaper-opacity: 0.026;
 }
