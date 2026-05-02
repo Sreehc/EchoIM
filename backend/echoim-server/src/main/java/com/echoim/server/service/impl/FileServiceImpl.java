@@ -40,6 +40,7 @@ public class FileServiceImpl implements FileService {
     private static final int BIZ_TYPE_AVATAR = 1;
     private static final int BIZ_TYPE_IMAGE = 2;
     private static final int BIZ_TYPE_FILE = 4;
+    private static final int BIZ_TYPE_AUDIO = 5;
 
     private final ImFileMapper imFileMapper;
     private final FileProperties fileProperties;
@@ -268,13 +269,19 @@ public class FileServiceImpl implements FileService {
 
     private int resolveBizType(MultipartFile file, Integer bizType) {
         if (bizType != null) {
-            if (bizType != BIZ_TYPE_AVATAR && bizType != BIZ_TYPE_IMAGE && bizType != BIZ_TYPE_FILE) {
-                throw new BizException(ErrorCode.PARAM_ERROR, "bizType 仅支持头像、图片或文件");
+            if (bizType != BIZ_TYPE_AVATAR && bizType != BIZ_TYPE_IMAGE && bizType != BIZ_TYPE_FILE && bizType != BIZ_TYPE_AUDIO) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "bizType 仅支持头像、图片、音频或文件");
             }
             return bizType;
         }
         String contentType = file.getContentType();
-        return contentType != null && contentType.startsWith("image/") ? BIZ_TYPE_IMAGE : BIZ_TYPE_FILE;
+        if (contentType != null && contentType.startsWith("image/")) {
+            return BIZ_TYPE_IMAGE;
+        }
+        if (contentType != null && contentType.startsWith("audio/")) {
+            return BIZ_TYPE_AUDIO;
+        }
+        return BIZ_TYPE_FILE;
     }
 
     private byte[] readBytes(MultipartFile file) {
@@ -309,6 +316,16 @@ public class FileServiceImpl implements FileService {
                 }
             } catch (IOException ex) {
                 throw new BizException(ErrorCode.PARAM_ERROR, "图片内容不合法");
+            }
+            return;
+        }
+
+        if (resolvedBizType == BIZ_TYPE_AUDIO) {
+            validateWhitelist(ext, detectedContentType, fileProperties.getAllowedAudioExtensions(), fileProperties.getAllowedAudioContentTypes());
+            if (clientContentType != null
+                    && !"application/octet-stream".equals(clientContentType)
+                    && !fileProperties.getAllowedAudioContentTypes().contains(clientContentType)) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "音频类型不合法");
             }
             return;
         }

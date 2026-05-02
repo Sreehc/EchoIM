@@ -503,6 +503,7 @@ export const useChatStore = defineStore('chat', () => {
     file?: ChatFile | null
     replySource?: MessageReplySource | null
     sticker?: ChatMessage['sticker']
+    voice?: ChatMessage['voice']
   }) {
     const conversation = activeConversation.value
     const nextMsgType = payload.msgType ?? 'TEXT'
@@ -512,6 +513,7 @@ export const useChatStore = defineStore('chat', () => {
     if (nextMsgType === 'TEXT' && !nextContent) return
     if ((nextMsgType === 'IMAGE' || nextMsgType === 'GIF' || nextMsgType === 'FILE') && !payload.fileId) return
     if (nextMsgType === 'STICKER' && !payload.sticker?.stickerId) return
+    if (nextMsgType === 'VOICE' && !payload.fileId) return
     if (!conversation.canSend) {
       errors.value.noticeMessage = '当前频道仅创建者可发送消息'
       return
@@ -544,6 +546,7 @@ export const useChatStore = defineStore('chat', () => {
       replySource: payload.replySource ?? null,
       reactions: [],
       sticker: payload.sticker ?? null,
+      voice: nextMsgType === 'VOICE' ? (payload.voice ?? null) : null,
       errorMessage: null,
     }
 
@@ -1161,6 +1164,9 @@ export const useChatStore = defineStore('chat', () => {
     }
     if (message.sticker) {
       extra.sticker = message.sticker
+    }
+    if (message.voice) {
+      extra.voice = message.voice
     }
     return Object.keys(extra).length ? extra : undefined
   }

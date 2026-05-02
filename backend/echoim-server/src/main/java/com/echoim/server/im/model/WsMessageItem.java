@@ -7,6 +7,7 @@ import com.echoim.server.vo.message.MessageForwardSourceVo;
 import com.echoim.server.vo.message.MessageReactionStatVo;
 import com.echoim.server.vo.message.MessageReplySourceVo;
 import com.echoim.server.vo.message.StickerPayloadVo;
+import com.echoim.server.vo.message.VoicePayloadVo;
 
 public class WsMessageItem {
 
@@ -37,6 +38,7 @@ public class WsMessageItem {
     private MessageReplySourceVo replySource;
     private java.util.List<MessageReactionStatVo> reactions;
     private StickerPayloadVo sticker;
+    private VoicePayloadVo voice;
 
     public Long getMessageId() {
         return messageId;
@@ -252,5 +254,13 @@ public class WsMessageItem {
 
     public void setSticker(StickerPayloadVo sticker) {
         this.sticker = sticker;
+    }
+
+    public VoicePayloadVo getVoice() {
+        return voice;
+    }
+
+    public void setVoice(VoicePayloadVo voice) {
+        this.voice = voice;
     }
 }

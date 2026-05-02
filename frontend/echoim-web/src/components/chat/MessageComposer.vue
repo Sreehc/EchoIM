@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import { ChatDotRound, Close, Paperclip } from '@element-plus/icons-vue'
 import type { StickerDefinition } from '@/types/chat'
+import type { VoiceRecordResult } from './VoiceRecorder.vue'
+import VoiceRecorder from './VoiceRecorder.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +30,7 @@ const emit = defineEmits<{
   send: [content: string]
   'upload-file': [file: File]
   'send-sticker': [sticker: StickerDefinition]
+  'send-voice': [result: VoiceRecordResult]
   'cancel-reply': []
   typing: []
 }>()
@@ -36,6 +39,7 @@ const draft = ref('')
 const hasText = computed(() => Boolean(draft.value.trim()))
 const fileInput = ref<HTMLInputElement | null>(null)
 const stickerTrayOpen = ref(false)
+const voiceRecorderOpen = ref(false)
 const replyPreview = computed(() => props.replyingMessage?.content || props.replyingMessage?.file?.fileName || '原消息')
 
 function submit() {
@@ -80,6 +84,23 @@ function sendSticker(sticker: StickerDefinition) {
   stickerTrayOpen.value = false
   emit('send-sticker', sticker)
 }
+
+function toggleVoiceRecorder() {
+  if (!props.canSend) return
+  voiceRecorderOpen.value = !voiceRecorderOpen.value
+  if (voiceRecorderOpen.value) {
+    stickerTrayOpen.value = false
+  }
+}
+
+function handleVoiceSend(result: VoiceRecordResult) {
+  voiceRecorderOpen.value = false
+  emit('send-voice', result)
+}
+
+function handleVoiceCancel() {
+  voiceRecorderOpen.value = false
+}
 </script>
 
 <template>
@@ -91,6 +112,9 @@ function sendSticker(sticker: StickerDefinition) {
           <button type="button" @click="emit('cancel-reply')">取消</button>
         </div>
         <div v-if="attachmentError" class="composer__error">{{ attachmentError }}</div>
+      </div>
+      <div v-if="voiceRecorderOpen" class="composer__voice-panel">
+        <VoiceRecorder @send="handleVoiceSend" @cancel="handleVoiceCancel" />
       </div>
       <div v-if="stickerTrayOpen" class="composer__stickers">
         <div class="composer__stickers-header">
@@ -117,6 +141,21 @@ function sendSticker(sticker: StickerDefinition) {
         </button>
         <button class="composer__icon" type="button" aria-label="附件" :disabled="attachmentUploading" @click="openFilePicker">
           <Paperclip />
+        </button>
+        <button
+          class="composer__icon"
+          :class="{ 'is-active': voiceRecorderOpen }"
+          type="button"
+          aria-label="语音录制"
+          data-testid="voice-recorder-toggle"
+          @click="toggleVoiceRecorder"
+        >
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M5 11a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="8" y1="22" x2="16" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
         </button>
         <el-input
           v-model="draft"
@@ -164,6 +203,10 @@ function sendSticker(sticker: StickerDefinition) {
   grid-column: 1 / -1;
   display: grid;
   gap: 8px;
+}
+
+.composer__voice-panel {
+  grid-column: 1 / -1;
 }
 
 .composer__stickers {
@@ -313,6 +356,12 @@ function sendSticker(sticker: StickerDefinition) {
   color: var(--text-primary);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
   transform: translateY(-1px);
+}
+
+.composer__icon.is-active {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, var(--surface-panel));
+  border-color: color-mix(in srgb, var(--interactive-primary-bg) 30%, var(--border-default));
+  color: var(--interactive-primary-bg);
 }
 
 .composer__bar :deep(.el-textarea) {

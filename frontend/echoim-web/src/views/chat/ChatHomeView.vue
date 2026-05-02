@@ -8,6 +8,7 @@ import ChatTopbar from '@/components/chat/ChatTopbar.vue'
 import CallOverlay from '@/components/chat/CallOverlay.vue'
 import MessagePane from '@/components/chat/MessagePane.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
+import type { VoiceRecordResult } from '@/components/chat/VoiceRecorder.vue'
 import ConversationProfileDrawer from '@/components/chat/ConversationProfileDrawer.vue'
 import AvatarBadge from '@/components/chat/AvatarBadge.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -1290,6 +1291,35 @@ async function handleSendSticker(sticker: StickerDefinition) {
   }
 }
 
+async function handleSendVoiceMessage(result: VoiceRecordResult) {
+  attachmentUploading.value = true
+  attachmentError.value = null
+
+  try {
+    const ext = result.blob.type.includes('webm') ? 'webm' : result.blob.type.includes('ogg') ? 'ogg' : 'm4a'
+    const file = new File([result.blob], `voice-${Date.now()}.${ext}`, { type: result.blob.type })
+    const uploaded = await uploadFile(file, 5)
+
+    await chatStore.sendMessage({
+      currentUserId: authStore.currentUser?.userId ?? 0,
+      content: null,
+      msgType: 'VOICE',
+      fileId: uploaded.fileId,
+      file: uploaded,
+      replySource: toReplySource(replyingMessage.value),
+      voice: {
+        duration: result.duration,
+        waveform: result.waveform,
+      },
+    })
+    clearReplyMessage()
+  } catch (error) {
+    attachmentError.value = error instanceof Error ? error.message : '语音发送失败'
+  } finally {
+    attachmentUploading.value = false
+  }
+}
+
 async function handleCheckUsername(username: string) {
   const normalized = username.trim()
   if (!normalized) {
@@ -1641,6 +1671,7 @@ function registerDebugHooks() {
             @send="handleSendTextMessage"
             @upload-file="handleUploadAttachment"
             @send-sticker="handleSendSticker"
+            @send-voice="handleSendVoiceMessage"
             @typing="handleTypingInput"
           />
         </div>

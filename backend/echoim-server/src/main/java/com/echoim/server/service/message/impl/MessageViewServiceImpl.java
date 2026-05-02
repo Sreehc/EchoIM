@@ -11,6 +11,7 @@ import com.echoim.server.vo.message.MessageReactionStatVo;
 import com.echoim.server.vo.message.MessageReplySourceVo;
 import com.echoim.server.vo.message.MessageReceiptStatVo;
 import com.echoim.server.vo.message.StickerPayloadVo;
+import com.echoim.server.vo.message.VoicePayloadVo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -142,6 +143,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setForwardSource(readForwardSource(extraMap.get("forwardSource")));
         item.setReplySource(readReplySource(extraMap.get("replySource")));
         item.setSticker(readSticker(extraMap.get("sticker")));
+        item.setVoice(readVoice(extraMap.get("voice")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -150,6 +152,7 @@ public class MessageViewServiceImpl implements MessageViewService {
             item.setFileId(null);
             item.setFile(null);
             item.setMsgType("SYSTEM");
+            item.setVoice(null);
         }
     }
 
@@ -163,6 +166,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setForwardSource(readForwardSource(extraMap.get("forwardSource")));
         item.setReplySource(readReplySource(extraMap.get("replySource")));
         item.setSticker(readSticker(extraMap.get("sticker")));
+        item.setVoice(readVoice(extraMap.get("voice")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -171,6 +175,7 @@ public class MessageViewServiceImpl implements MessageViewService {
             item.setFileId(null);
             item.setFile(null);
             item.setMsgType("SYSTEM");
+            item.setVoice(null);
         }
     }
 
@@ -207,6 +212,13 @@ public class MessageViewServiceImpl implements MessageViewService {
             return null;
         }
         return objectMapper.convertValue(value, StickerPayloadVo.class);
+    }
+
+    private VoicePayloadVo readVoice(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return objectMapper.convertValue(value, VoicePayloadVo.class);
     }
 
     private Map<Long, List<MessageReactionStatVo>> loadReactionMap(List<Long> messageIds, Long viewerUserId) {

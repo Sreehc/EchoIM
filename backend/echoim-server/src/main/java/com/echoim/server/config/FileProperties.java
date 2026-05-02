@@ -30,6 +30,20 @@ public class FileProperties {
     private List<String> allowedFileExtensions = new ArrayList<>(List.of(
             "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip"
     ));
+    private List<String> allowedAudioContentTypes = new ArrayList<>(List.of(
+            "audio/webm",
+            "audio/ogg",
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/mp4",
+            "audio/aac",
+            "audio/flac"
+    ));
+    private List<String> allowedAudioExtensions = new ArrayList<>(List.of(
+            "webm", "ogg", "mp3", "wav", "m4a", "aac", "flac"
+    ));
     private Oss oss = new Oss();
     private Local local = new Local();
 
@@ -103,6 +117,22 @@ public class FileProperties {
 
     public void setAllowedFileExtensions(List<String> allowedFileExtensions) {
         this.allowedFileExtensions = allowedFileExtensions;
+    }
+
+    public List<String> getAllowedAudioContentTypes() {
+        return allowedAudioContentTypes;
+    }
+
+    public void setAllowedAudioContentTypes(List<String> allowedAudioContentTypes) {
+        this.allowedAudioContentTypes = allowedAudioContentTypes;
+    }
+
+    public List<String> getAllowedAudioExtensions() {
+        return allowedAudioExtensions;
+    }
+
+    public void setAllowedAudioExtensions(List<String> allowedAudioExtensions) {
+        this.allowedAudioExtensions = allowedAudioExtensions;
     }
 
     public Oss getOss() {

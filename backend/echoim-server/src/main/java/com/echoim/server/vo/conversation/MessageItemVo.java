@@ -4,6 +4,7 @@ import com.echoim.server.vo.message.MessageForwardSourceVo;
 import com.echoim.server.vo.message.MessageReactionStatVo;
 import com.echoim.server.vo.message.MessageReplySourceVo;
 import com.echoim.server.vo.message.StickerPayloadVo;
+import com.echoim.server.vo.message.VoicePayloadVo;
 import java.time.LocalDateTime;
 
 import com.echoim.server.vo.file.FileInfoVo;
@@ -38,6 +39,7 @@ public class MessageItemVo {
     private MessageReplySourceVo replySource;
     private java.util.List<MessageReactionStatVo> reactions;
     private StickerPayloadVo sticker;
+    private VoicePayloadVo voice;
     @JsonIgnore
     private String extraJsonRaw;
 
@@ -255,6 +257,14 @@ public class MessageItemVo {
 
     public void setSticker(StickerPayloadVo sticker) {
         this.sticker = sticker;
+    }
+
+    public VoicePayloadVo getVoice() {
+        return voice;
+    }
+
+    public void setVoice(VoicePayloadVo voice) {
+        this.voice = voice;
     }
 
     public String getExtraJsonRaw() {

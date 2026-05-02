@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS im_conversation_user (
 CREATE TABLE IF NOT EXISTS im_file (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '文件ID',
   owner_user_id BIGINT NOT NULL COMMENT '上传用户ID',
-  biz_type TINYINT NOT NULL COMMENT '1头像 2图片 3视频 4普通文件',
+  biz_type TINYINT NOT NULL COMMENT '1头像 2图片 3视频 4普通文件 5音频',
   storage_type VARCHAR(20) NOT NULL DEFAULT 'local' COMMENT 'local/minio/oss',
   bucket_name VARCHAR(100) DEFAULT NULL COMMENT '桶名',
   object_key VARCHAR(255) NOT NULL COMMENT '对象路径',
@@ -183,7 +183,7 @@ CREATE TABLE IF NOT EXISTS im_message (
   from_user_id BIGINT NOT NULL COMMENT '发送人ID',
   to_user_id BIGINT DEFAULT NULL COMMENT '接收人ID，单聊时使用',
   group_id BIGINT DEFAULT NULL COMMENT '群ID，群聊时使用',
-  msg_type TINYINT NOT NULL COMMENT '1文本 2表情 3图片 4视频 5文件 6系统消息',
+  msg_type TINYINT NOT NULL COMMENT '1文本 2表情 3图片 4GIF 5文件 6系统消息 7语音',
   content TEXT DEFAULT NULL COMMENT '消息内容',
   extra_json JSON DEFAULT NULL COMMENT '扩展数据',
   file_id BIGINT DEFAULT NULL COMMENT '文件ID',

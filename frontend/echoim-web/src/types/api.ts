@@ -22,6 +22,7 @@ import type {
   FriendListItem,
   MessageReactionStat,
   StickerPayload,
+  VoicePayload,
   SpecialConversationType,
   TrustedDeviceSummary,
   UpdateCurrentUserProfilePayload,
@@ -134,6 +135,7 @@ export interface ApiMessageItem {
   replySource?: MessageReplySource | null
   reactions?: MessageReactionStat[] | null
   sticker?: StickerPayload | null
+  voice?: VoicePayload | null
 }
 
 export interface ApiOfflineSyncConversation {

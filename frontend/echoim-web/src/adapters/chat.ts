@@ -13,6 +13,7 @@ import type {
   MessageReactionStat,
   MessageReplySource,
   StickerPayload,
+  VoicePayload,
 } from '@/types/chat'
 import { normalizeDisplayText } from '@/utils/text'
 
@@ -80,6 +81,14 @@ function adaptSticker(sticker: StickerPayload | null | undefined): StickerPayloa
   }
 }
 
+function adaptVoice(voice: VoicePayload | null | undefined): VoicePayload | null {
+  if (!voice) return null
+  return {
+    duration: Number(voice.duration ?? 0),
+    waveform: Array.isArray(voice.waveform) ? voice.waveform.map(Number) : [],
+  }
+}
+
 export function adaptConversationSummary(
   item: ApiConversationItem,
 ): ConversationSummary {
@@ -136,6 +145,7 @@ export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
     replySource: adaptReplySource(item.replySource),
     reactions: adaptReactionStats(item.reactions),
     sticker: adaptSticker(item.sticker),
+    voice: adaptVoice(item.voice),
     errorMessage: null,
   }
 }
@@ -159,6 +169,10 @@ export function messagePreviewFromMessage(message: ChatMessage): string {
 
   if (message.msgType === 'FILE') {
     return message.file?.fileName ? `[文件] ${message.file.fileName}` : '[文件]'
+  }
+
+  if (message.msgType === 'VOICE') {
+    return '[语音]'
   }
 
   if (message.msgType === 'SYSTEM') {

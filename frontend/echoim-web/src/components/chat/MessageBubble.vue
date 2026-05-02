@@ -5,6 +5,7 @@ import type { ChatMessage, ConversationType } from '@/types/chat'
 import { formatMessageTime, highlightText } from '@/utils/format'
 import { findStickerDefinition } from '@/stickers/library'
 import AvatarBadge from './AvatarBadge.vue'
+import VoicePlayer from './VoicePlayer.vue'
 
 const props = defineProps<{
   message: ChatMessage
@@ -444,6 +445,16 @@ onUnmounted(() => {
               下载文件
             </button>
           </div>
+        </div>
+      </template>
+      <template v-else-if="message.msgType === 'VOICE'">
+        <div class="message-bubble__voice">
+          <VoicePlayer
+            :audio-url="message.file?.downloadUrl ?? null"
+            :duration="message.voice?.duration ?? 0"
+            :waveform="message.voice?.waveform ?? []"
+            :self="isSelf"
+          />
         </div>
       </template>
       <template v-else>
@@ -1012,6 +1023,11 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.message-bubble__voice {
+  min-width: 220px;
+  padding: 4px 2px;
 }
 
 .message-bubble__gif-badge {

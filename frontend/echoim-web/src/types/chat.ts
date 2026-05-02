@@ -118,7 +118,7 @@ export interface SecurityEventSummary {
 }
 
 export type ConversationType = 1 | 2 | 3
-export type MessageType = 'TEXT' | 'STICKER' | 'IMAGE' | 'GIF' | 'FILE' | 'SYSTEM'
+export type MessageType = 'TEXT' | 'STICKER' | 'IMAGE' | 'GIF' | 'FILE' | 'SYSTEM' | 'VOICE'
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'ready' | 'reconnecting'
 export type CallType = 'audio'
 export type CallSessionStatus = 'ringing' | 'accepted' | 'rejected' | 'cancelled' | 'ended' | 'missed' | 'failed'
@@ -222,6 +222,7 @@ export interface ChatMessage {
   replySource?: MessageReplySource | null
   reactions?: MessageReactionStat[]
   sticker?: StickerPayload | null
+  voice?: VoicePayload | null
   errorMessage?: string | null
 }
 
@@ -239,6 +240,11 @@ export interface StickerPayload {
 export interface StickerDefinition extends StickerPayload {
   svg: string
   accent: string
+}
+
+export interface VoicePayload {
+  duration: number
+  waveform: number[]
 }
 
 export interface MessageForwardSource {

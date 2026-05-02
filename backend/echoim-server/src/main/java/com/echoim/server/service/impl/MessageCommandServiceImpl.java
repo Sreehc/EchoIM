@@ -50,6 +50,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     private static final int MESSAGE_TYPE_GIF = 4;
     private static final int MESSAGE_TYPE_FILE = 5;
     private static final int MESSAGE_TYPE_SYSTEM = 6;
+    private static final int MESSAGE_TYPE_VOICE = 7;
     private static final int MESSAGE_STATUS_RECALLED = 3;
     private static final String CONFIG_KEY_RECALL_SECONDS = "message.recall-seconds";
     private static final String SAVED_BIZ_KEY_PREFIX = "saved_";
@@ -307,6 +308,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
             case MESSAGE_TYPE_IMAGE -> "[图片]";
             case MESSAGE_TYPE_GIF -> "[GIF]";
             case MESSAGE_TYPE_FILE -> "[文件]";
+            case MESSAGE_TYPE_VOICE -> "[语音]";
             default -> sourceMessage.getContent();
         };
     }
@@ -318,6 +320,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
             case MESSAGE_TYPE_GIF -> "GIF";
             case MESSAGE_TYPE_FILE -> "FILE";
             case MESSAGE_TYPE_SYSTEM -> "SYSTEM";
+            case MESSAGE_TYPE_VOICE -> "VOICE";
             default -> "TEXT";
         };
     }

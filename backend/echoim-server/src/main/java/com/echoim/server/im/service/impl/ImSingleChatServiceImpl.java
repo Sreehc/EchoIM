@@ -51,8 +51,10 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private static final int MESSAGE_TYPE_IMAGE = 3;
     private static final int MESSAGE_TYPE_GIF = 4;
     private static final int MESSAGE_TYPE_FILE = 5;
+    private static final int MESSAGE_TYPE_VOICE = 7;
     private static final int FILE_BIZ_TYPE_IMAGE = 2;
     private static final int FILE_BIZ_TYPE_FILE = 4;
+    private static final int FILE_BIZ_TYPE_AUDIO = 5;
     private static final int MESSAGE_STATUS_SENT = 1;
     private static final int RECEIPT_TYPE_DELIVERED = 1;
     private static final int RECEIPT_TYPE_READ = 2;
@@ -221,8 +223,11 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (msgType == MESSAGE_TYPE_TEXT && !StringUtils.hasText(data.getContent())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文本消息内容不能为空");
         }
-        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE) && data.getFileId() == null) {
+        if ((msgType == MESSAGE_TYPE_IMAGE || msgType == MESSAGE_TYPE_GIF || msgType == MESSAGE_TYPE_FILE || msgType == MESSAGE_TYPE_VOICE) && data.getFileId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件消息必须传 fileId");
+        }
+        if (msgType == MESSAGE_TYPE_VOICE) {
+            validateVoiceExtra(data);
         }
         if (msgType == MESSAGE_TYPE_STICKER) {
             normalizeStickerExtra(data);
@@ -290,6 +295,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if ("FILE".equalsIgnoreCase(msgType)) {
             return MESSAGE_TYPE_FILE;
         }
+        if ("VOICE".equalsIgnoreCase(msgType)) {
+            return MESSAGE_TYPE_VOICE;
+        }
         throw new BizException(ErrorCode.PARAM_ERROR, "不支持的消息类型");
     }
 
@@ -308,6 +316,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         }
         if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(msgType)) {
             return "FILE";
+        }
+        if (Integer.valueOf(MESSAGE_TYPE_VOICE).equals(msgType)) {
+            return "VOICE";
         }
         return "UNKNOWN";
     }
@@ -339,6 +350,9 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (msgType == MESSAGE_TYPE_FILE) {
             return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_FILE);
         }
+        if (msgType == MESSAGE_TYPE_VOICE) {
+            return fileService.requireOwnedFile(userId, data.getFileId(), FILE_BIZ_TYPE_AUDIO);
+        }
         return null;
     }
 
@@ -359,6 +373,24 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         data.setExtraJson(extraMap);
     }
 
+    @SuppressWarnings("unchecked")
+    private void validateVoiceExtra(WsChatSingleData data) {
+        Object extra = data.getExtraJson();
+        if (extra instanceof Map<?, ?> rawMap) {
+            Map<String, Object> extraMap = new LinkedHashMap<>();
+            rawMap.forEach((key, value) -> extraMap.put(String.valueOf(key), value));
+            Object duration = extraMap.get("duration");
+            if (duration != null) {
+                double durationVal = ((Number) duration).doubleValue();
+                if (durationVal < 0 || durationVal > 60) {
+                    throw new BizException(ErrorCode.PARAM_ERROR, "语音时长必须在0-60秒之间");
+                }
+                extraMap.put("duration", durationVal);
+            }
+            data.setExtraJson(extraMap);
+        }
+    }
+
     private String preview(ImMessageEntity entity, ImFileEntity messageFile) {
         String preview;
         if (Integer.valueOf(MESSAGE_TYPE_STICKER).equals(entity.getMsgType())) {
@@ -369,6 +401,8 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
             preview = "[图片]";
         } else if (Integer.valueOf(MESSAGE_TYPE_FILE).equals(entity.getMsgType())) {
             preview = "[文件] " + (messageFile == null ? "" : messageFile.getFileName());
+        } else if (Integer.valueOf(MESSAGE_TYPE_VOICE).equals(entity.getMsgType())) {
+            preview = "[语音]";
         } else {
             preview = entity.getContent();
         }

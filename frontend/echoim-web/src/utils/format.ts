@@ -57,3 +57,13 @@ export function highlightText(value: string, keyword: string) {
 
   return segments
 }
+
+export function formatVoiceDuration(seconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(seconds))
+  if (totalSeconds < 60) {
+    return `${totalSeconds}"`
+  }
+  const minutes = Math.floor(totalSeconds / 60)
+  const remaining = totalSeconds % 60
+  return `${minutes}'${remaining.toString().padStart(2, '0')}"`
+}
