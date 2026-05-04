@@ -250,10 +250,13 @@ location /ws/ {
 
 项目详细文档位于 `docs/` 目录：
 
-- [开发文档](docs/EchoIM%20开发文档.md) — 架构设计与开发规范
-- [接口文档](docs/接口文档.md) — REST API 与 WebSocket 协议
-- [部署文档](docs/部署文档.md) — 完整部署指南
-- [一期路线图](docs/development-roadmap.md) — 一期五阶段开发规划
+- [系统架构](docs/architecture/) — 技术架构、分层设计、数据流
+- [接口文档](docs/api/) — REST API 与 WebSocket 协议
+- [数据库设计](docs/database/) — 表结构、索引策略、Redis 使用
+- [部署指南](docs/deployment/) — 本地开发、Docker、Nginx、生产部署
+- [产品需求](docs/prd/) — 功能清单、非功能需求
+- [用户指南](docs/user-manual/) — 功能使用说明
+- [UI/UX 设计](docs/design/) — 设计系统、布局、交互设计
 - [二期路线图](docs/phase2-roadmap.md) — 二期六至十一阶段开发规划
 
 ## 许可证

@@ -6,6 +6,4 @@
 backend/echoim-server/src/main/resources/application-local.yml
 .env
 
-# Development docs
-/docs/
-/*文档.md
+# Old development docs (removed)
