@@ -1,14 +1,24 @@
 package com.echoim.server.vo.group;
 
-public class GroupMemberItemVo {
+import java.time.LocalDateTime;
 
+public class GroupJoinRequestItemVo {
+
+    private Long requestId;
     private Long userId;
     private String userNo;
     private String nickname;
     private String avatarUrl;
-    private Integer role;
-    private Integer status;
-    private String muteUntil;
+    private String applyMsg;
+    private LocalDateTime createdAt;
+
+    public Long getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(Long requestId) {
+        this.requestId = requestId;
+    }
 
     public Long getUserId() {
         return userId;
@@ -42,27 +52,19 @@ public class GroupMemberItemVo {
         this.avatarUrl = avatarUrl;
     }
 
-    public Integer getRole() {
-        return role;
+    public String getApplyMsg() {
+        return applyMsg;
     }
 
-    public void setRole(Integer role) {
-        this.role = role;
+    public void setApplyMsg(String applyMsg) {
+        this.applyMsg = applyMsg;
     }
 
-    public Integer getStatus() {
-        return status;
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
 
-    public void setStatus(Integer status) {
-        this.status = status;
-    }
-
-    public String getMuteUntil() {
-        return muteUntil;
-    }
-
-    public void setMuteUntil(String muteUntil) {
-        this.muteUntil = muteUntil;
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

@@ -334,6 +334,7 @@ export interface GroupMemberItem {
   avatarUrl: string | null
   role: number
   status: number
+  muteUntil: string | null
 }
 
 export interface GroupUpdatePayload {

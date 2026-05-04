@@ -17,6 +17,13 @@ public final class ErrorCode {
     public static final int USERNAME_EXISTS = 40901;
     public static final int FRIEND_REQUEST_DUPLICATE = 40902;
     public static final int ALREADY_FRIEND = 40903;
+    public static final int INVITE_LINK_NOT_FOUND = 40405;
+    public static final int INVITE_LINK_EXPIRED = 40904;
+    public static final int INVITE_LINK_EXHAUSTED = 40905;
+    public static final int ALREADY_IN_GROUP = 40906;
+    public static final int JOIN_REQUEST_PENDING = 40907;
+    public static final int JOIN_REQUEST_NOT_FOUND = 40406;
+    public static final int MEMBER_MUTED = 40301;
     public static final int SYSTEM_ERROR = 50000;
 
     private ErrorCode() {

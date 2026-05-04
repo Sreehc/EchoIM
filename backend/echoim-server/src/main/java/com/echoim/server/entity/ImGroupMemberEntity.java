@@ -18,6 +18,7 @@ public class ImGroupMemberEntity {
     private Integer joinSource;
     private LocalDateTime joinAt;
     private Integer status;
+    private LocalDateTime muteUntil;
     private LocalDateTime updatedAt;
 
     public Long getId() {
@@ -82,6 +83,14 @@ public class ImGroupMemberEntity {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public LocalDateTime getMuteUntil() {
+        return muteUntil;
+    }
+
+    public void setMuteUntil(LocalDateTime muteUntil) {
+        this.muteUntil = muteUntil;
     }
 
     public LocalDateTime getUpdatedAt() {

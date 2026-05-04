@@ -13,6 +13,7 @@
         join_source AS joinSource,
         join_at AS joinAt,
         status,
+        mute_until AS muteUntil,
         updated_at AS updatedAt
     </sql>
 
@@ -47,7 +48,8 @@
                COALESCE(NULLIF(gm.nick_name, ''), u.nickname) AS nickname,
                u.avatar_url AS avatarUrl,
                gm.role AS role,
-               gm.status AS status
+               gm.status AS status,
+               gm.mute_until AS muteUntil
         FROM im_group_member gm
         JOIN im_user u ON u.id = gm.user_id
         WHERE gm.group_id = #{groupId}

@@ -5,17 +5,25 @@ import com.echoim.server.common.exception.BizException;
 import com.echoim.server.common.util.IdGenerator;
 import com.echoim.server.dto.group.AddGroupMembersRequestDto;
 import com.echoim.server.dto.group.CreateGroupRequestDto;
+import com.echoim.server.dto.group.CreateInviteLinkRequestDto;
+import com.echoim.server.dto.group.MuteMemberRequestDto;
+import com.echoim.server.dto.group.ReviewJoinRequestDto;
 import com.echoim.server.dto.group.UpdateGroupMemberRoleRequestDto;
 import com.echoim.server.dto.group.UpdateGroupRequestDto;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImGroupEntity;
+import com.echoim.server.entity.ImGroupInviteEntity;
+import com.echoim.server.entity.ImGroupJoinRequestEntity;
 import com.echoim.server.entity.ImGroupMemberEntity;
 import com.echoim.server.entity.ImMessageEntity;
+import com.echoim.server.entity.ImUserEntity;
 import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
+import com.echoim.server.mapper.ImGroupInviteMapper;
+import com.echoim.server.mapper.ImGroupJoinRequestMapper;
 import com.echoim.server.mapper.ImGroupMapper;
 import com.echoim.server.mapper.ImGroupMemberMapper;
 import com.echoim.server.mapper.ImMessageMapper;
@@ -23,7 +31,11 @@ import com.echoim.server.mapper.ImUserMapper;
 import com.echoim.server.service.group.GroupService;
 import com.echoim.server.vo.group.GroupCreateVo;
 import com.echoim.server.vo.group.GroupDetailVo;
+import com.echoim.server.vo.group.GroupInviteItemVo;
+import com.echoim.server.vo.group.GroupInviteLinkVo;
+import com.echoim.server.vo.group.GroupJoinRequestItemVo;
 import com.echoim.server.vo.group.GroupMemberItemVo;
+import com.echoim.server.vo.group.InvitePreviewVo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,6 +43,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -50,6 +63,13 @@ public class GroupServiceImpl implements GroupService {
     private static final int CONVERSATION_TYPE_GROUP = 2;
     private static final int CONVERSATION_TYPE_CHANNEL = 3;
     private static final int CONVERSATION_STATUS_NORMAL = 1;
+    private static final int INVITE_STATUS_ACTIVE = 1;
+    private static final int INVITE_STATUS_REVOKED = 2;
+    private static final int JOIN_REQUEST_PENDING = 0;
+    private static final int JOIN_REQUEST_APPROVED = 1;
+    private static final int JOIN_REQUEST_REJECTED = 2;
+    private static final int JOIN_SOURCE_INVITE_LINK = 3;
+    private static final int JOIN_SOURCE_JOIN_REQUEST = 4;
 
     private final ImGroupMapper imGroupMapper;
     private final ImGroupMemberMapper imGroupMemberMapper;
@@ -58,6 +78,8 @@ public class GroupServiceImpl implements GroupService {
     private final ImMessageMapper imMessageMapper;
     private final ImUserMapper imUserMapper;
     private final ImWsPushService imWsPushService;
+    private final ImGroupInviteMapper imGroupInviteMapper;
+    private final ImGroupJoinRequestMapper imGroupJoinRequestMapper;
 
     public GroupServiceImpl(ImGroupMapper imGroupMapper,
                             ImGroupMemberMapper imGroupMemberMapper,
@@ -65,7 +87,9 @@ public class GroupServiceImpl implements GroupService {
                             ImConversationUserMapper imConversationUserMapper,
                             ImMessageMapper imMessageMapper,
                             ImUserMapper imUserMapper,
-                            ImWsPushService imWsPushService) {
+                            ImWsPushService imWsPushService,
+                            ImGroupInviteMapper imGroupInviteMapper,
+                            ImGroupJoinRequestMapper imGroupJoinRequestMapper) {
         this.imGroupMapper = imGroupMapper;
         this.imGroupMemberMapper = imGroupMemberMapper;
         this.imConversationMapper = imConversationMapper;
@@ -73,6 +97,8 @@ public class GroupServiceImpl implements GroupService {
         this.imMessageMapper = imMessageMapper;
         this.imUserMapper = imUserMapper;
         this.imWsPushService = imWsPushService;
+        this.imGroupInviteMapper = imGroupInviteMapper;
+        this.imGroupJoinRequestMapper = imGroupJoinRequestMapper;
     }
 
     @Override
@@ -251,6 +277,249 @@ public class GroupServiceImpl implements GroupService {
         }
         group.setStatus(GROUP_STATUS_DISSOLVED);
         imGroupMapper.updateById(group);
+    }
+
+    // ==================== 7.3 邀请链接 ====================
+
+    @Override
+    @Transactional
+    public GroupInviteLinkVo createInviteLink(Long currentUserId, Long groupId, CreateInviteLinkRequestDto requestDto) {
+        requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权创建邀请链接");
+        }
+
+        ImGroupInviteEntity invite = new ImGroupInviteEntity();
+        invite.setGroupId(groupId);
+        invite.setToken(UUID.randomUUID().toString().replace("-", ""));
+        invite.setInviterUserId(currentUserId);
+        invite.setMaxUses(requestDto.getMaxUses());
+        invite.setCurrentUses(0);
+        if (requestDto.getExpireHours() != null && requestDto.getExpireHours() > 0) {
+            invite.setExpireAt(LocalDateTime.now().plusHours(requestDto.getExpireHours()));
+        }
+        invite.setStatus(INVITE_STATUS_ACTIVE);
+        invite.setCreatedAt(LocalDateTime.now());
+        invite.setUpdatedAt(LocalDateTime.now());
+        imGroupInviteMapper.insert(invite);
+
+        GroupInviteLinkVo vo = new GroupInviteLinkVo();
+        vo.setInviteId(invite.getId());
+        vo.setToken(invite.getToken());
+        vo.setUrl("/invite/" + invite.getToken());
+        vo.setMaxUses(invite.getMaxUses());
+        vo.setCurrentUses(0);
+        vo.setExpireAt(invite.getExpireAt());
+        vo.setCreatedAt(invite.getCreatedAt());
+        return vo;
+    }
+
+    @Override
+    public List<GroupInviteItemVo> listInviteLinks(Long currentUserId, Long groupId) {
+        requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权查看邀请链接");
+        }
+        return imGroupInviteMapper.selectActiveInvitesByGroupId(groupId);
+    }
+
+    @Override
+    @Transactional
+    public void revokeInviteLink(Long currentUserId, Long groupId, Long inviteId) {
+        requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权撤销邀请链接");
+        }
+        ImGroupInviteEntity invite = imGroupInviteMapper.selectById(inviteId);
+        if (invite == null || !invite.getGroupId().equals(groupId)) {
+            throw new BizException(ErrorCode.INVITE_LINK_NOT_FOUND, "邀请链接不存在");
+        }
+        invite.setStatus(INVITE_STATUS_REVOKED);
+        invite.setUpdatedAt(LocalDateTime.now());
+        imGroupInviteMapper.updateById(invite);
+    }
+
+    @Override
+    public InvitePreviewVo getInvitePreview(String token) {
+        ImGroupInviteEntity invite = imGroupInviteMapper.selectValidByToken(token);
+        if (invite == null) {
+            throw new BizException(ErrorCode.INVITE_LINK_NOT_FOUND, "邀请链接不存在或已失效");
+        }
+        ImGroupEntity group = imGroupMapper.selectById(invite.getGroupId());
+        if (group == null || !Integer.valueOf(GROUP_STATUS_NORMAL).equals(group.getStatus())) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "群组不存在");
+        }
+        ImUserEntity inviter = imUserMapper.selectById(invite.getInviterUserId());
+
+        InvitePreviewVo vo = new InvitePreviewVo();
+        vo.setGroupId(group.getId());
+        vo.setGroupName(group.getGroupName());
+        vo.setAvatarUrl(group.getAvatarUrl());
+        vo.setMemberCount(imGroupMemberMapper.countActiveMembers(group.getId()));
+        vo.setInviterNickname(inviter != null ? inviter.getNickname() : null);
+        return vo;
+    }
+
+    @Override
+    @Transactional
+    public void joinByInvite(Long currentUserId, String token) {
+        ImGroupInviteEntity invite = imGroupInviteMapper.selectValidByToken(token);
+        if (invite == null) {
+            throw new BizException(ErrorCode.INVITE_LINK_NOT_FOUND, "邀请链接不存在或已失效");
+        }
+        if (invite.getExpireAt() != null && invite.getExpireAt().isBefore(LocalDateTime.now())) {
+            throw new BizException(ErrorCode.INVITE_LINK_EXPIRED, "邀请链接已过期");
+        }
+        if (invite.getMaxUses() != null && invite.getCurrentUses() >= invite.getMaxUses()) {
+            throw new BizException(ErrorCode.INVITE_LINK_EXHAUSTED, "邀请链接已达使用上限");
+        }
+
+        Long groupId = invite.getGroupId();
+        ImGroupEntity group = requireNormalGroup(groupId);
+
+        ImGroupMemberEntity existing = imGroupMemberMapper.selectByGroupIdAndUserId(groupId, currentUserId);
+        if (existing != null && Integer.valueOf(MEMBER_STATUS_NORMAL).equals(existing.getStatus())) {
+            throw new BizException(ErrorCode.ALREADY_IN_GROUP, "已经是群成员");
+        }
+
+        ensureGroupMember(groupId, currentUserId, MEMBER_ROLE_MEMBER, JOIN_SOURCE_INVITE_LINK);
+        ImConversationEntity conversation = ensureCollectiveConversation(group);
+        ensureConversationUser(conversation.getId(), currentUserId, false);
+
+        invite.setCurrentUses(invite.getCurrentUses() + 1);
+        invite.setUpdatedAt(LocalDateTime.now());
+        imGroupInviteMapper.updateById(invite);
+
+        var conversationItem = imConversationMapper.selectConversationItemByUserId(conversation.getId(), currentUserId);
+        if (conversationItem != null) {
+            imWsPushService.pushConversationChange(currentUserId, "CONVERSATION_CREATED", conversationItem, null);
+        }
+    }
+
+    // ==================== 7.4 禁言 ====================
+
+    @Override
+    @Transactional
+    public void muteMember(Long currentUserId, Long groupId, Long userId, MuteMemberRequestDto requestDto) {
+        requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权禁言成员");
+        }
+        ImGroupMemberEntity target = requireActiveMember(groupId, userId);
+        if (Integer.valueOf(MEMBER_ROLE_OWNER).equals(target.getRole())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "不能禁言群主");
+        }
+        if (Integer.valueOf(MEMBER_ROLE_ADMIN).equals(target.getRole())
+                && !Integer.valueOf(MEMBER_ROLE_OWNER).equals(operator.getRole())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有群主可以禁言管理员");
+        }
+
+        LocalDateTime muteUntil = null;
+        if (requestDto.getDurationMinutes() != null && requestDto.getDurationMinutes() > 0) {
+            muteUntil = LocalDateTime.now().plusMinutes(requestDto.getDurationMinutes());
+        }
+        target.setMuteUntil(muteUntil);
+        target.setUpdatedAt(LocalDateTime.now());
+        imGroupMemberMapper.updateById(target);
+    }
+
+    @Override
+    @Transactional
+    public void unmuteMember(Long currentUserId, Long groupId, Long userId) {
+        requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权解除禁言");
+        }
+        ImGroupMemberEntity target = requireActiveMember(groupId, userId);
+        target.setMuteUntil(null);
+        target.setUpdatedAt(LocalDateTime.now());
+        imGroupMemberMapper.updateById(target);
+    }
+
+    // ==================== 7.4 入群审批 ====================
+
+    @Override
+    @Transactional
+    public void submitJoinRequest(Long currentUserId, Long groupId, String applyMsg) {
+        requireNormalGroup(groupId);
+
+        ImGroupMemberEntity existing = imGroupMemberMapper.selectByGroupIdAndUserId(groupId, currentUserId);
+        if (existing != null && Integer.valueOf(MEMBER_STATUS_NORMAL).equals(existing.getStatus())) {
+            throw new BizException(ErrorCode.ALREADY_IN_GROUP, "已经是群成员");
+        }
+
+        ImGroupJoinRequestEntity pending = imGroupJoinRequestMapper.selectPendingByGroupAndUser(groupId, currentUserId);
+        if (pending != null) {
+            throw new BizException(ErrorCode.JOIN_REQUEST_PENDING, "已有待审批的申请");
+        }
+
+        ImGroupJoinRequestEntity request = new ImGroupJoinRequestEntity();
+        request.setGroupId(groupId);
+        request.setUserId(currentUserId);
+        request.setApplyMsg(applyMsg);
+        request.setStatus(JOIN_REQUEST_PENDING);
+        request.setCreatedAt(LocalDateTime.now());
+        request.setUpdatedAt(LocalDateTime.now());
+        imGroupJoinRequestMapper.insert(request);
+
+        // Push notification to admins/owner
+        List<ImGroupMemberEntity> admins = imGroupMemberMapper.selectActiveMembersByGroupId(groupId);
+        ImUserEntity applicant = imUserMapper.selectById(currentUserId);
+        String notifyContent = (applicant != null ? applicant.getNickname() : "用户") + " 申请加入群聊";
+        for (ImGroupMemberEntity admin : admins) {
+            if (Integer.valueOf(MEMBER_ROLE_OWNER).equals(admin.getRole())
+                    || Integer.valueOf(MEMBER_ROLE_ADMIN).equals(admin.getRole())) {
+                imWsPushService.pushToUser(admin.getUserId(), WsMessageType.NOTICE, null, null,
+                        Map.of("type", "JOIN_REQUEST", "groupId", groupId, "requestId", request.getId()));
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void reviewJoinRequest(Long currentUserId, Long groupId, Long requestId, ReviewJoinRequestDto requestDto) {
+        ImGroupEntity group = requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权审批入群申请");
+        }
+
+        ImGroupJoinRequestEntity joinRequest = imGroupJoinRequestMapper.selectById(requestId);
+        if (joinRequest == null || !joinRequest.getGroupId().equals(groupId)
+                || !Integer.valueOf(JOIN_REQUEST_PENDING).equals(joinRequest.getStatus())) {
+            throw new BizException(ErrorCode.JOIN_REQUEST_NOT_FOUND, "申请不存在或已处理");
+        }
+
+        joinRequest.setStatus(requestDto.getApproved() ? JOIN_REQUEST_APPROVED : JOIN_REQUEST_REJECTED);
+        joinRequest.setHandledBy(currentUserId);
+        joinRequest.setHandledAt(LocalDateTime.now());
+        joinRequest.setUpdatedAt(LocalDateTime.now());
+        imGroupJoinRequestMapper.updateById(joinRequest);
+
+        if (requestDto.getApproved()) {
+            ensureGroupMember(groupId, joinRequest.getUserId(), MEMBER_ROLE_MEMBER, JOIN_SOURCE_JOIN_REQUEST);
+            ImConversationEntity conversation = ensureCollectiveConversation(group);
+            ensureConversationUser(conversation.getId(), joinRequest.getUserId(), false);
+            var conversationItem = imConversationMapper.selectConversationItemByUserId(conversation.getId(), joinRequest.getUserId());
+            if (conversationItem != null) {
+                imWsPushService.pushConversationChange(joinRequest.getUserId(), "CONVERSATION_CREATED", conversationItem, null);
+            }
+        }
+    }
+
+    @Override
+    public List<GroupJoinRequestItemVo> listPendingJoinRequests(Long currentUserId, Long groupId) {
+        requireNormalGroup(groupId);
+        ImGroupMemberEntity operator = requireActiveMember(groupId, currentUserId);
+        if (!canManageMembers(operator)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权查看入群申请");
+        }
+        return imGroupJoinRequestMapper.selectPendingItemsByGroupId(groupId);
     }
 
     private ImGroupEntity requireNormalGroup(Long groupId) {

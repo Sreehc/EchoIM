@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS im_group_member (
   nick_name VARCHAR(100) DEFAULT NULL COMMENT '群内昵称',
   join_source TINYINT NOT NULL DEFAULT 1 COMMENT '1创建群 2邀请加入 3申请加入',
   join_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+  mute_until DATETIME DEFAULT NULL COMMENT '禁言截止时间，NULL为未禁言',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '1正常 2退出 3移除',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uk_group_user (group_id, user_id),
@@ -233,6 +234,35 @@ CREATE TABLE IF NOT EXISTS im_message_pin (
   KEY idx_conversation (conversation_id),
   KEY idx_group (group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='消息置顶表';
+
+CREATE TABLE IF NOT EXISTS im_group_invite (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '邀请链接ID',
+  group_id BIGINT NOT NULL COMMENT '群组ID',
+  token VARCHAR(64) NOT NULL COMMENT '邀请令牌',
+  inviter_user_id BIGINT NOT NULL COMMENT '创建人ID',
+  max_uses INT DEFAULT NULL COMMENT '最大使用次数，NULL为不限',
+  current_uses INT NOT NULL DEFAULT 0 COMMENT '已使用次数',
+  expire_at DATETIME DEFAULT NULL COMMENT '过期时间，NULL为永不过期',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '1有效 2已撤销',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_token (token),
+  KEY idx_group_id (group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='群邀请链接表';
+
+CREATE TABLE IF NOT EXISTS im_group_join_request (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '入群申请ID',
+  group_id BIGINT NOT NULL COMMENT '群组ID',
+  user_id BIGINT NOT NULL COMMENT '申请人ID',
+  apply_msg VARCHAR(255) DEFAULT NULL COMMENT '申请留言',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '0待处理 1同意 2拒绝',
+  handled_by BIGINT DEFAULT NULL COMMENT '处理人ID',
+  handled_at DATETIME DEFAULT NULL COMMENT '处理时间',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '申请时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_group_status (group_id, status),
+  KEY idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='入群申请表';
 
 CREATE TABLE IF NOT EXISTS im_call_session (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '通话记录ID',

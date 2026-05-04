@@ -22,6 +22,10 @@ const emit = defineEmits<{
   'add-members': []
   'leave-group': []
   'dissolve-group': []
+  'manage-invites': []
+  'manage-join-requests': []
+  'mute-member': [payload: { userId: number; nickname: string }]
+  'unmute-member': [userId: number]
 }>()
 </script>
 
@@ -51,6 +55,10 @@ const emit = defineEmits<{
       @add-members="emit('add-members')"
       @leave-group="emit('leave-group')"
       @dissolve-group="emit('dissolve-group')"
+      @manage-invites="emit('manage-invites')"
+      @manage-join-requests="emit('manage-join-requests')"
+      @mute-member="emit('mute-member', $event)"
+      @unmute-member="emit('unmute-member', $event)"
     />
   </el-drawer>
 
@@ -70,6 +78,10 @@ const emit = defineEmits<{
       @add-members="emit('add-members')"
       @leave-group="emit('leave-group')"
       @dissolve-group="emit('dissolve-group')"
+      @manage-invites="emit('manage-invites')"
+      @manage-join-requests="emit('manage-join-requests')"
+      @mute-member="emit('mute-member', $event)"
+      @unmute-member="emit('unmute-member', $event)"
     />
   </aside>
 </template>

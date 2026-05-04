@@ -21,6 +21,11 @@ const router = createRouter({
       children: [{ path: ':username', name: 'public-profile', component: () => import('@/views/PublicProfileView.vue') }],
     },
     {
+      path: '/invite/:token',
+      name: 'invite',
+      component: () => import('@/views/InviteView.vue'),
+    },
+    {
       path: '/chat',
       component: () => import('@/layouts/ChatLayout.vue'),
       meta: { requiresAuth: true },

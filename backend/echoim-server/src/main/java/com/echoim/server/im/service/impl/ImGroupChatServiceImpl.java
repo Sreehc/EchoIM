@@ -113,6 +113,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         validateGroupConversation(conversation, data.getGroupId());
         validateGroup(data.getGroupId());
         ImGroupMemberEntity currentMember = requireActiveMember(data.getGroupId(), loginUser.getUserId());
+        validateNotMuted(currentMember);
         validateSendPermission(conversation, currentMember);
         ImFileEntity messageFile = validateAndLoadMessageFile(loginUser.getUserId(), data);
 
@@ -199,6 +200,12 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
             throw new BizException(ErrorCode.BUSINESS_CONFLICT, "不是有效成员，无法发送消息");
         }
         return member;
+    }
+
+    private void validateNotMuted(ImGroupMemberEntity member) {
+        if (member.getMuteUntil() != null && member.getMuteUntil().isAfter(LocalDateTime.now())) {
+            throw new BizException(ErrorCode.MEMBER_MUTED, "你已被禁言，无法发送消息");
+        }
     }
 
     private void validateSendPermission(ImConversationEntity conversation, ImGroupMemberEntity member) {

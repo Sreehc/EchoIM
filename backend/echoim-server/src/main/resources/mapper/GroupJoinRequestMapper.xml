@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImGroupJoinRequestMapper">
+
+    <select id="selectPendingByGroupAndUser" resultType="com.echoim.server.entity.ImGroupJoinRequestEntity">
+        SELECT id, group_id AS groupId, user_id AS userId, apply_msg AS applyMsg,
+               status, handled_by AS handledBy, handled_at AS handledAt,
+               created_at AS createdAt, updated_at AS updatedAt
+        FROM im_group_join_request
+        WHERE group_id = #{groupId}
+          AND user_id = #{userId}
+          AND status = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectPendingItemsByGroupId" resultType="com.echoim.server.vo.group.GroupJoinRequestItemVo">
+        SELECT gjr.id AS requestId,
+               gjr.user_id AS userId,
+               u.user_no AS userNo,
+               COALESCE(NULLIF(u.nickname, ''), u.username) AS nickname,
+               u.avatar_url AS avatarUrl,
+               gjr.apply_msg AS applyMsg,
+               gjr.created_at AS createdAt
+        FROM im_group_join_request gjr
+        JOIN im_user u ON u.id = gjr.user_id
+        WHERE gjr.group_id = #{groupId}
+          AND gjr.status = 0
+        ORDER BY gjr.created_at ASC
+    </select>
+
+</mapper>

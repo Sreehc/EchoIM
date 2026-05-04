@@ -35,9 +35,16 @@ import {
 import { searchGlobal } from '@/services/search'
 import {
   addGroupMembers,
+  createInviteLink,
   dissolveGroup,
+  fetchInviteLinks,
+  fetchJoinRequests,
   leaveGroup,
+  muteGroupMember,
   removeGroupMember,
+  reviewJoinRequest,
+  revokeInviteLink,
+  unmuteGroupMember,
   updateGroup,
   updateGroupMemberRole,
 } from '@/services/groups'
@@ -878,6 +885,123 @@ async function handleDissolveActiveGroup() {
   uiStore.setProfileOpen(false)
   await chatStore.refreshConversationList(true)
   await router.push('/chat')
+}
+
+// 7.3 邀请链接管理
+const inviteDialog = reactive({
+  visible: false,
+  loading: false,
+  groupId: null as number | null,
+  links: [] as Array<{ inviteId: number; token: string; maxUses: number | null; currentUses: number | null; expireAt: string | null; createdAt: string | null; inviterNickname: string | null }>,
+  newLinkMaxUses: null as number | null,
+  newLinkExpireHours: null as number | null,
+  createdUrl: null as string | null,
+})
+
+async function handleManageInvites() {
+  if (!chatStore.activeConversation?.groupId) return
+  inviteDialog.groupId = chatStore.activeConversation.groupId
+  inviteDialog.visible = true
+  inviteDialog.createdUrl = null
+  inviteDialog.loading = true
+  try {
+    inviteDialog.links = await fetchInviteLinks(chatStore.activeConversation.groupId)
+  } catch {
+    inviteDialog.links = []
+  } finally {
+    inviteDialog.loading = false
+  }
+}
+
+async function handleCreateInviteLink() {
+  if (!inviteDialog.groupId) return
+  inviteDialog.loading = true
+  try {
+    const result = await createInviteLink(inviteDialog.groupId, {
+      maxUses: inviteDialog.newLinkMaxUses,
+      expireHours: inviteDialog.newLinkExpireHours,
+    })
+    inviteDialog.createdUrl = result.url
+    inviteDialog.links = await fetchInviteLinks(inviteDialog.groupId)
+    inviteDialog.newLinkMaxUses = null
+    inviteDialog.newLinkExpireHours = null
+  } catch {
+    // error handled by http layer
+  } finally {
+    inviteDialog.loading = false
+  }
+}
+
+async function handleRevokeInviteLink(inviteId: number) {
+  if (!inviteDialog.groupId) return
+  try {
+    await ElMessageBox.confirm('撤销后该链接将无法使用，确认撤销？', '撤销邀请链接', {
+      confirmButtonText: '撤销',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch { return }
+  await revokeInviteLink(inviteDialog.groupId, inviteId)
+  inviteDialog.links = await fetchInviteLinks(inviteDialog.groupId)
+}
+
+// 7.4 禁言
+const muteDialog = reactive({
+  visible: false,
+  userId: null as number | null,
+  nickname: '',
+  durationMinutes: 60,
+})
+
+function handleMuteMember(payload: { userId: number; nickname: string }) {
+  muteDialog.userId = payload.userId
+  muteDialog.nickname = payload.nickname
+  muteDialog.durationMinutes = 60
+  muteDialog.visible = true
+}
+
+async function handleConfirmMute() {
+  if (!chatStore.activeConversation?.groupId || !muteDialog.userId) return
+  await muteGroupMember(chatStore.activeConversation.groupId, muteDialog.userId, muteDialog.durationMinutes)
+  muteDialog.visible = false
+  await chatStore.fetchConversationProfile(chatStore.activeConversation.conversationId, true)
+}
+
+async function handleUnmuteMember(userId: number) {
+  if (!chatStore.activeConversation?.groupId) return
+  await unmuteGroupMember(chatStore.activeConversation.groupId, userId)
+  await chatStore.fetchConversationProfile(chatStore.activeConversation.conversationId, true)
+}
+
+// 7.4 入群审批
+const joinRequestDialog = reactive({
+  visible: false,
+  loading: false,
+  groupId: null as number | null,
+  requests: [] as Array<{ requestId: number; userId: number; userNo: string; nickname: string; avatarUrl: string | null; applyMsg: string | null; createdAt: string | null }>,
+})
+
+async function handleManageJoinRequests() {
+  if (!chatStore.activeConversation?.groupId) return
+  joinRequestDialog.groupId = chatStore.activeConversation.groupId
+  joinRequestDialog.visible = true
+  joinRequestDialog.loading = true
+  try {
+    joinRequestDialog.requests = await fetchJoinRequests(chatStore.activeConversation.groupId)
+  } catch {
+    joinRequestDialog.requests = []
+  } finally {
+    joinRequestDialog.loading = false
+  }
+}
+
+async function handleReviewJoinRequest(requestId: number, approved: boolean) {
+  if (!joinRequestDialog.groupId) return
+  await reviewJoinRequest(joinRequestDialog.groupId, requestId, approved)
+  joinRequestDialog.requests = await fetchJoinRequests(joinRequestDialog.groupId)
+  if (approved && chatStore.activeConversation?.conversationId) {
+    await chatStore.fetchConversationProfile(chatStore.activeConversation.conversationId, true)
+  }
 }
 
 async function saveProfile(payload: UpdateCurrentUserProfilePayload) {
@@ -1840,6 +1964,10 @@ function registerDebugHooks() {
       @add-members="handleAddGroupMembers"
       @leave-group="handleLeaveActiveGroup"
       @dissolve-group="handleDissolveActiveGroup"
+      @manage-invites="handleManageInvites"
+      @manage-join-requests="handleManageJoinRequests"
+      @mute-member="handleMuteMember"
+      @unmute-member="handleUnmuteMember"
     />
 
     <el-dialog
@@ -2220,6 +2348,81 @@ function registerDebugHooks() {
           保存
         </button>
       </footer>
+    </el-dialog>
+
+    <!-- 邀请链接管理 -->
+    <el-dialog v-model="inviteDialog.visible" title="邀请链接" width="560px" destroy-on-close class="invite-link-dialog">
+      <div v-if="inviteDialog.createdUrl" class="invite-link-created">
+        <p>邀请链接已创建：</p>
+        <div class="invite-link-url">
+          <el-input :model-value="inviteDialog.createdUrl" readonly />
+          <el-button type="primary" @click="navigator.clipboard?.writeText(inviteDialog.createdUrl || '')">复制</el-button>
+        </div>
+      </div>
+      <div class="invite-link-create-form">
+        <el-input v-model.number="inviteDialog.newLinkMaxUses" type="number" placeholder="最大使用次数（留空不限）" style="width: 200px" />
+        <el-input v-model.number="inviteDialog.newLinkExpireHours" type="number" placeholder="有效小时数（留空不限）" style="width: 200px" />
+        <el-button type="primary" :loading="inviteDialog.loading" @click="handleCreateInviteLink">生成链接</el-button>
+      </div>
+      <el-divider />
+      <div v-if="inviteDialog.loading && !inviteDialog.links.length" v-loading="true" style="height: 60px" />
+      <el-table v-else :data="inviteDialog.links" style="width: 100%" size="small">
+        <el-table-column label="链接" min-width="200">
+          <template #default="{ row }">
+            <span style="font-family: monospace; font-size: 12px">/invite/{{ row.token }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="使用次数" width="100">
+          <template #default="{ row }">
+            {{ row.currentUses ?? 0 }}{{ row.maxUses != null ? `/${row.maxUses}` : '/∞' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="过期时间" width="140">
+          <template #default="{ row }">
+            {{ row.expireAt ? new Date(row.expireAt).toLocaleString() : '永不过期' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="handleRevokeInviteLink(row.inviteId)">撤销</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <!-- 禁言成员 -->
+    <el-dialog v-model="muteDialog.visible" :title="`禁言 ${muteDialog.nickname}`" width="400px" destroy-on-close>
+      <el-form label-position="top">
+        <el-form-item label="禁言时长（分钟）">
+          <el-input v-model.number="muteDialog.durationMinutes" type="number" placeholder="留空为永久禁言" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="muteDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="handleConfirmMute">确认禁言</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 入群审批 -->
+    <el-dialog v-model="joinRequestDialog.visible" title="入群审批" width="560px" destroy-on-close class="join-request-dialog">
+      <div v-if="joinRequestDialog.loading" v-loading="true" style="height: 60px" />
+      <div v-else-if="!joinRequestDialog.requests.length" style="text-align: center; color: var(--text-tertiary); padding: 20px">
+        暂无待审批的入群申请
+      </div>
+      <div v-else class="join-request-list">
+        <div v-for="req in joinRequestDialog.requests" :key="req.requestId" class="join-request-item">
+          <AvatarBadge :name="req.nickname" :avatar-url="req.avatarUrl" size="md" type="user" />
+          <div class="join-request-item__info">
+            <span class="join-request-item__name">{{ req.nickname }}</span>
+            <span v-if="req.applyMsg" class="join-request-item__msg">{{ req.applyMsg }}</span>
+            <span class="join-request-item__time">{{ req.createdAt ? new Date(req.createdAt).toLocaleString() : '' }}</span>
+          </div>
+          <div class="join-request-item__actions">
+            <el-button type="primary" size="small" @click="handleReviewJoinRequest(req.requestId, true)">同意</el-button>
+            <el-button type="danger" size="small" @click="handleReviewJoinRequest(req.requestId, false)">拒绝</el-button>
+          </div>
+        </div>
+      </div>
     </el-dialog>
   </main>
 </template>
@@ -3682,6 +3885,87 @@ function registerDebugHooks() {
 
 .edit-group-modal__btn--primary:hover:not(:disabled) {
   background: var(--interactive-primary-bg);
+}
+
+/* ── Invite link dialog ── */
+
+.invite-link-created {
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--interactive-primary-bg) 30%, var(--border-default));
+  background: color-mix(in srgb, var(--interactive-primary-bg) 6%, transparent);
+}
+
+.invite-link-created p {
+  margin: 0 0 8px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.invite-link-url {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-link-create-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Join request dialog ── */
+
+.join-request-list {
+  display: grid;
+  gap: 4px;
+}
+
+.join-request-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  transition: background var(--motion-fast) var(--motion-ease-out);
+}
+
+.join-request-item:hover {
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.join-request-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.join-request-item__name {
+  font-weight: 500;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.join-request-item__msg {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.join-request-item__time {
+  font-size: var(--text-2xs);
+  color: var(--text-quaternary);
+}
+
+.join-request-item__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .edit-group-modal__btn--primary:disabled {

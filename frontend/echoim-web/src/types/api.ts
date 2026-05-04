@@ -338,3 +338,41 @@ export interface OfflineSyncRequest {
   perConversationLimit: number
   totalLimit: number
 }
+
+export interface ApiGroupInviteLink {
+  inviteId: number
+  token: string
+  url: string
+  maxUses: number | null
+  currentUses: number | null
+  expireAt: string | null
+  createdAt: string | null
+}
+
+export interface ApiGroupInviteItem {
+  inviteId: number
+  token: string
+  maxUses: number | null
+  currentUses: number | null
+  expireAt: string | null
+  createdAt: string | null
+  inviterNickname: string | null
+}
+
+export interface ApiInvitePreview {
+  groupId: number
+  groupName: string
+  avatarUrl: string | null
+  memberCount: number | null
+  inviterNickname: string | null
+}
+
+export interface ApiGroupJoinRequestItem {
+  requestId: number
+  userId: number
+  userNo: string
+  nickname: string
+  avatarUrl: string | null
+  applyMsg: string | null
+  createdAt: string | null
+}

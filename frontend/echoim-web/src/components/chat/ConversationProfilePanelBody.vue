@@ -24,6 +24,10 @@ const emit = defineEmits<{
   'add-members': []
   'leave-group': []
   'dissolve-group': []
+  'manage-invites': []
+  'manage-join-requests': []
+  'mute-member': [payload: { userId: number; nickname: string }]
+  'unmute-member': [userId: number]
 }>()
 
 const spotlightTags = computed(() => {
@@ -140,6 +144,32 @@ function fileIcon(ext: string): string {
   return '📁'
 }
 
+function isMemberMuted(muteUntil: string | null | undefined): boolean {
+  if (!muteUntil) return false
+  return new Date(muteUntil) > new Date()
+}
+
+function muteRemainingText(muteUntil: string | null | undefined): string {
+  if (!muteUntil) return ''
+  const diff = new Date(muteUntil).getTime() - Date.now()
+  if (diff <= 0) return ''
+  const minutes = Math.ceil(diff / 60000)
+  if (minutes < 60) return `${minutes}分钟`
+  const hours = Math.ceil(minutes / 60)
+  if (hours < 24) return `${hours}小时`
+  return '永久'
+}
+
+function onMemberClick(member: { userId: number; nickname: string; role: number; muteUntil: string | null }) {
+  if (member.role === 1) return // can't mute owner
+  if (!profile.value?.group?.canManageMembers) return
+  if (isMemberMuted(member.muteUntil)) {
+    emit('unmute-member', member.userId)
+  } else {
+    emit('mute-member', { userId: member.userId, nickname: member.nickname })
+  }
+}
+
 </script>
 
 <template>
@@ -181,6 +211,9 @@ function fileIcon(ext: string): string {
               v-for="member in profile.members.slice(0, 30)"
               :key="member.userId"
               class="profile-members-grid__item"
+              :class="{ 'is-clickable': member.role !== 1 && profile.group?.canManageMembers }"
+              :title="member.role !== 1 && profile.group?.canManageMembers ? (isMemberMuted(member.muteUntil) ? '点击解除禁言' : '点击禁言') : ''"
+              @click="onMemberClick(member)"
             >
               <AvatarBadge
                 :name="member.nickname"
@@ -191,6 +224,9 @@ function fileIcon(ext: string): string {
               <span class="profile-members-grid__name">{{ member.nickname }}</span>
               <span v-if="member.role !== 2" class="profile-members-grid__role">
                 {{ member.role === 1 ? '群主' : '管理' }}
+              </span>
+              <span v-if="isMemberMuted(member.muteUntil)" class="profile-members-grid__muted" :title="member.muteUntil ? `禁言至 ${member.muteUntil}` : '永久禁言'">
+                禁言{{ muteRemainingText(member.muteUntil) ? ` ${muteRemainingText(member.muteUntil)}` : '' }}
               </span>
             </div>
           </div>
@@ -307,6 +343,14 @@ function fileIcon(ext: string): string {
             </button>
             <button v-if="profile.group.canManageMembers" class="profile-row-action" type="button" @click="emit('add-members')">
               <span>邀请成员</span>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button v-if="profile.group.canManageMembers" class="profile-row-action" type="button" @click="emit('manage-invites')">
+              <span>邀请链接</span>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button v-if="profile.group.canManageMembers" class="profile-row-action" type="button" @click="emit('manage-join-requests')">
+              <span>入群审批</span>
               <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button v-if="profile.group.canLeave" class="profile-row-action is-danger" type="button" @click="emit('leave-group')">
@@ -561,6 +605,29 @@ function fileIcon(ext: string): string {
   color: var(--text-on-brand);
   font: 600 9px/1 var(--font-mono);
   letter-spacing: 0.02em;
+}
+
+.profile-members-grid__muted {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  padding: 2px 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--status-danger) 85%, white);
+  color: white;
+  font: 600 8px/1 var(--font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.profile-members-grid__item.is-clickable {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background var(--motion-fast) var(--motion-ease-out);
+}
+
+.profile-members-grid__item.is-clickable:hover {
+  background: var(--interactive-secondary-bg-hover);
 }
 
 /* ── Personal info fields ── */
