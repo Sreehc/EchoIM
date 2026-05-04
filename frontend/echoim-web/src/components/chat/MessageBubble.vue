@@ -38,6 +38,7 @@ const emit = defineEmits<{
   'toggle-reaction': [emoji: string]
   'toggle-forward-selection': []
   'jump-to-source': [sourceMessageId: number]
+  'open-image-viewer': [messageId: number, imageUrl: string]
 }>()
 
 type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'retry'
@@ -194,6 +195,12 @@ const contextMenuActions = computed(() => {
   return actions
 })
 const canOpenContextMenu = computed(() => !isSystem.value && (canReactToMessage.value || contextMenuActions.value.length > 0))
+const imageDisplayUrl = computed(() => {
+  if (props.message.msgType === 'IMAGE') {
+    return props.message.file?.thumbnailUrl || props.message.file?.downloadUrl || null
+  }
+  return props.message.file?.downloadUrl || null
+})
 
 function formatFileSize(value: number | null) {
   if (!value || value <= 0) return ''
@@ -205,6 +212,17 @@ function formatFileSize(value: number | null) {
 function openAttachment(url: string | null | undefined) {
   if (!url) return
   window.open(url, '_blank', 'noopener')
+}
+
+function handleImageClick() {
+  if (props.message.msgType === 'IMAGE') {
+    const fullUrl = props.message.file?.downloadUrl || props.message.file?.url
+    if (fullUrl) {
+      emit('open-image-viewer', props.message.messageId, fullUrl)
+    }
+  } else {
+    openAttachment(props.message.file?.downloadUrl)
+  }
 }
 
 function closeContextMenu() {
@@ -411,11 +429,11 @@ onUnmounted(() => {
         </div>
       </template>
       <template v-else-if="message.msgType === 'IMAGE' || message.msgType === 'GIF'">
-        <div class="message-bubble__file message-bubble__file--image" @click="openAttachment(message.file?.downloadUrl)">
+        <div class="message-bubble__file message-bubble__file--image" @click="handleImageClick">
           <img
-            v-if="message.file?.downloadUrl"
+            v-if="imageDisplayUrl"
             class="message-bubble__image"
-            v-lazy-image="message.file.downloadUrl"
+            v-lazy-image="imageDisplayUrl"
             :alt="attachmentMeta?.title || '图片消息'"
           />
           <div v-else class="message-bubble__preview">

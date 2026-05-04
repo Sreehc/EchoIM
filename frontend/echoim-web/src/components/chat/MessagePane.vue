@@ -42,6 +42,7 @@ const emit = defineEmits<{
   'toggle-forward-selection': [message: ChatMessage]
   'toggle-reaction': [payload: { messageId: number; emoji: string }]
   'update:search-match-count': [value: number]
+  'open-image-viewer': [messageId: number, imageUrl: string]
 }>()
 
 const scroller = ref()
@@ -329,6 +330,7 @@ function jumpToMessage(messageId: number) {
           @cancel-edit="emit('cancel-edit-message')"
           @save-edit="emit('save-edit-message', { messageId: entry.message.messageId, content: $event })"
           @recall="emit('recall-message', entry.message.messageId)"
+          @open-image-viewer="emit('open-image-viewer', $event[0], $event[1])"
         />
       </template>
     </div>

@@ -29,6 +29,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   send: [content: string]
   'upload-file': [file: File]
+  'upload-files': [files: File[]]
   'send-sticker': [sticker: StickerDefinition]
   'send-voice': [result: VoiceRecordResult]
   'cancel-reply': []
@@ -74,9 +75,14 @@ function toggleStickerTray() {
 
 function onSelectFile(event: Event) {
   const target = event.target as HTMLInputElement | null
-  const file = target?.files?.[0]
-  if (!file) return
-  emit('upload-file', file)
+  const fileList = target?.files
+  if (!fileList || fileList.length === 0) return
+  const files = Array.from(fileList)
+  if (files.length === 1) {
+    emit('upload-file', files[0])
+  } else {
+    emit('upload-files', files)
+  }
   target.value = ''
 }
 
@@ -179,7 +185,7 @@ function handleVoiceCancel() {
         >
           <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <input ref="fileInput" class="composer__file-input" type="file" @change="onSelectFile" />
+        <input ref="fileInput" class="composer__file-input" type="file" multiple @change="onSelectFile" />
       </div>
     </div>
   </footer>

@@ -35,6 +35,7 @@ function adaptFile(file: ChatFile | null | undefined): ChatFile | null {
     bizType: file.bizType ?? null,
     objectKey: file.objectKey ?? null,
     url: file.url ?? null,
+    thumbnailUrl: file.thumbnailUrl ?? null,
     downloadUrl: file.downloadUrl ?? null,
     expiresIn: file.expiresIn ?? null,
     expireAt: file.expireAt ? normalizeTime(file.expireAt) : null,

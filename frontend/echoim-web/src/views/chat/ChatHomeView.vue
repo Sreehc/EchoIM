@@ -6,6 +6,8 @@ import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ContactsPanel from '@/components/chat/ContactsPanel.vue'
 import ChatTopbar from '@/components/chat/ChatTopbar.vue'
 import CallOverlay from '@/components/chat/CallOverlay.vue'
+import ImageViewer from '@/components/chat/ImageViewer.vue'
+import type { ImageViewerImage } from '@/components/chat/ImageViewer.vue'
 import MessagePane from '@/components/chat/MessagePane.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
 import type { VoiceRecordResult } from '@/components/chat/VoiceRecorder.vue'
@@ -183,6 +185,11 @@ const forwardDialog = reactive<{
   error: null,
 })
 const forwardSearchInput = ref<{ focus?: () => void } | null>(null)
+const imageViewerState = reactive({
+  visible: false,
+  images: [] as ImageViewerImage[],
+  startIndex: 0,
+})
 
 const shouldShowConversationList = computed(() => !uiStore.isMobile || uiStore.mobileView === 'list')
 const shouldShowMainPanel = computed(() => !uiStore.isMobile || uiStore.mobileView === 'chat')
@@ -635,6 +642,29 @@ function openForwardDialogForMessages(messages: ChatMessage[]) {
 
 function handleForwardMessage(message: ChatMessage) {
   openForwardDialogForMessages([message])
+}
+
+function handleOpenImageViewer(messageId: number, imageUrl: string) {
+  const imageMessages = chatStore.activeMessages.filter(
+    (message) => message.msgType === 'IMAGE' && message.file?.downloadUrl,
+  )
+  const viewerImages: ImageViewerImage[] = imageMessages.map((message) => ({
+    messageId: message.messageId,
+    imageUrl: message.file!.downloadUrl!,
+    fileName: message.file?.fileName ?? null,
+  }))
+  const startIndex = viewerImages.findIndex((img) => img.messageId === messageId)
+  imageViewerState.images = viewerImages
+  imageViewerState.startIndex = startIndex >= 0 ? startIndex : 0
+  imageViewerState.visible = true
+}
+
+function handleImageViewerForward(messageId: number) {
+  const message = chatStore.activeMessages.find((m) => m.messageId === messageId)
+  if (message) {
+    imageViewerState.visible = false
+    handleForwardMessage(message)
+  }
 }
 
 function toggleForwardSelection(message: ChatMessage) {
@@ -1269,6 +1299,38 @@ async function handleUploadAttachment(file: File) {
   }
 }
 
+async function handleUploadMultipleFiles(files: File[]) {
+  if (!files.length) return
+  attachmentUploading.value = true
+  attachmentError.value = null
+  let uploadedCount = 0
+
+  try {
+    for (const file of files) {
+      const bizType = file.type.startsWith('image/') ? 2 : 4
+      const uploadedFile = (await uploadFile(file, bizType)) as ChatFile
+      await chatStore.sendMessage({
+        currentUserId: authStore.currentUser?.userId ?? 0,
+        content: null,
+        msgType: file.type === 'image/gif' ? 'GIF' : bizType === 2 ? 'IMAGE' : 'FILE',
+        fileId: uploadedFile.fileId,
+        file: uploadedFile,
+      })
+      uploadedCount++
+    }
+    if (uploadedCount > 1) {
+      chatStore.errors.noticeMessage = `已发送 ${uploadedCount} 张图片`
+    }
+  } catch (error) {
+    const remaining = files.length - uploadedCount
+    attachmentError.value = error instanceof Error
+      ? `${error.message}（已发送 ${uploadedCount} 张，剩余 ${remaining} 张发送失败）`
+      : `附件上传失败（已发送 ${uploadedCount} 张）`
+  } finally {
+    attachmentUploading.value = false
+  }
+}
+
 async function handleSendSticker(sticker: StickerDefinition) {
   attachmentUploading.value = true
   attachmentError.value = null
@@ -1358,6 +1420,11 @@ function handleGlobalKeydown(event: KeyboardEvent) {
   }
 
   if (event.key !== 'Escape') return
+  if (imageViewerState.visible) {
+    imageViewerState.visible = false
+    event.preventDefault()
+    return
+  }
   if (globalSearchState.visible) {
     globalSearchState.visible = false
     event.preventDefault()
@@ -1645,6 +1712,7 @@ function registerDebugHooks() {
             @forward-message="handleForwardMessage"
             @toggle-forward-selection="toggleForwardSelection"
             @toggle-reaction="handleToggleReaction"
+            @open-image-viewer="handleOpenImageViewer"
           />
           <div v-if="typingLabel" class="chat-page__typing" data-testid="typing-indicator">
             {{ typingLabel }}
@@ -1671,6 +1739,7 @@ function registerDebugHooks() {
             @cancel-reply="clearReplyMessage"
             @send="handleSendTextMessage"
             @upload-file="handleUploadAttachment"
+            @upload-files="handleUploadMultipleFiles"
             @send-sticker="handleSendSticker"
             @send-voice="handleSendVoiceMessage"
             @typing="handleTypingInput"
@@ -1699,6 +1768,14 @@ function registerDebugHooks() {
       @toggle-minimized="callStore.toggleMinimized"
       @toggle-mute="callStore.toggleMute"
       @toggle-camera="callStore.toggleCamera"
+    />
+
+    <ImageViewer
+      :visible="imageViewerState.visible"
+      :images="imageViewerState.images"
+      :start-index="imageViewerState.startIndex"
+      @close="imageViewerState.visible = false"
+      @forward="handleImageViewerForward"
     />
 
     <ConversationProfileDrawer

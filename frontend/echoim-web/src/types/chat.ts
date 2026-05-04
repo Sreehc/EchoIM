@@ -189,6 +189,7 @@ export interface ChatFile {
   bizType: number | null
   objectKey: string | null
   url: string | null
+  thumbnailUrl: string | null
   downloadUrl: string | null
   expiresIn: number | null
   expireAt: string | null

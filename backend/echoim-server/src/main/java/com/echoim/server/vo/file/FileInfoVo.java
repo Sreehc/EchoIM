@@ -12,6 +12,7 @@ public class FileInfoVo {
     private Integer bizType;
     private String objectKey;
     private String url;
+    private String thumbnailUrl;
     private String downloadUrl;
     private Integer expiresIn;
     private LocalDateTime expireAt;
@@ -86,6 +87,14 @@ public class FileInfoVo {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
+    }
+
+    public void setThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
     }
 
     public Integer getExpiresIn() {

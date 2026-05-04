@@ -22,6 +22,7 @@ public class ImFileEntity {
     private Long fileSize;
     private String md5;
     private String url;
+    private String thumbnailUrl;
     private Integer status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -120,6 +121,14 @@ public class ImFileEntity {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
+    }
+
+    public void setThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
     }
 
     public Integer getStatus() {

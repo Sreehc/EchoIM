@@ -20,7 +20,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -41,6 +45,7 @@ public class FileServiceImpl implements FileService {
     private static final int BIZ_TYPE_IMAGE = 2;
     private static final int BIZ_TYPE_FILE = 4;
     private static final int BIZ_TYPE_AUDIO = 5;
+    private static final int THUMBNAIL_MAX_WIDTH = 300;
 
     private final ImFileMapper imFileMapper;
     private final FileProperties fileProperties;
@@ -96,6 +101,10 @@ public class FileServiceImpl implements FileService {
         imFileMapper.insert(entity);
 
         entity.setUrl(storageService.generatePublicUrl(entity));
+        if (resolvedBizType == BIZ_TYPE_IMAGE) {
+            String thumbUrl = generateAndStoreThumbnail(bytes, objectKey, storageService, resolveBucketName(storageService));
+            entity.setThumbnailUrl(thumbUrl);
+        }
         imFileMapper.updateById(entity);
 
         auditLogService.log("FILE_UPLOAD", Map.of(
@@ -234,6 +243,7 @@ public class FileServiceImpl implements FileService {
         vo.setBizType(entity.getBizType());
         vo.setObjectKey(entity.getObjectKey());
         vo.setUrl(storageServiceFor(entity).generatePublicUrl(entity));
+        vo.setThumbnailUrl(entity.getThumbnailUrl());
         vo.setDownloadUrl(resolveDownloadUrl(entity));
         vo.setExpiresIn(fileProperties.getSignedUrlExpireSeconds());
         vo.setExpireAt(LocalDateTime.now().plusSeconds(fileProperties.getSignedUrlExpireSeconds()));
@@ -387,5 +397,45 @@ public class FileServiceImpl implements FileService {
 
     private String defaultContentType(String contentType) {
         return StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
+    }
+
+    private String generateAndStoreThumbnail(byte[] imageBytes, String originalObjectKey, FileStorageService storageService, String bucketName) {
+        try {
+            BufferedImage original = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (original == null || original.getWidth() <= THUMBNAIL_MAX_WIDTH) {
+                return null;
+            }
+            int targetWidth = THUMBNAIL_MAX_WIDTH;
+            int targetHeight = (int) ((long) original.getHeight() * targetWidth / original.getWidth());
+            if (targetHeight <= 0) {
+                return null;
+            }
+            BufferedImage thumbnail = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g2d = thumbnail.createGraphics();
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2d.drawImage(original, 0, 0, targetWidth, targetHeight, null);
+            g2d.dispose();
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(thumbnail, "jpg", baos);
+            byte[] thumbBytes = baos.toByteArray();
+
+            int lastSlash = originalObjectKey.lastIndexOf('/');
+            int lastDot = originalObjectKey.lastIndexOf('.');
+            String baseName = lastDot > lastSlash ? originalObjectKey.substring(0, lastDot) : originalObjectKey;
+            String thumbObjectKey = baseName + "_thumb.jpg";
+
+            storageService.store(bucketName, thumbObjectKey, thumbBytes);
+
+            ImFileEntity thumbEntity = new ImFileEntity();
+            thumbEntity.setObjectKey(thumbObjectKey);
+            thumbEntity.setContentType("image/jpeg");
+            thumbEntity.setStorageType(storageService.storageType());
+            thumbEntity.setBucketName(bucketName);
+            return storageService.generatePublicUrl(thumbEntity);
+        } catch (IOException ex) {
+            return null;
+        }
     }
 }
