@@ -5,6 +5,7 @@ import AvatarBadge from '@/components/chat/AvatarBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { createFriendRequest } from '@/services/friends'
+import { blockUser, unblockUser } from '@/services/blocks'
 import { fetchPublicUserProfileByUsername, fetchUserPublicProfileByUsername } from '@/services/user'
 import type { ApiUserPublicProfile } from '@/types/api'
 import type { PublicUserProfile } from '@/types/chat'
@@ -111,6 +112,27 @@ async function copyPublicLink() {
   }
 }
 
+async function handleToggleBlock() {
+  if (!privateProfile.value || isSelf.value) return
+  actionLoading.value = true
+  noticeMessage.value = null
+  try {
+    if (privateProfile.value.blocked) {
+      await unblockUser(privateProfile.value.userId)
+      privateProfile.value = { ...privateProfile.value, blocked: false }
+      noticeMessage.value = '已取消屏蔽'
+    } else {
+      await blockUser(privateProfile.value.userId)
+      privateProfile.value = { ...privateProfile.value, blocked: true }
+      noticeMessage.value = '已屏蔽该用户'
+    }
+  } catch (error) {
+    noticeMessage.value = error instanceof Error ? error.message : '操作失败'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
 function openLogin() {
   router.push({ name: 'login' }).catch(() => undefined)
 }
@@ -179,7 +201,7 @@ onMounted(() => {
             <button
               class="public-profile__primary"
               type="button"
-              :disabled="actionLoading || !privateProfile || ['BLOCKED_OUT', 'BLOCKED_IN'].includes(privateProfile.friendStatus || '')"
+              :disabled="actionLoading || !privateProfile || privateProfile.blocked || ['BLOCKED_OUT', 'BLOCKED_IN'].includes(privateProfile.friendStatus || '')"
               @click="handleStartChat"
             >
               发消息
@@ -191,6 +213,14 @@ onMounted(() => {
               @click="handleAddFriend"
             >
               {{ privateProfile?.friendStatus === 'FRIEND' ? '已是好友' : privateProfile?.pendingRequestId ? '处理中' : '加好友' }}
+            </button>
+            <button
+              class="public-profile__danger"
+              type="button"
+              :disabled="actionLoading || !privateProfile"
+              @click="handleToggleBlock"
+            >
+              {{ privateProfile?.blocked ? '取消屏蔽' : '屏蔽用户' }}
             </button>
           </div>
         </section>
@@ -344,6 +374,17 @@ onMounted(() => {
   border-color: transparent;
   color: var(--interactive-primary-fg);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--interactive-primary-bg) 18%, transparent);
+}
+
+.public-profile__danger {
+  background: transparent;
+  border-color: var(--status-danger);
+  color: var(--status-danger);
+}
+
+.public-profile__danger:hover,
+.public-profile__danger:focus-visible {
+  background: color-mix(in srgb, var(--status-danger) 10%, transparent);
 }
 
 .public-profile__primary:hover,

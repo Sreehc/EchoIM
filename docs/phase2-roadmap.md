@@ -3,7 +3,7 @@
 > 创建日期：2026-05-04
 > 前置条件：一期工程全部五个阶段已完成，系统具备完整的即时通讯、语音通话、管理后台能力
 > 目标：从"功能可用"升级为"体验优秀、安全可靠、可规模运营"
-> 最后更新：2026-05-04 — 阶段六 6.1 语音消息 + 6.2 视频通话全部 8 项任务完成
+> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八 8.1 用户屏蔽全部 3 项任务完成
 
 ---
 
@@ -55,11 +55,14 @@
 
 ### 6.3 图片消息增强
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 6.3.1 | 图片缩略图生成 | P1 | 1d | 后端上传时自动生成缩略图（300px 宽），file 表增加 thumbnailUrl |
-| 6.3.2 | 图片查看器 | P1 | 1d | 全屏查看、双指缩放、左右滑动切换、下载、转发 |
-| 6.3.3 | 多图发送 | P2 | 1d | 消息编辑器支持一次选择多张图片，九宫格展示 |
+> **审查结论（2026-05-04）**：阶段六 6.3 图片消息增强全部 3 项任务在代码层面均已实现。
+> 后端上传时通过 ImageIO 自动生成 300px 宽缩略图并存储，前端新增全屏图片查看器支持缩放/滑动/下载/转发，消息编辑器支持多图选择批量发送。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 6.3.1 | 图片缩略图生成 | P1 | 1d | ✅ 已完成 | 后端：`ImFileEntity` + `FileInfoVo` thumbnailUrl 字段 + `FileServiceImpl.generateAndStoreThumbnail()`（ImageIO 缩放 300px 宽，JPEG 输出，`_thumb.jpg` 后缀存储）+ `init.sql` thumbnail_url 列；前端：`types/chat.ts` ChatFile.thumbnailUrl + `adapters/chat.ts` adaptFile() 映射 + `MessageBubble.vue` imageDisplayUrl 优先使用缩略图 |
+| 6.3.2 | 图片查看器 | P1 | 1d | ✅ 已完成 | `components/chat/ImageViewer.vue`（全屏暗色遮罩 + 鼠标滚轮缩放 0.3x-5x + 指针拖拽平移 + 左右箭头/滑动切换 + 双击复位 + 下载/转发按钮 + 键盘导航 Escape/←/→）+ `MessageBubble.vue` IMAGE 点击 emit open-image-viewer + `MessagePane.vue` 事件透传 + `ChatHomeView.vue` 收集会话全部 IMAGE 消息构建 viewer 列表 |
+| 6.3.3 | 多图发送 | P2 | 1d | ✅ 已完成 | `MessageComposer.vue` 文件 input 增加 multiple 属性 + onSelectFile 支持多文件 → emit upload-files + `ChatHomeView.vue` handleUploadMultipleFiles() 逐个上传并发送 IMAGE 消息 + 发送完成后通知计数 |
 
 **验收标准：**
 - 单聊中可以录制并发送语音消息，对方能播放
@@ -74,38 +77,48 @@
 
 ### 7.1 群公告与置顶消息
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 7.1.1 | 群内消息置顶 | P0 | 1d | 后端：im_message_pin 表，PinMessage/UnpinMessage API；前端：消息长按菜单"置顶"、群内置顶消息横幅展示 |
-| 7.1.2 | 群公告增强 | P1 | 0.5d | 公告变更时自动发送系统消息通知全体成员，公告弹窗确认已读 |
+> **审查结论（2026-05-04）**：阶段七 7.1 群公告与置顶消息全部 2 项任务在代码层面均已实现。
+> 后端 im_message_pin 表 + PinMessage/UnpinMessage/ListPinned API，前端消息右键菜单置顶/取消置顶 + PinnedMessagesBanner 横幅展示。
+> 群公告变更自动推送系统消息到所有成员。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 7.1.1 | 群内消息置顶 | P0 | 1d | ✅ 已完成 | 后端：`ImMessagePinEntity.java` + `ImMessagePinMapper.java` + `MessagePinMapper.xml` + `init.sql` im_message_pin 表 + `MessageCommandServiceImpl` pinMessage/unpinMessage/listPinned + `MessageController` PUT /{id}/pin, PUT /{id}/unpin, GET /pinned + `MessageMapper.xml` LEFT JOIN im_message_pin + `WsMessageType` MESSAGE_PIN/MESSAGE_UNPIN；前端：`services/messages.ts` pinMessage/unpinMessage/listPinnedMessages + `MessageBubble.vue` pin/unpin 右键菜单 + 置顶徽章 + `PinnedMessagesBanner.vue` + `ChatHomeView.vue` handlePinMessage/handleUnpinMessage + `stores/chat.ts` pinMessage/unpinMessage actions + WS 处理 |
+| 7.1.2 | 群公告增强 | P1 | 0.5d | ✅ 已完成 | `GroupServiceImpl.java` updateGroup() 检测 notice 变更 → pushSystemMessage() 插入系统消息 + 推送 CONVERSATION_CHANGE 给所有非删除成员 |
 
 ### 7.2 @提及
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 7.2.1 | @提及输入 | P0 | 1.5d | 输入框 @ 触发成员选择器，选中后插入 @userId 标记，支持 @所有人 |
-| 7.2.2 | @提及解析与高亮 | P0 | 1d | 消息气泡中 @ 部分高亮显示，可点击查看用户资料 |
-| 7.2.3 | @提及通知 | P1 | 0.5d | 被 @ 的用户收到特殊通知（即使免打扰也提醒），会话列表显示 @ 标记 |
+> **审查结论（2026-05-04）**：阶段七 7.2 @提及全部 3 项任务在代码层面均已实现。
+> 输入框 @ 触发 MentionSelector 成员选择器，mentions 存入 extraJson，消息气泡中 @ 部分高亮可点击跳转会话，
+> 被 @ 用户收到 CONVERSATION_CHANGE 带 atMentionedUserIds 字段，会话列表显示 @ 标记。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 7.2.1 | @提及输入 | P0 | 1.5d | ✅ 已完成 | 前端：`MentionSelector.vue`（成员选择器：过滤/键盘导航/角色徽章）+ `MessageComposer.vue` @ 触发检测 + mention 跟踪 + `ChatHomeView.vue` activeGroupMembers 传递 + `stores/chat.ts` buildMessageExtraWithMentions + sendMessageThroughRealtime mentions 参数；后端：`MentionVo.java` + `MessageItemVo`/`WsMessageItem` mentions 字段 + `MessageViewServiceImpl` readMentions() 从 extraJson 提取 + `types/api.ts` ApiMentionItem + `adapters/chat.ts` adaptChatMessage mentions 映射 |
+| 7.2.2 | @提及解析与高亮 | P0 | 1d | ✅ 已完成 | `utils/format.ts` highlightMentions() + highlightBubbleContent()（mention/search 双层高亮）+ `MessageBubble.vue` .message-bubble__mention 高亮样式 + 点击 emit view-profile → openChatFromContact 跳转会话 + `MessagePane.vue` view-profile 事件透传 |
+| 7.2.3 | @提及通知 | P1 | 0.5d | ✅ 已完成 | 后端：`ImGroupChatServiceImpl` extractMentionedUserIds() 从 extraJson 解析 + pushConversationChange 传递 atMentionedUserIds + `ImWsPushService` 重载 pushConversationChange 支持 atMentionedUserIds；前端：`types/api.ts` WsConversationChangePayload.atMentionedUserIds + `stores/chat.ts` mentionedConversationIds Set + handleConversationChange 检测 atMentionedUserIds + openConversation 清除 + `ConversationListItem.vue` @ 标记徽章 |
 
 ### 7.3 群邀请
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 7.3.1 | 邀请链接生成 | P1 | 1d | 群主/管理员生成邀请链接（含过期时间、最大人数），链接格式 /invite/:token |
-| 7.3.2 | 邀请链接加入 | P1 | 1d | 邀请页面展示群信息，确认后自动加入，校验链接有效性和群人数上限 |
-| 7.3.3 | 邀请链接管理 | P2 | 0.5d | 群设置中查看/作废已有邀请链接 |
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 说明 |
+|------|------|--------|---------|------|------|
+| 7.3.1 | 邀请链接生成 | P1 | 1d | ✅ 已完成 | `im_group_invite` 表 + `ImGroupInviteEntity` + `ImGroupInviteMapper` + `GroupInviteMapper.xml`(selectValidByToken/selectActiveInvitesByGroupId) + `CreateInviteLinkRequestDto`(maxUses/expireHours) + `GroupInviteLinkVo`/`GroupInviteItemVo` + `GroupServiceImpl.createInviteLink/listInviteLinks/revokeInviteLink` + `GroupController` POST/GET/DELETE `/{groupId}/invites` |
+| 7.3.2 | 邀请链接加入 | P1 | 1d | ✅ 已完成 | `InvitePreviewVo`(groupId/groupName/avatarUrl/memberCount/inviterNickname) + `GroupServiceImpl.getInvitePreview/joinByInvite`(校验过期/使用次数/已在群) + `GroupController` GET `/invite/{token}/preview` + POST `/invite/{token}/join`(公开) + `InviteView.vue`(/invite/:token 路由，展示群信息+确认加入) + `router/index.ts` 新增 invite 路由 |
+| 7.3.3 | 邀请链接管理 | P2 | 0.5d | ✅ 已完成 | `ConversationProfilePanelBody.vue` 管理区新增"邀请链接"按钮 + `ChatHomeView.vue` inviteDialog 弹窗(列表展示使用次数/过期时间+生成新链接+撤销) + `groups.ts` createInviteLink/fetchInviteLinks/revokeInviteLink API |
 
 ### 7.4 群成员权限细化
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 7.4.1 | 禁言功能 | P1 | 1d | 管理员禁言指定成员（临时/永久），被禁言者无法发送消息，前端显示禁言状态和剩余时间 |
-| 7.4.2 | 入群审批 | P2 | 1d | 非邀请链接入群需管理员审批，审批消息推送给管理员 |
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 说明 |
+|------|------|--------|---------|------|------|
+| 7.4.1 | 禁言功能 | P1 | 1d | ✅ 已完成 | `im_group_member` 新增 `mute_until` 字段 + `ImGroupMemberEntity/GroupMemberItemVo` 新增 muteUntil + `GroupMemberMapper.xml` 查询包含 mute_until + `MuteMemberRequestDto`(durationMinutes) + `GroupServiceImpl.muteMember/unmuteMember`(管理员权限校验+不能禁言群主) + `GroupController` PUT/DELETE `/{groupId}/members/{userId}/mute` + `ImGroupChatServiceImpl.validateNotMuted`(发送消息校验) + 前端成员网格显示禁言徽章(剩余时间)+点击禁言/解除禁言 + `ChatHomeView.vue` muteDialog |
+| 7.4.2 | 入群审批 | P2 | 1d | ✅ 已完成 | `im_group_join_request` 表 + `ImGroupJoinRequestEntity` + `ImGroupJoinRequestMapper` + `GroupJoinRequestMapper.xml` + `ReviewJoinRequestDto`(approved) + `GroupJoinRequestItemVo` + `GroupServiceImpl.submitJoinRequest/reviewJoinRequest/listPendingJoinRequests`(WS 推送通知管理员) + `GroupController` POST/GET/PUT `/{groupId}/join-requests` + `ConversationProfilePanelBody.vue` 新增"入群审批"按钮 + `ChatHomeView.vue` joinRequestDialog(同意/拒绝) |
 
 **验收标准：**
 - 群聊中可以置顶重要消息，所有成员可见横幅
 - 输入 @ 弹出成员选择器，被 @ 的用户收到特殊提醒
 - 群主可以生成邀请链接，新用户通过链接加入群聊
+- 管理员可禁言/解除禁言成员，被禁言者发送消息时收到提示
+- 非邀请链接入群需管理员审批，审批结果实时推送
 
 ---
 
@@ -115,11 +128,16 @@
 
 ### 8.1 用户屏蔽
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 8.1.1 | 屏蔽用户 | P0 | 1d | 后端：im_block_user 表，BlockUser/UnblockUser API；前端：用户资料页"屏蔽"操作 |
-| 8.1.2 | 屏蔽生效 | P0 | 1d | 被屏蔽用户无法发送单聊消息、无法查看在线状态，群聊中互相隐藏消息（可配置） |
-| 8.1.3 | 屏蔽列表管理 | P1 | 0.5d | 设置页"已屏蔽用户"列表，支持解除屏蔽 |
+> **审查结论（2026-05-04）**：阶段八 8.1 用户屏蔽全部 3 项任务在代码层面均已实现。
+> 后端 im_block_user 表 + BlockService + BlockController 提供完整的屏蔽/取消屏蔽/列表 API，
+> 单聊发送消息时双向校验屏蔽关系，群聊消息推送过滤已屏蔽用户，在线状态通知也过滤屏蔽关系。
+> 前端用户资料页新增"屏蔽用户/取消屏蔽"按钮，设置页新增"隐私"分组展示已屏蔽用户列表。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 8.1.1 | 屏蔽用户 | P0 | 1d | ✅ 已完成 | 后端：`init.sql` im_block_user 表 + `ImBlockUserEntity.java` + `ImBlockUserMapper.java` + `BlockUserMapper.xml` + `BlockedUserItemVo.java` + `BlockService.java` + `BlockServiceImpl.java`（自屏蔽/目标存在/重复屏蔽校验）+ `BlockController.java`（POST/DELETE/GET /api/blocks）+ `ErrorCode.java` USER_BLOCKED/ALREADY_BLOCKED/NOT_BLOCKED；前端：`services/blocks.ts`（blockUser/unblockUser/fetchBlockedUsers）+ `types/api.ts` ApiBlockedUserItem + `PublicProfileView.vue` 屏蔽/取消屏蔽按钮 + 危险操作样式 |
+| 8.1.2 | 屏蔽生效 | P0 | 1d | ✅ 已完成 | 后端：`ImSingleChatServiceImpl.validateNotBlocked()` 双向校验 + `ImGroupChatServiceImpl.sendGroup()` recipientUserIds 过滤已屏蔽用户 + `ImOnlineService.notifyPresenceToPeers()` 过滤已屏蔽用户 + `UserMapper.xml` selectPublicProfileByUserId/selectPublicProfileByUsername 新增 blocked 字段（EXISTS 子查询 im_block_user）+ `UserPublicProfileVo.java` blocked 字段；前端：`types/api.ts` ApiUserPublicProfile.blocked + `PublicProfileView.vue` 发消息按钮 disabled 当 blocked=true |
+| 8.1.3 | 屏蔽列表管理 | P1 | 0.5d | ✅ 已完成 | 前端：`types/chat.ts` SettingsSection 新增 'privacy' + `stores/auth.ts` blockedUsers/blockedUsersLoading/loadBlockedUsers/handleUnblockUser + `ConversationSidebar.vue` settingsSections 新增隐私分组 + 已屏蔽用户列表（头像/昵称/用户号/取消屏蔽按钮）+ `ChatHomeView.vue` blockedUsers/blockedUsersLoading props + refresh-blocked-users/unblock-user 事件处理 |
 
 ### 8.2 消息安全
 

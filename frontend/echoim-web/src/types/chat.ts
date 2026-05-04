@@ -1,6 +1,6 @@
 export type ThemeMode = 'light' | 'dark'
 export type LeftPanelMode = 'conversations' | 'contacts' | 'me' | 'settings'
-export type SettingsSection = 'appearance' | 'chat' | 'notifications' | 'security'
+export type SettingsSection = 'appearance' | 'chat' | 'notifications' | 'security' | 'privacy'
 export type ConversationFolder = 'inbox' | 'archived' | 'unread' | 'single' | 'group' | 'channel'
 export type SpecialConversationType = 'SAVED_MESSAGES'
 

@@ -11,6 +11,7 @@ import type {
   TrustedDeviceSummary,
   UpdateCurrentUserProfilePayload,
 } from '@/types/chat'
+import type { ApiBlockedUserItem } from '@/types/api'
 import {
   bindEmailRequest,
   changePasswordRequest,
@@ -29,6 +30,7 @@ import {
   verifyLoginChallengeRequest,
   verifyRecoveryCodeRequest,
 } from '@/services/auth'
+import { fetchBlockedUsers, unblockUser } from '@/services/blocks'
 import { HttpError } from '@/services/http'
 import { updateCurrentUserProfile, fetchCurrentUserProfile } from '@/services/user'
 import { STORAGE_KEYS } from '@/utils/storage'
@@ -52,8 +54,10 @@ export const useAuthStore = defineStore('auth', () => {
   const emailBindingLoading = ref(false)
   const trustedDevicesLoading = ref(false)
   const securityEventsLoading = ref(false)
+  const blockedUsersLoading = ref(false)
   const trustedDevices = ref<TrustedDeviceSummary[]>([])
   const securityEvents = ref<SecurityEventSummary[]>([])
+  const blockedUsers = ref<ApiBlockedUserItem[]>([])
   const profileError = ref<string | null>(null)
   const profileNotice = ref<string | null>(null)
   let refreshPromise: Promise<AuthSession | null> | null = null
@@ -435,6 +439,33 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loadBlockedUsers(force = false) {
+    if (!force && blockedUsers.value.length && !blockedUsersLoading.value) return blockedUsers.value
+    blockedUsersLoading.value = true
+
+    try {
+      blockedUsers.value = await fetchBlockedUsers()
+      return blockedUsers.value
+    } finally {
+      blockedUsersLoading.value = false
+    }
+  }
+
+  async function handleUnblockUser(userId: number) {
+    blockedUsersLoading.value = true
+
+    try {
+      await unblockUser(userId)
+      blockedUsers.value = blockedUsers.value.filter((item) => item.userId !== userId)
+      profileNotice.value = '已取消屏蔽'
+    } catch (error) {
+      profileError.value = error instanceof Error ? error.message : '取消屏蔽失败'
+      throw error
+    } finally {
+      blockedUsersLoading.value = false
+    }
+  }
+
   function removeStoredAccount(userId: number) {
     storedAccounts.value = storedAccounts.value.filter((item) => item.userInfo.userId !== userId)
     persistStoredAccounts(storedAccounts.value)
@@ -670,8 +701,10 @@ export const useAuthStore = defineStore('auth', () => {
     emailBindingLoading,
     trustedDevicesLoading,
     securityEventsLoading,
+    blockedUsersLoading,
     trustedDevices,
     securityEvents,
+    blockedUsers,
     profileError,
     profileNotice,
     isAuthenticated,
@@ -690,6 +723,8 @@ export const useAuthStore = defineStore('auth', () => {
     revokeTrustedDevice,
     revokeAllTrustedDevices,
     loadSecurityEvents,
+    loadBlockedUsers,
+    handleUnblockUser,
     removeStoredAccount,
     clearSession,
     ensureCurrentProfile,

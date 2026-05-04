@@ -88,6 +88,15 @@ CREATE TABLE IF NOT EXISTS im_friend (
   KEY idx_friend_user (friend_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='好友关系表';
 
+CREATE TABLE IF NOT EXISTS im_block_user (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '屏蔽记录ID',
+  user_id BIGINT NOT NULL COMMENT '发起屏蔽的用户ID',
+  blocked_user_id BIGINT NOT NULL COMMENT '被屏蔽的用户ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  UNIQUE KEY uk_user_blocked (user_id, blocked_user_id),
+  KEY idx_blocked_user (blocked_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户屏蔽表';
+
 CREATE TABLE IF NOT EXISTS im_group (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '群组ID',
   group_no VARCHAR(32) NOT NULL COMMENT '群编号',

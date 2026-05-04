@@ -37,6 +37,7 @@ import type {
   UpdateCurrentUserProfilePayload,
   UserInfo,
 } from '@/types/chat'
+import type { ApiBlockedUserItem } from '@/types/api'
 import { readBrowserNotificationPermission } from '@/utils/browserNotifications'
 import { STORAGE_KEYS } from '@/utils/storage'
 import { uploadFile } from '@/services/files'
@@ -97,6 +98,8 @@ const props = defineProps<{
   securityEventsLoading?: boolean
   trustedDevices?: TrustedDeviceSummary[]
   securityEvents?: SecurityEventSummary[]
+  blockedUsers?: ApiBlockedUserItem[]
+  blockedUsersLoading?: boolean
   profileError?: string | null
   profileNotice?: string | null
   usernameChecking?: boolean
@@ -129,6 +132,8 @@ const emit = defineEmits<{
   'revoke-trusted-device': [payload: { deviceId: number; deviceFingerprint: string }]
   'revoke-all-trusted-devices': []
   'refresh-security-events': []
+  'refresh-blocked-users': []
+  'unblock-user': [userId: number]
   'clear-profile-error': []
   'clear-profile-notice': []
   'conversation-action': [payload: { command: ConversationContextAction; conversationId: number }]
@@ -219,6 +224,10 @@ const settingsSections = [
   {
     key: 'security',
     title: '账号安全',
+  },
+  {
+    key: 'privacy',
+    title: '隐私',
   },
 ] as const satisfies ReadonlyArray<{
   key: SettingsSection
@@ -432,6 +441,9 @@ watch(
     if (mode === 'settings' && section === 'security') {
       emit('refresh-trusted-devices')
       emit('refresh-security-events')
+    }
+    if (mode === 'settings' && section === 'privacy') {
+      emit('refresh-blocked-users')
     }
   },
   { immediate: true },
@@ -1719,6 +1731,50 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
                 <div v-else class="settings-empty">暂无记录</div>
               </div>
             </details>
+          </div>
+
+          <div v-else-if="settingsSection === 'privacy'" class="sidebar-stack">
+            <div class="settings-panel">
+              <div class="settings-panel__head">
+                <strong>已屏蔽用户</strong>
+                <el-button
+                  plain
+                  size="small"
+                  :loading="blockedUsersLoading"
+                  @click="emit('refresh-blocked-users')"
+                >
+                  刷新
+                </el-button>
+              </div>
+              <div v-if="blockedUsersLoading" class="settings-empty">正在加载屏蔽列表…</div>
+              <div v-else-if="!blockedUsers?.length" class="settings-empty">暂无屏蔽用户</div>
+              <div v-else class="blocked-users-list">
+                <div
+                  v-for="item in blockedUsers"
+                  :key="item.blockId"
+                  class="blocked-user-item"
+                >
+                  <AvatarBadge
+                    :name="item.nickname"
+                    :avatar-url="item.avatarUrl"
+                    size="sm"
+                  />
+                  <div class="blocked-user-item__copy">
+                    <strong>{{ item.nickname }}</strong>
+                    <span>@{{ item.userNo }}</span>
+                  </div>
+                  <el-button
+                    type="danger"
+                    plain
+                    size="small"
+                    :loading="blockedUsersLoading"
+                    @click="emit('unblock-user', item.userId)"
+                  >
+                    取消屏蔽
+                  </el-button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </el-scrollbar>
@@ -3113,6 +3169,41 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   padding: 10px 2px 0;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+}
+
+.blocked-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blocked-user-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
+}
+
+.blocked-user-item__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.blocked-user-item__copy strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.blocked-user-item__copy span {
+  display: block;
+  color: var(--text-quaternary);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
 }
 
 .sidebar-stack--security {

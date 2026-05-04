@@ -68,6 +68,7 @@ export interface ApiUserPublicProfile {
   status: number | null
   friendStatus: string | null
   pendingRequestId: number | null
+  blocked: boolean | null
 }
 
 export interface ApiGroupDetail {
@@ -375,4 +376,13 @@ export interface ApiGroupJoinRequestItem {
   avatarUrl: string | null
   applyMsg: string | null
   createdAt: string | null
+}
+
+export interface ApiBlockedUserItem {
+  blockId: number
+  userId: number
+  userNo: string
+  nickname: string
+  avatarUrl: string | null
+  blockedAt: string | null
 }

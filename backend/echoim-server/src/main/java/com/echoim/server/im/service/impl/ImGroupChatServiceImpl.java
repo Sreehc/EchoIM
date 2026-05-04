@@ -21,6 +21,7 @@ import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImGroupMapper;
 import com.echoim.server.mapper.ImGroupMemberMapper;
 import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.service.block.BlockService;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.message.StickerCatalog;
 import com.echoim.server.service.message.MessageViewService;
@@ -65,6 +66,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
     private final ImGroupMapper imGroupMapper;
     private final ImGroupMemberMapper imGroupMemberMapper;
     private final ImWsPushService imWsPushService;
+    private final BlockService blockService;
     private final FileService fileService;
     private final StickerCatalog stickerCatalog;
     private final MessageViewService messageViewService;
@@ -77,6 +79,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
                                   ImGroupMapper imGroupMapper,
                                   ImGroupMemberMapper imGroupMemberMapper,
                                   ImWsPushService imWsPushService,
+                                  BlockService blockService,
                                   FileService fileService,
                                   StickerCatalog stickerCatalog,
                                   MessageViewService messageViewService,
@@ -88,6 +91,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         this.imGroupMapper = imGroupMapper;
         this.imGroupMemberMapper = imGroupMemberMapper;
         this.imWsPushService = imWsPushService;
+        this.blockService = blockService;
         this.fileService = fileService;
         this.stickerCatalog = stickerCatalog;
         this.messageViewService = messageViewService;
@@ -132,9 +136,12 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         }
 
         imConversationUserMapper.resetDeleted(conversation.getId(), loginUser.getUserId());
+        List<Long> senderBlockedIds = blockService.getBlockedUserIds(loginUser.getUserId());
         List<Long> recipientUserIds = imGroupMemberMapper.selectActiveUserIdsByGroupId(data.getGroupId())
                 .stream()
                 .filter(userId -> !userId.equals(loginUser.getUserId()))
+                .filter(userId -> !senderBlockedIds.contains(userId))
+                .filter(userId -> !blockService.isBlocked(userId, loginUser.getUserId()))
                 .toList();
         if (!recipientUserIds.isEmpty()) {
             imConversationUserMapper.incrementUnreadBatch(conversation.getId(), recipientUserIds);

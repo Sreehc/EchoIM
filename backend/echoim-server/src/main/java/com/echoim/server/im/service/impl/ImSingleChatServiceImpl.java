@@ -21,6 +21,7 @@ import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
+import com.echoim.server.service.block.BlockService;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.friend.FriendService;
 import com.echoim.server.service.message.StickerCatalog;
@@ -70,6 +71,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
     private final ImMessageReceiptMapper imMessageReceiptMapper;
     private final ImWsPushService imWsPushService;
     private final FriendService friendService;
+    private final BlockService blockService;
     private final FileService fileService;
     private final StickerCatalog stickerCatalog;
     private final MessageViewService messageViewService;
@@ -82,6 +84,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
                                    ImMessageReceiptMapper imMessageReceiptMapper,
                                    ImWsPushService imWsPushService,
                                    FriendService friendService,
+                                   BlockService blockService,
                                    FileService fileService,
                                    StickerCatalog stickerCatalog,
                                    MessageViewService messageViewService,
@@ -93,6 +96,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         this.imMessageReceiptMapper = imMessageReceiptMapper;
         this.imWsPushService = imWsPushService;
         this.friendService = friendService;
+        this.blockService = blockService;
         this.fileService = fileService;
         this.stickerCatalog = stickerCatalog;
         this.messageViewService = messageViewService;
@@ -124,6 +128,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         }
         if (!savedMessagesConversation) {
             friendService.validateSingleChatAllowed(loginUser.getUserId(), data.getToUserId());
+            validateNotBlocked(loginUser.getUserId(), data.getToUserId());
         }
         ImFileEntity messageFile = validateAndLoadMessageFile(loginUser.getUserId(), data);
 
@@ -238,6 +243,15 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         if (conversation == null || !Integer.valueOf(CONVERSATION_STATUS_NORMAL).equals(conversation.getStatus())
                 || !Integer.valueOf(CONVERSATION_TYPE_SINGLE).equals(conversation.getConversationType())) {
             throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
+        }
+    }
+
+    private void validateNotBlocked(Long senderId, Long receiverId) {
+        if (blockService.isBlocked(senderId, receiverId)) {
+            throw new BizException(ErrorCode.USER_BLOCKED, "你已屏蔽对方，无法发送消息");
+        }
+        if (blockService.isBlocked(receiverId, senderId)) {
+            throw new BizException(ErrorCode.USER_BLOCKED, "对方已屏蔽你，无法发送消息");
         }
     }
 

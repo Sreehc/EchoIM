@@ -12,6 +12,7 @@ public class UserPublicProfileVo {
     private Integer status;
     private String friendStatus;
     private Long pendingRequestId;
+    private Boolean blocked;
 
     public Long getUserId() {
         return userId;
@@ -91,5 +92,13 @@ public class UserPublicProfileVo {
 
     public void setPendingRequestId(Long pendingRequestId) {
         this.pendingRequestId = pendingRequestId;
+    }
+
+    public Boolean getBlocked() {
+        return blocked;
+    }
+
+    public void setBlocked(Boolean blocked) {
+        this.blocked = blocked;
     }
 }

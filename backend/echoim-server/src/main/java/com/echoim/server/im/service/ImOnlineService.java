@@ -8,12 +8,14 @@ import com.echoim.server.im.monitor.WsMetrics;
 import com.echoim.server.im.session.ImSessionContext;
 import com.echoim.server.im.session.ImSessionManager;
 import com.echoim.server.mapper.ImConversationUserMapper;
+import com.echoim.server.service.block.BlockService;
 import io.netty.channel.Channel;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -24,17 +26,20 @@ public class ImOnlineService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ImWsPushService imWsPushService;
     private final ImConversationUserMapper imConversationUserMapper;
+    private final BlockService blockService;
     private final WsMetrics wsMetrics;
 
     public ImOnlineService(ImSessionManager imSessionManager,
                            StringRedisTemplate stringRedisTemplate,
                            ImWsPushService imWsPushService,
                            ImConversationUserMapper imConversationUserMapper,
+                           BlockService blockService,
                            WsMetrics wsMetrics) {
         this.imSessionManager = imSessionManager;
         this.stringRedisTemplate = stringRedisTemplate;
         this.imWsPushService = imWsPushService;
         this.imConversationUserMapper = imConversationUserMapper;
+        this.blockService = blockService;
         this.wsMetrics = wsMetrics;
     }
 
@@ -104,8 +109,11 @@ public class ImOnlineService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("userId", userId);
         data.put("online", presenceType == WsMessageType.USER_ONLINE);
+        List<Long> blockedByMe = blockService.getBlockedUserIds(userId);
         imConversationUserMapper.selectDistinctPeerUserIds(userId).stream()
                 .filter(peerId -> !peerId.equals(userId))
+                .filter(peerId -> !blockedByMe.contains(peerId))
+                .filter(peerId -> !blockService.isBlocked(peerId, userId))
                 .forEach(peerId -> imWsPushService.pushToUser(peerId, presenceType, null, null, data));
     }
 }

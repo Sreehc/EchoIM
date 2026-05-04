@@ -141,7 +141,8 @@
                u.signature AS signature,
                u.status AS status,
                <include refid="FriendStatusCase"/> AS friendStatus,
-               <include refid="PendingRequestIdExpr"/> AS pendingRequestId
+               <include refid="PendingRequestIdExpr"/> AS pendingRequestId,
+               EXISTS(SELECT 1 FROM im_block_user b WHERE b.user_id = #{currentUserId} AND b.blocked_user_id = u.id) AS blocked
         FROM im_user u
         WHERE u.id = #{targetUserId}
           AND u.status = 1
@@ -158,7 +159,8 @@
                u.signature AS signature,
                u.status AS status,
                <include refid="FriendStatusCase"/> AS friendStatus,
-               <include refid="PendingRequestIdExpr"/> AS pendingRequestId
+               <include refid="PendingRequestIdExpr"/> AS pendingRequestId,
+               EXISTS(SELECT 1 FROM im_block_user b WHERE b.user_id = #{currentUserId} AND b.blocked_user_id = u.id) AS blocked
         FROM im_user u
         WHERE u.username = #{username}
           AND u.status = 1

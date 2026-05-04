@@ -24,6 +24,9 @@ public final class ErrorCode {
     public static final int JOIN_REQUEST_PENDING = 40907;
     public static final int JOIN_REQUEST_NOT_FOUND = 40406;
     public static final int MEMBER_MUTED = 40301;
+    public static final int USER_BLOCKED = 40302;
+    public static final int ALREADY_BLOCKED = 40908;
+    public static final int NOT_BLOCKED = 40407;
     public static final int SYSTEM_ERROR = 50000;
 
     private ErrorCode() {

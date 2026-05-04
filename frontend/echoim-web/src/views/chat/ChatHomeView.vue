@@ -1309,6 +1309,14 @@ async function handleRefreshSecurityEvents() {
   await authStore.loadSecurityEvents(true)
 }
 
+async function handleRefreshBlockedUsers() {
+  await authStore.loadBlockedUsers(true)
+}
+
+async function handleUnblockUser(userId: number) {
+  await authStore.handleUnblockUser(userId)
+}
+
 async function handleLoadOlderMessages() {
   const conversationId = chatStore.activeConversationId
   if (!conversationId) return
@@ -1750,8 +1758,10 @@ function registerDebugHooks() {
       :email-binding-loading="authStore.emailBindingLoading"
       :trusted-devices-loading="authStore.trustedDevicesLoading"
       :security-events-loading="authStore.securityEventsLoading"
+      :blocked-users-loading="authStore.blockedUsersLoading"
       :trusted-devices="authStore.trustedDevices"
       :security-events="authStore.securityEvents"
+      :blocked-users="authStore.blockedUsers"
       :profile-error="authStore.profileError"
       :profile-notice="authStore.profileNotice"
       :username-checking="usernameCheck.checking"
@@ -1777,6 +1787,8 @@ function registerDebugHooks() {
       @revoke-trusted-device="handleRevokeTrustedDevice"
       @revoke-all-trusted-devices="handleRevokeAllTrustedDevices"
       @refresh-security-events="handleRefreshSecurityEvents"
+      @refresh-blocked-users="handleRefreshBlockedUsers"
+      @unblock-user="handleUnblockUser"
       @clear-profile-error="authStore.clearProfileError"
       @clear-profile-notice="authStore.clearProfileNotice"
       @conversation-action="handleConversationContextAction"
