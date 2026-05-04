@@ -146,6 +146,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setSticker(readSticker(extraMap.get("sticker")));
         item.setVoice(readVoice(extraMap.get("voice")));
         item.setMentions(readMentions(extraMap.get("mentions")));
+        item.setSelfDestructSeconds(readInteger(extraMap.get("selfDestructSeconds")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -170,6 +171,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setSticker(readSticker(extraMap.get("sticker")));
         item.setVoice(readVoice(extraMap.get("voice")));
         item.setMentions(readMentions(extraMap.get("mentions")));
+        item.setSelfDestructSeconds(readInteger(extraMap.get("selfDestructSeconds")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -232,6 +234,20 @@ public class MessageViewServiceImpl implements MessageViewService {
             return objectMapper.convertValue(value, new com.fasterxml.jackson.core.type.TypeReference<List<MentionVo>>() {});
         } catch (Exception e) {
             return List.of();
+        }
+    }
+
+    private Integer readInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return null;
         }
     }
 

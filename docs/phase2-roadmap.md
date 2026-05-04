@@ -3,7 +3,7 @@
 > 创建日期：2026-05-04
 > 前置条件：一期工程全部五个阶段已完成，系统具备完整的即时通讯、语音通话、管理后台能力
 > 目标：从"功能可用"升级为"体验优秀、安全可靠、可规模运营"
-> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八 8.1 用户屏蔽全部 3 项任务完成
+> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八 8.1-8.2 全部完成
 
 ---
 
@@ -141,11 +141,19 @@
 
 ### 8.2 消息安全
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 8.2.1 | 阅后即焚 | P1 | 1.5d | 消息设置自毁时间（5s/30s/1m/5m/1h），对方查看后倒计时销毁，前端截屏检测（可选） |
-| 8.2.2 | 消息删除（双向） | P1 | 0.5d | "删除并撤回"选项，从双方消息列表中移除 |
-| 8.2.3 | 敏感内容过滤 | P2 | 1d | 后端关键词过滤（可配置词库），命中后消息标记或拦截，管理后台词库管理 |
+> **审查结论（2026-05-04）**：阶段八 8.2 消息安全全部 3 项任务在代码层面均已实现。
+> 阅后即焚：前端 MessageComposer 自毁时间选择器（5s/30s/1m/5m/1h），selfDestructSeconds 存入 extraJson，
+> MessageBubble 读取后启动倒计时，到期触发 recallMessage 销毁消息。
+> 双向删除：后端 deleteForEveryone API 实际删除消息记录并推送 MESSAGE_DELETE WS 事件，
+> 前端右键菜单"删除并撤回"选项，双方消息列表同步移除。
+> 敏感内容过滤：后端 im_sensitive_word 表 + SensitiveWordService 缓存式词库，
+> 单聊/群聊发送时自动过滤，拦截类词汇直接拒绝，标记类词汇替换为星号。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 8.2.1 | 阅后即焚 | P1 | 1.5d | ✅ 已完成 | 前端：`types/chat.ts` ChatMessage selfDestructSeconds/selfDestructAt + `MessageComposer.vue` SELF_DESTRUCT_OPTIONS 自毁时间选择器 + emit send 增加 selfDestructSeconds 参数 + `MessageBubble.vue` selfDestructCountdown 倒计时逻辑 + 自毁徽章 Timer 图标 + `MessagePane.vue` self-destruct-message 事件透传 + `ChatHomeView.vue` handleSendTextMessage 传递 selfDestructSeconds + handleSelfDestructMessage 触发 recallMessage + `stores/chat.ts` sendMessage payload selfDestructSeconds + buildMessageExtra 包含 selfDestructSeconds；后端：`MessageItemVo.java`/`WsMessageItem.java` selfDestructSeconds Integer 字段 + `MessageViewServiceImpl` readInteger() + applyExtra() 读取 selfDestructSeconds |
+| 8.2.2 | 消息删除（双向） | P1 | 0.5d | ✅ 已完成 | 后端：`MessageCommandService` 新增 deleteForEveryone 接口 + `MessageCommandServiceImpl` deleteForEveryone()（校验 → 通知删除 → 删除 pin/reaction/message → 刷新会话预览）+ `MessageController` DELETE /api/messages/{id} + `WsMessageType` MESSAGE_DELETE + `ImMessageMapper` selectLatestByConversationId + `MessageMapper.xml` 对应 SQL；前端：`services/messages.ts` deleteMessage() + `stores/chat.ts` deleteMessage action + MESSAGE_DELETE WS 事件处理 + `MessageBubble.vue` delete-for-everyone emit + 'delete' context command + "删除并撤回"菜单项 + `MessagePane.vue` delete-message 事件透传 + `ChatHomeView.vue` handleDeleteMessage 确认弹窗 + 调用 chatStore.deleteMessage |
+| 8.2.3 | 敏感内容过滤 | P2 | 1d | ✅ 已完成 | 后端：`init.sql` im_sensitive_word 表 + `ImSensitiveWordEntity.java` + `ImSensitiveWordMapper.java` + `SensitiveWordMapper.xml` + `SensitiveWordService` 接口 + `SensitiveWordServiceImpl`（缓存式词库、containsBlockedWords/filterContent/addSensitiveWord/removeSensitiveWord/reloadCache）+ `ImSingleChatServiceImpl`/`ImGroupChatServiceImpl` 发送时敏感词过滤（拦截/标记）+ `AdminSensitiveWordController` GET/POST/DELETE /api/admin/sensitive-words + POST /reload |
 
 ### 8.3 登录安全增强
 

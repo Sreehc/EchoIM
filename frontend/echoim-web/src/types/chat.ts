@@ -228,6 +228,8 @@ export interface ChatMessage {
   pinnedByUserId?: number | null
   pinnedAt?: string | null
   mentions?: MentionItem[]
+  selfDestructSeconds?: number | null
+  selfDestructAt?: string | null
   errorMessage?: string | null
 }
 

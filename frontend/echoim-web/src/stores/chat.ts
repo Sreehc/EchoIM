@@ -23,7 +23,7 @@ import {
 } from '@/services/conversations'
 import { createGroup as createGroupRequest, fetchGroupDetail, fetchGroupMembers } from '@/services/groups'
 import { getJson, HttpError } from '@/services/http'
-import { editMessage as editMessageRequest, reactMessage as reactMessageRequest, recallMessage as recallMessageRequest, pinMessage as pinMessageRequest, unpinMessage as unpinMessageRequest } from '@/services/messages'
+import { editMessage as editMessageRequest, reactMessage as reactMessageRequest, recallMessage as recallMessageRequest, deleteMessage as deleteMessageRequest, pinMessage as pinMessageRequest, unpinMessage as unpinMessageRequest } from '@/services/messages'
 import { EchoWsClient } from '@/services/ws'
 import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
@@ -515,6 +515,7 @@ export const useChatStore = defineStore('chat', () => {
     sticker?: ChatMessage['sticker']
     voice?: ChatMessage['voice']
     mentions?: MentionItem[]
+    selfDestructSeconds?: number
   }) {
     const conversation = activeConversation.value
     const nextMsgType = payload.msgType ?? 'TEXT'
@@ -558,6 +559,8 @@ export const useChatStore = defineStore('chat', () => {
       reactions: [],
       sticker: payload.sticker ?? null,
       voice: nextMsgType === 'VOICE' ? (payload.voice ?? null) : null,
+      selfDestructSeconds: payload.selfDestructSeconds ?? null,
+      selfDestructAt: null,
       errorMessage: null,
     }
 
@@ -629,6 +632,26 @@ export const useChatStore = defineStore('chat', () => {
       })
     } catch (error) {
       errors.value.noticeMessage = toErrorMessage(error, '撤回消息失败')
+      throw error
+    }
+  }
+
+  async function deleteMessage(messageId: number) {
+    const target = findMessageById(messageId)
+    if (!target) return
+
+    errors.value.noticeMessage = null
+
+    try {
+      await deleteMessageRequest(messageId)
+      // Remove the message from the local list
+      const conversationMessages = messagesByConversation.value[target.conversationId] ?? []
+      messagesByConversation.value = {
+        ...messagesByConversation.value,
+        [target.conversationId]: conversationMessages.filter(m => m.messageId !== messageId),
+      }
+    } catch (error) {
+      errors.value.noticeMessage = toErrorMessage(error, '删除消息失败')
       throw error
     }
   }
@@ -835,6 +858,17 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
+    if (envelope.type === 'MESSAGE_DELETE') {
+      const payload = envelope.data as { messageId: number; conversationId: number }
+      if (!payload?.messageId || !payload?.conversationId) return
+      const conversationMessages = messagesByConversation.value[payload.conversationId] ?? []
+      messagesByConversation.value = {
+        ...messagesByConversation.value,
+        [payload.conversationId]: conversationMessages.filter(m => m.messageId !== payload.messageId),
+      }
+      return
+    }
+
     if (envelope.type === 'MESSAGE_RECALL' || envelope.type === 'MESSAGE_EDIT' || envelope.type === 'MESSAGE_PIN' || envelope.type === 'MESSAGE_UNPIN') {
       const payload = envelope.data as { message: ApiMessageItem }
       if (!payload?.message) return
@@ -1006,6 +1040,11 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (!payload.message) {
+      // For MESSAGE_DELETE, the message is null but we still need to handle it
+      if (payload.changeType === 'MESSAGE_DELETE' && payload.conversation) {
+        // The message was deleted - we'll handle this via the direct WS message
+        return
+      }
       return
     }
 
@@ -1212,6 +1251,9 @@ export const useChatStore = defineStore('chat', () => {
     }
     if (message.voice) {
       extra.voice = message.voice
+    }
+    if (message.selfDestructSeconds && message.selfDestructSeconds > 0) {
+      extra.selfDestructSeconds = message.selfDestructSeconds
     }
     return Object.keys(extra).length ? extra : undefined
   }
@@ -1586,6 +1628,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     retryMessage,
     recallMessage,
+    deleteMessage,
     editMessage,
     toggleReaction,
     pinMessage,

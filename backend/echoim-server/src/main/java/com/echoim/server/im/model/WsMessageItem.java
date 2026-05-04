@@ -44,6 +44,7 @@ public class WsMessageItem {
     private Long pinnedByUserId;
     private LocalDateTime pinnedAt;
     private java.util.List<MentionVo> mentions;
+    private Integer selfDestructSeconds;
 
     public Long getMessageId() {
         return messageId;
@@ -299,5 +300,13 @@ public class WsMessageItem {
 
     public void setMentions(java.util.List<MentionVo> mentions) {
         this.mentions = mentions;
+    }
+
+    public Integer getSelfDestructSeconds() {
+        return selfDestructSeconds;
+    }
+
+    public void setSelfDestructSeconds(Integer selfDestructSeconds) {
+        this.selfDestructSeconds = selfDestructSeconds;
     }
 }

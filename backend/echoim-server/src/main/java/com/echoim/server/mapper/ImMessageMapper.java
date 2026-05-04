@@ -45,4 +45,6 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
     List<GlobalSearchMessageItemVo> selectGlobalSearchMessages(@Param("userId") Long userId,
                                                                @Param("keyword") String keyword,
                                                                @Param("limit") long limit);
+
+    ImMessageEntity selectLatestByConversationId(@Param("conversationId") Long conversationId);
 }

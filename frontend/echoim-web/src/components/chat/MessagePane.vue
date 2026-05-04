@@ -33,10 +33,12 @@ const emit = defineEmits<{
   loadOlder: []
   retryMessage: [clientMsgId: string]
   'start-edit-message': [message: ChatMessage]
+  'self-destruct-message': [messageId: number]
   'update:editing-draft': [value: string]
   'cancel-edit-message': []
   'save-edit-message': [payload: { messageId: number; content: string }]
   'recall-message': [messageId: number]
+  'delete-message': [messageId: number]
   'reply-message': [message: ChatMessage]
   'forward-message': [message: ChatMessage]
   'toggle-forward-selection': [message: ChatMessage]
@@ -336,7 +338,9 @@ function jumpToMessage(messageId: number) {
           @cancel-edit="emit('cancel-edit-message')"
           @save-edit="emit('save-edit-message', { messageId: entry.message.messageId, content: $event })"
           @recall="emit('recall-message', entry.message.messageId)"
+          @delete-for-everyone="emit('delete-message', entry.message.messageId)"
           @open-image-viewer="emit('open-image-viewer', $event[0], $event[1])"
+          @self-destruct="emit('self-destruct-message', $event)"
         />
       </template>
     </div>

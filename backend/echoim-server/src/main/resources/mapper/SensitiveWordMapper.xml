@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.ImSensitiveWordMapper">
+
+    <select id="selectAllEnabled" resultType="com.echoim.server.entity.ImSensitiveWordEntity">
+        SELECT id,
+               word,
+               category,
+               level,
+               action,
+               status,
+               created_by AS createdBy,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_sensitive_word
+        WHERE status = 1
+        ORDER BY level DESC, id ASC
+    </select>
+</mapper>

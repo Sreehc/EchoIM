@@ -115,6 +115,29 @@
         WHERE conversation_id = #{conversationId}
     </select>
 
+    <select id="selectLatestByConversationId" resultType="com.echoim.server.entity.ImMessageEntity">
+        SELECT id,
+               conversation_id AS conversationId,
+               conversation_type AS conversationType,
+               seq_no AS seqNo,
+               client_msg_id AS clientMsgId,
+               from_user_id AS fromUserId,
+               to_user_id AS toUserId,
+               group_id AS groupId,
+               msg_type AS msgType,
+               content,
+               extra_json AS extraJson,
+               file_id AS fileId,
+               send_status AS sendStatus,
+               sent_at AS sentAt,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM im_message
+        WHERE conversation_id = #{conversationId}
+        ORDER BY seq_no DESC
+        LIMIT 1
+    </select>
+
     <select id="selectByFromUserIdAndClientMsgId" resultType="com.echoim.server.entity.ImMessageEntity">
         SELECT id,
                conversation_id AS conversationId,

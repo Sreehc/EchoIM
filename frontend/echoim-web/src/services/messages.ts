@@ -5,6 +5,10 @@ export function recallMessage(messageId: number) {
   return putJson(`/api/messages/${messageId}/recall`)
 }
 
+export function deleteMessage(messageId: number) {
+  return fetch(`/api/messages/${messageId}`, { method: 'DELETE', credentials: 'include' }).then(r => r.json())
+}
+
 export function editMessage(messageId: number, content: string) {
   return putJson(`/api/messages/${messageId}/edit`, { content })
 }

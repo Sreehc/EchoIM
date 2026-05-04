@@ -258,6 +258,29 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     }
 
     @Override
+    @Transactional
+    public Map<String, Object> deleteForEveryone(Long userId, Long messageId) {
+        ImMessageEntity message = requireOwnedMessage(userId, messageId);
+        validateDeleteForEveryone(message);
+        Long conversationId = message.getConversationId();
+        // Notify all members before deleting
+        notifyMessageDeletion(message, userId);
+        // Delete related data
+        imMessagePinMapper.delete(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessagePinEntity>()
+                        .eq(ImMessagePinEntity::getMessageId, messageId));
+        imMessageReactionMapper.delete(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessageReactionEntity>()
+                        .eq(ImMessageReactionEntity::getMessageId, messageId));
+        // Delete the message itself
+        imMessageMapper.deleteById(messageId);
+        // Refresh conversation preview
+        refreshConversationPreviewAfterDelete(conversationId);
+        auditLogService.log("MESSAGE_DELETE", Map.of("userId", userId, "messageId", messageId, "conversationId", conversationId));
+        return Map.of("messageId", messageId, "conversationId", conversationId, "status", "DELETED");
+    }
+
+    @Override
     public List<MessageItemVo> listPinnedMessages(Long userId, Long conversationId) {
         requireConversationMember(conversationId, userId);
         List<Long> pinnedMessageIds = imMessagePinMapper.selectPinnedMessageIdsByConversationId(conversationId);
@@ -310,6 +333,52 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         int recallSeconds = systemConfigService.getIntValue(CONFIG_KEY_RECALL_SECONDS, 120);
         if (message.getSentAt() == null || message.getSentAt().plusSeconds(recallSeconds).isBefore(LocalDateTime.now())) {
             throw new BizException(ErrorCode.BUSINESS_CONFLICT, "已超过可操作时间窗口");
+        }
+    }
+
+    private void validateDeleteForEveryone(ImMessageEntity message) {
+        if (Integer.valueOf(MESSAGE_TYPE_SYSTEM).equals(message.getMsgType())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "系统消息不支持删除");
+        }
+        if (Integer.valueOf(MESSAGE_STATUS_RECALLED).equals(message.getSendStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "消息已撤回");
+        }
+        validateRecallWindow(message);
+    }
+
+    private void notifyMessageDeletion(ImMessageEntity message, Long operatorUserId) {
+        List<ImConversationUserEntity> members = imConversationUserMapper.selectByConversationId(message.getConversationId());
+        for (ImConversationUserEntity member : members) {
+            if (member.getDeleted() != null
+                    && member.getDeleted() == 1
+                    && (Integer.valueOf(CONVERSATION_TYPE_GROUP).equals(message.getConversationType())
+                    || Integer.valueOf(CONVERSATION_TYPE_CHANNEL).equals(message.getConversationType()))) {
+                continue;
+            }
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("messageId", message.getId());
+            payload.put("conversationId", message.getConversationId());
+            imWsPushService.pushToUser(member.getUserId(), WsMessageType.MESSAGE_DELETE, null, message.getClientMsgId(), payload);
+            var conversationItem = imConversationMapper.selectConversationItemByUserId(message.getConversationId(), member.getUserId());
+            if (conversationItem != null) {
+                imWsPushService.pushConversationChange(member.getUserId(), "MESSAGE_DELETE", conversationItem, null);
+            }
+        }
+    }
+
+    private void refreshConversationPreviewAfterDelete(Long conversationId) {
+        ImConversationEntity conversation = imConversationMapper.selectById(conversationId);
+        if (conversation == null) {
+            return;
+        }
+        ImMessageEntity latestMessage = imMessageMapper.selectLatestByConversationId(conversationId);
+        if (latestMessage != null) {
+            String preview = Integer.valueOf(MESSAGE_STATUS_RECALLED).equals(latestMessage.getSendStatus())
+                    ? "撤回了一条消息"
+                    : buildPreview(latestMessage);
+            imConversationMapper.updateLastMessageState(conversationId, latestMessage.getId(), preview, latestMessage.getSentAt());
+        } else {
+            imConversationMapper.updateLastMessageState(conversationId, null, null, null);
         }
     }
 

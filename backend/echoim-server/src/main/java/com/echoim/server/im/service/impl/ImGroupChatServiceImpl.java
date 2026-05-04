@@ -25,6 +25,7 @@ import com.echoim.server.service.block.BlockService;
 import com.echoim.server.service.file.FileService;
 import com.echoim.server.service.message.StickerCatalog;
 import com.echoim.server.service.message.MessageViewService;
+import com.echoim.server.service.sensitive.SensitiveWordService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -71,6 +72,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
     private final StickerCatalog stickerCatalog;
     private final MessageViewService messageViewService;
     private final LocalRateLimitService localRateLimitService;
+    private final SensitiveWordService sensitiveWordService;
     private final ObjectMapper objectMapper;
 
     public ImGroupChatServiceImpl(ImConversationMapper imConversationMapper,
@@ -84,6 +86,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
                                   StickerCatalog stickerCatalog,
                                   MessageViewService messageViewService,
                                   LocalRateLimitService localRateLimitService,
+                                  SensitiveWordService sensitiveWordService,
                                   ObjectMapper objectMapper) {
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
@@ -96,6 +99,7 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         this.stickerCatalog = stickerCatalog;
         this.messageViewService = messageViewService;
         this.localRateLimitService = localRateLimitService;
+        this.sensitiveWordService = sensitiveWordService;
         this.objectMapper = objectMapper;
     }
 
@@ -105,6 +109,14 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         localRateLimitService.check("ws-group-send:" + loginUser.getUserId(), 120, 60, "发送过于频繁");
         WsGroupChatData data = objectMapper.convertValue(message.getData(), WsGroupChatData.class);
         validateChatRequest(message, data);
+
+        // Sensitive word filtering for text messages
+        if (MESSAGE_TYPE_TEXT == data.getMsgType() && StringUtils.hasText(data.getContent())) {
+            if (sensitiveWordService.containsBlockedWords(data.getContent())) {
+                throw new BizException(ErrorCode.BUSINESS_CONFLICT, "消息包含敏感内容，已被拦截");
+            }
+            data.setContent(sensitiveWordService.filterContent(data.getContent()));
+        }
 
         ImMessageEntity duplicate = imMessageMapper.selectByFromUserIdAndClientMsgId(loginUser.getUserId(), message.getClientMsgId());
         if (duplicate != null) {

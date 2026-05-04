@@ -22,4 +22,6 @@ public interface MessageCommandService {
     MessageItemVo unpinMessage(Long userId, Long messageId);
 
     List<MessageItemVo> listPinnedMessages(Long userId, Long conversationId);
+
+    Map<String, Object> deleteForEveryone(Long userId, Long messageId);
 }

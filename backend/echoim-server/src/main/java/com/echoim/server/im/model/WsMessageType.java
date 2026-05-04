@@ -27,5 +27,6 @@ public enum WsMessageType {
     USER_ONLINE,
     USER_OFFLINE,
     MESSAGE_PIN,
-    MESSAGE_UNPIN
+    MESSAGE_UNPIN,
+    MESSAGE_DELETE
 }

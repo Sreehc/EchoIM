@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ChatDotRound, Close, Paperclip } from '@element-plus/icons-vue'
+import { ChatDotRound, Close, Paperclip, Timer } from '@element-plus/icons-vue'
 import type { GroupMemberItem, MentionItem, StickerDefinition } from '@/types/chat'
 import type { VoiceRecordResult } from './VoiceRecorder.vue'
 import VoiceRecorder from './VoiceRecorder.vue'
 import MentionSelector from './MentionSelector.vue'
+
+const SELF_DESTRUCT_OPTIONS = [
+  { label: '关闭', value: 0 },
+  { label: '5秒', value: 5 },
+  { label: '30秒', value: 30 },
+  { label: '1分钟', value: 60 },
+  { label: '5分钟', value: 300 },
+  { label: '1小时', value: 3600 },
+]
 
 const props = withDefaults(
   defineProps<{
@@ -32,7 +41,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  send: [content: string, mentions: MentionItem[]]
+  send: [content: string, mentions: MentionItem[], selfDestructSeconds?: number]
   'upload-file': [file: File]
   'upload-files': [files: File[]]
   'send-sticker': [sticker: StickerDefinition]
@@ -46,6 +55,8 @@ const hasText = computed(() => Boolean(draft.value.trim()))
 const fileInput = ref<HTMLInputElement | null>(null)
 const stickerTrayOpen = ref(false)
 const voiceRecorderOpen = ref(false)
+const selfDestructSeconds = ref(0)
+const selfDestructMenuOpen = ref(false)
 const replyPreview = computed(() => props.replyingMessage?.content || props.replyingMessage?.file?.fileName || '原消息')
 
 // @mention state
@@ -68,7 +79,7 @@ function submit() {
     content.includes(`@${m.displayName}`) || content.includes(`@${m.userId}`)
   )
 
-  emit('send', content, mentionsInText)
+  emit('send', content, mentionsInText, selfDestructSeconds.value > 0 ? selfDestructSeconds.value : undefined)
   draft.value = ''
   pendingMentions.value = []
   closeMentionSelector()
@@ -266,6 +277,36 @@ function handleVoiceCancel() {
             <line x1="8" y1="22" x2="16" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
         </button>
+        <div class="composer__self-destruct-wrapper">
+          <button
+            class="composer__icon"
+            :class="{ 'is-active': selfDestructSeconds > 0 }"
+            type="button"
+            aria-label="阅后即焚"
+            data-testid="self-destruct-toggle"
+            @click="selfDestructMenuOpen = !selfDestructMenuOpen"
+          >
+            <Timer />
+          </button>
+          <transition name="self-destruct-menu-fade">
+            <div v-if="selfDestructMenuOpen" class="composer__self-destruct-menu">
+              <div class="composer__self-destruct-header">
+                <strong>阅后即焚</strong>
+                <p>消息将在对方查看后自动销毁</p>
+              </div>
+              <button
+                v-for="option in SELF_DESTRUCT_OPTIONS"
+                :key="option.value"
+                class="composer__self-destruct-option"
+                :class="{ 'is-active': selfDestructSeconds === option.value }"
+                type="button"
+                @click="selfDestructSeconds = option.value; selfDestructMenuOpen = false"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </transition>
+        </div>
         <el-input
           v-model="draft"
           :autosize="{ minRows: 1, maxRows: 4 }"
@@ -546,6 +587,78 @@ function handleVoiceCancel() {
   background: color-mix(in srgb, var(--interactive-primary-bg) 48%, var(--surface-panel));
   box-shadow: none;
   opacity: 0.55;
+}
+
+.composer__self-destruct-wrapper {
+  position: relative;
+}
+
+.composer__self-destruct-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 180px;
+  padding: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+}
+
+.composer__self-destruct-header {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.composer__self-destruct-header strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.composer__self-destruct-header p {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.composer__self-destruct-option {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease-out);
+}
+
+.composer__self-destruct-option:hover {
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.composer__self-destruct-option.is-active {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent);
+  color: var(--interactive-selected-fg);
+  font-weight: 600;
+}
+
+.self-destruct-menu-fade-enter-active,
+.self-destruct-menu-fade-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.self-destruct-menu-fade-enter-from,
+.self-destruct-menu-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px) scale(0.98);
 }
 
 @media (max-width: 767px) {

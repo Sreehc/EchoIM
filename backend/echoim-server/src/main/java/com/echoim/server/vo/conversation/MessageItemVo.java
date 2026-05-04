@@ -45,6 +45,7 @@ public class MessageItemVo {
     private Long pinnedByUserId;
     private LocalDateTime pinnedAt;
     private java.util.List<MentionVo> mentions;
+    private Integer selfDestructSeconds;
     @JsonIgnore
     private String extraJsonRaw;
 
@@ -302,6 +303,14 @@ public class MessageItemVo {
 
     public void setMentions(java.util.List<MentionVo> mentions) {
         this.mentions = mentions;
+    }
+
+    public Integer getSelfDestructSeconds() {
+        return selfDestructSeconds;
+    }
+
+    public void setSelfDestructSeconds(Integer selfDestructSeconds) {
+        this.selfDestructSeconds = selfDestructSeconds;
     }
 
     public String getExtraJsonRaw() {

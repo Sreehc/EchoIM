@@ -1376,6 +1376,39 @@ async function handleRecallMessage(messageId: number) {
   }
 }
 
+async function handleDeleteMessage(messageId: number) {
+  try {
+    await ElMessageBox.confirm('删除后消息将从双方消息列表中移除，且不可恢复。', '删除消息', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  messageActionPendingId.value = messageId
+
+  try {
+    await chatStore.deleteMessage(messageId)
+    if (editingMessageId.value === messageId) {
+      cancelMessageEditing()
+    }
+  } catch {
+    return
+  } finally {
+    messageActionPendingId.value = null
+  }
+}
+
+async function handleSelfDestructMessage(messageId: number) {
+  try {
+    await chatStore.recallMessage(messageId)
+  } catch {
+    // Silently fail - message may have already been deleted
+  }
+}
+
 async function handleToggleReaction(payload: { messageId: number; emoji: string }) {
   try {
     await chatStore.toggleReaction(payload.messageId, payload.emoji)
@@ -1430,13 +1463,14 @@ function handleTypingInput() {
   }, 2000)
 }
 
-async function handleSendTextMessage(content: string, mentions?: MentionItem[]) {
+async function handleSendTextMessage(content: string, mentions?: MentionItem[], selfDestructSeconds?: number) {
   attachmentError.value = null
   await chatStore.sendMessage({
     currentUserId: authStore.currentUser?.userId ?? 0,
     content,
     mentions: mentions && mentions.length > 0 ? mentions : undefined,
     replySource: toReplySource(replyingMessage.value),
+    selfDestructSeconds,
   })
   clearReplyMessage()
 }
@@ -1882,6 +1916,7 @@ function registerDebugHooks() {
             @cancel-edit-message="cancelMessageEditing"
             @save-edit-message="saveEditingMessage"
             @recall-message="handleRecallMessage"
+            @delete-message="handleDeleteMessage"
             @reply-message="handleReplyMessage"
             @forward-message="handleForwardMessage"
             @toggle-forward-selection="toggleForwardSelection"
@@ -1890,6 +1925,7 @@ function registerDebugHooks() {
             @unpin-message="handleUnpinMessage"
             @view-profile="openChatFromContact"
             @open-image-viewer="handleOpenImageViewer"
+            @self-destruct-message="handleSelfDestructMessage"
           />
           <div v-if="typingLabel" class="chat-page__typing" data-testid="typing-indicator">
             {{ typingLabel }}

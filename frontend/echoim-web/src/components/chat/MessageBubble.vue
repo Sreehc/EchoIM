@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Document, Picture } from '@element-plus/icons-vue'
+import { Document, Picture, Timer } from '@element-plus/icons-vue'
 import type { ChatMessage, ConversationType } from '@/types/chat'
 import { formatMessageTime, highlightBubbleContent } from '@/utils/format'
 import { findStickerDefinition } from '@/stickers/library'
@@ -33,6 +33,7 @@ const emit = defineEmits<{
   'cancel-edit': []
   'save-edit': [value: string]
   recall: []
+  'delete-for-everyone': []
   reply: []
   forward: []
   'toggle-reaction': [emoji: string]
@@ -42,12 +43,81 @@ const emit = defineEmits<{
   'view-profile': [userId: number]
   pin: []
   unpin: []
+  'self-destruct': [messageId: number]
 }>()
 
-type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'retry' | 'pin' | 'unpin'
+type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'delete' | 'retry' | 'pin' | 'unpin'
 
 const isSelf = computed(() => props.message.fromUserId === props.currentUserId)
 const isSystem = computed(() => props.message.msgType === 'SYSTEM')
+
+// Self-destruct countdown
+const selfDestructRemaining = ref<number | null>(null)
+let selfDestructTimer: ReturnType<typeof setInterval> | null = null
+
+const selfDestructActive = computed(() => {
+  return props.message.selfDestructSeconds != null && props.message.selfDestructSeconds > 0
+})
+
+const selfDestructCountdown = computed(() => {
+  if (selfDestructRemaining.value == null) return null
+  const seconds = selfDestructRemaining.value
+  if (seconds <= 0) return null
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes < 60) return `${minutes}m${remainingSeconds > 0 ? ` ${remainingSeconds}s` : ''}`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`
+})
+
+function startSelfDestructCountdown() {
+  if (!selfDestructActive.value || !props.message.read || isSelf.value) return
+
+  const readAt = props.message.readAt ? new Date(props.message.readAt).getTime() : Date.now()
+  const elapsed = Math.floor((Date.now() - readAt) / 1000)
+  const remaining = (props.message.selfDestructSeconds ?? 0) - elapsed
+
+  if (remaining <= 0) {
+    emit('self-destruct', props.message.messageId)
+    return
+  }
+
+  selfDestructRemaining.value = remaining
+
+  selfDestructTimer = setInterval(() => {
+    if (selfDestructRemaining.value != null && selfDestructRemaining.value > 0) {
+      selfDestructRemaining.value--
+      if (selfDestructRemaining.value <= 0) {
+        if (selfDestructTimer) {
+          clearInterval(selfDestructTimer)
+          selfDestructTimer = null
+        }
+        emit('self-destruct', props.message.messageId)
+      }
+    }
+  }, 1000)
+}
+
+watch(
+  () => [props.message.read, props.message.readAt],
+  () => {
+    if (selfDestructTimer) {
+      clearInterval(selfDestructTimer)
+      selfDestructTimer = null
+    }
+    startSelfDestructCountdown()
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  if (selfDestructTimer) {
+    clearInterval(selfDestructTimer)
+    selfDestructTimer = null
+  }
+})
 const stickerDefinition = computed(() => findStickerDefinition(props.message.sticker?.stickerId))
 const stickerTitle = computed(() => props.message.sticker?.title ?? attachmentMeta.value?.title ?? '贴纸')
 const contextMenuVisible = ref(false)
@@ -201,6 +271,7 @@ const contextMenuActions = computed(() => {
   if (canManageMessage.value && !props.editing) {
     actions.push({ key: 'edit', label: '编辑', testId: 'message-context-edit' })
     actions.push({ key: 'recall', label: '撤回', danger: true, testId: 'message-context-recall' })
+    actions.push({ key: 'delete', label: '删除并撤回', danger: true, testId: 'message-context-delete' })
   }
 
   if (isSelf.value && props.message.sendStatus === 2) {
@@ -319,6 +390,11 @@ function handleContextCommand(command: MessageContextCommand) {
     return
   }
 
+  if (command === 'delete') {
+    emit('delete-for-everyone')
+    return
+  }
+
   if (props.message.clientMsgId) {
     emit('retry', props.message.clientMsgId)
   }
@@ -432,6 +508,10 @@ onUnmounted(() => {
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M10.5 2l3.5 3.5-4.3 4.3L10.5 14l-1.3-4.3L5 13.5l.7-4.3L1.5 5 10.5 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
         </svg>
+      </span>
+      <span v-if="selfDestructActive" class="message-bubble__self-destruct-badge" aria-label="阅后即焚">
+        <Timer />
+        <span v-if="selfDestructCountdown">{{ selfDestructCountdown }}</span>
       </span>
       <button
         v-if="message.replySource && !message.recalled"
@@ -1113,6 +1193,26 @@ onUnmounted(() => {
 .message-bubble__pinned-badge svg {
   width: 14px;
   height: 14px;
+}
+
+.message-bubble__self-destruct-badge {
+  position: absolute;
+  top: 4px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  color: var(--status-warning);
+  font: 600 var(--text-xs)/1 var(--font-mono);
+  opacity: 0.9;
+}
+
+.message-bubble__self-destruct-badge svg {
+  width: 12px;
+  height: 12px;
 }
 
 .message-bubble__gif-badge {

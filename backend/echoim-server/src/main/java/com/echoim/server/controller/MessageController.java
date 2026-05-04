@@ -32,6 +32,12 @@ public class MessageController {
         return ApiResponse.success(messageCommandService.recall(LoginUserContext.requireUserId(), id));
     }
 
+    @DeleteMapping("/{id}")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-delete", permits = 20, windowSeconds = 60, message = "删除过于频繁")
+    public ApiResponse<Map<String, Object>> deleteForEveryone(@PathVariable Long id) {
+        return ApiResponse.success(messageCommandService.deleteForEveryone(LoginUserContext.requireUserId(), id));
+    }
+
     @PutMapping("/{id}/edit")
     @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-edit", permits = 20, windowSeconds = 60, message = "编辑过于频繁")
     public ApiResponse<Map<String, Object>> edit(@PathVariable Long id,

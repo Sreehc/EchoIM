@@ -358,6 +358,21 @@ CREATE TABLE IF NOT EXISTS sys_operation_log (
   KEY idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='操作日志表';
 
+CREATE TABLE IF NOT EXISTS im_sensitive_word (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '敏感词ID',
+  word VARCHAR(100) NOT NULL COMMENT '敏感词',
+  category VARCHAR(50) DEFAULT 'default' COMMENT '分类',
+  level TINYINT NOT NULL DEFAULT 1 COMMENT '1普通 2严重',
+  action TINYINT NOT NULL DEFAULT 1 COMMENT '1标记 2拦截',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
+  created_by BIGINT DEFAULT NULL COMMENT '创建者ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_word (word),
+  KEY idx_category (category),
+  KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='敏感词库表';
+
 -- Redis key 规划建议
 -- echoim:online:user:{userId}
 -- echoim:route:user:{userId}
