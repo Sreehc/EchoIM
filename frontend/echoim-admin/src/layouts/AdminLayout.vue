@@ -46,6 +46,18 @@
           <el-icon><Filter /></el-icon>
           <template #title>敏感词管理</template>
         </el-menu-item>
+        <el-menu-item index="/notices">
+          <el-icon><Bell /></el-icon>
+          <template #title>系统公告</template>
+        </el-menu-item>
+        <el-menu-item index="/bans">
+          <el-icon><CircleClose /></el-icon>
+          <template #title>用户封禁</template>
+        </el-menu-item>
+        <el-menu-item index="/operation-logs">
+          <el-icon><Document /></el-icon>
+          <template #title>操作日志</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -96,6 +108,9 @@ import {
   DataAnalysis,
   Warning,
   Filter,
+  Bell,
+  CircleClose,
+  Document,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

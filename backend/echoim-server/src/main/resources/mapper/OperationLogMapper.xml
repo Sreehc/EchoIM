@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echoim.server.mapper.SysOperationLogMapper">
+
+    <select id="selectLogPage" resultType="java.util.Map">
+        SELECT l.id AS logId,
+               l.admin_user_id AS adminUserId,
+               a.nickname AS adminNickname,
+               l.module_name AS moduleName,
+               l.action_name AS actionName,
+               l.target_type AS targetType,
+               l.target_id AS targetId,
+               l.request_ip AS requestIp,
+               l.content_json AS contentJson,
+               l.created_at AS createdAt
+        FROM sys_operation_log l
+        LEFT JOIN sys_admin_user a ON a.id = l.admin_user_id
+        <where>
+            <if test="adminUserId != null">
+                AND l.admin_user_id = #{adminUserId}
+            </if>
+            <if test="moduleName != null and moduleName != ''">
+                AND l.module_name = #{moduleName}
+            </if>
+        </where>
+        ORDER BY l.created_at DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countLogs" resultType="long">
+        SELECT COUNT(1) FROM sys_operation_log
+        <where>
+            <if test="adminUserId != null">
+                AND admin_user_id = #{adminUserId}
+            </if>
+            <if test="moduleName != null and moduleName != ''">
+                AND module_name = #{moduleName}
+            </if>
+        </where>
+    </select>
+
+</mapper>
