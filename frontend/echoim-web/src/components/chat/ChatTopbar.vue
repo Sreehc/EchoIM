@@ -23,7 +23,7 @@ const emit = defineEmits<{
   closeSearch: []
   navigateSearchMatch: [step: -1 | 1]
   action: [command: 'toggle-top' | 'toggle-mute' | 'mark-read' | 'delete']
-  'start-call': []
+  'start-call': [callType: 'audio' | 'video']
   'update:menuOpen': [value: boolean]
   'update:messageSearchQuery': [value: string]
 }>()
@@ -134,9 +134,15 @@ watch(
           <el-dropdown-menu>
             <el-dropdown-item
               v-if="conversation?.conversationType === 1 && conversation?.specialType !== 'SAVED_MESSAGES'"
-              @click="emit('start-call')"
+              @click="emit('start-call', 'audio')"
             >
               发起语音通话
+            </el-dropdown-item>
+            <el-dropdown-item
+              v-if="conversation?.conversationType === 1 && conversation?.specialType !== 'SAVED_MESSAGES'"
+              @click="emit('start-call', 'video')"
+            >
+              发起视频通话
             </el-dropdown-item>
             <el-dropdown-item v-if="isMobile" @click="emit('focusSearch')">
               搜索消息

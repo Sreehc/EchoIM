@@ -48,6 +48,7 @@ public class CallServiceImpl implements CallService {
     private static final int MESSAGE_TYPE_SYSTEM = 6;
     private static final int MESSAGE_STATUS_SENT = 1;
     private static final String CALL_TYPE_AUDIO = "audio";
+    private static final String CALL_TYPE_VIDEO = "video";
     private static final String STATUS_RINGING = "ringing";
     private static final String STATUS_ACCEPTED = "accepted";
     private static final String STATUS_REJECTED = "rejected";
@@ -118,7 +119,8 @@ public class CallServiceImpl implements CallService {
         imCallSessionMapper.insert(session);
 
         ensureConversationVisible(conversation.getId(), userId, peerUserId);
-        pushSystemMessage(conversation, userId, peerUserId, "发起了语音通话", "call-start-" + session.getId(), session.getStartedAt());
+        String startText = CALL_TYPE_VIDEO.equals(normalizedType) ? "发起了视频通话" : "发起了语音通话";
+        pushSystemMessage(conversation, userId, peerUserId, startText, "call-start-" + session.getId(), session.getStartedAt());
         scheduleTimeout(session.getId());
 
         CallSessionSummaryVo calleeView = buildSummary(session, peerUserId);
@@ -293,7 +295,8 @@ public class CallServiceImpl implements CallService {
         if (conversation == null) {
             return;
         }
-        pushSystemMessage(conversation, session.getCallerUserId(), session.getCalleeUserId(), "未接来电", "call-missed-" + session.getId(), occurredAt);
+        String missedText = CALL_TYPE_VIDEO.equals(session.getCallType()) ? "未接视频通话" : "未接来电";
+        pushSystemMessage(conversation, session.getCallerUserId(), session.getCalleeUserId(), missedText, "call-missed-" + session.getId(), occurredAt);
     }
 
     private void pushDurationMessage(ImCallSessionEntity session, LocalDateTime occurredAt) {
@@ -305,11 +308,12 @@ public class CallServiceImpl implements CallService {
             return;
         }
         long durationSeconds = Math.max(0, Duration.between(session.getAnsweredAt(), occurredAt).getSeconds());
+        String callLabel = CALL_TYPE_VIDEO.equals(session.getCallType()) ? "视频通话时长" : "通话时长";
         pushSystemMessage(
                 conversation,
                 session.getCallerUserId(),
                 session.getCalleeUserId(),
-                "通话时长 " + formatDuration(durationSeconds),
+                callLabel + " " + formatDuration(durationSeconds),
                 "call-ended-" + session.getId(),
                 occurredAt
         );
@@ -446,8 +450,8 @@ public class CallServiceImpl implements CallService {
             throw new BizException(ErrorCode.PARAM_ERROR, "通话类型不能为空");
         }
         String normalized = callType.trim().toLowerCase();
-        if (!CALL_TYPE_AUDIO.equals(normalized)) {
-            throw new BizException(ErrorCode.PARAM_ERROR, "当前仅支持语音通话");
+        if (!CALL_TYPE_AUDIO.equals(normalized) && !CALL_TYPE_VIDEO.equals(normalized)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "不支持的通话类型：" + normalized);
         }
         return normalized;
     }

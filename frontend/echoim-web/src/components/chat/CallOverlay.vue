@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Microphone, Phone, TopRight } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, ref, watch, nextTick } from 'vue'
+import { Microphone, Phone, TopRight, VideoCamera, VideoPause } from '@element-plus/icons-vue'
 import type { CallPhase, CallSessionSummary } from '@/types/chat'
 import AvatarBadge from './AvatarBadge.vue'
 
@@ -10,8 +10,10 @@ const props = defineProps<{
   phase: CallPhase
   minimized: boolean
   localMuted: boolean
+  localCameraOff: boolean
   busy?: boolean
   error?: string | null
+  localStream: MediaStream | null
   remoteStream: MediaStream | null
 }>()
 
@@ -22,31 +24,55 @@ const emit = defineEmits<{
   end: []
   'toggle-minimized': []
   'toggle-mute': []
+  'toggle-camera': []
 }>()
 
 const remoteAudio = ref<HTMLAudioElement | null>(null)
+const remoteVideo = ref<HTMLVideoElement | null>(null)
+const localVideo = ref<HTMLVideoElement | null>(null)
+
+const isVideoCall = computed(() => props.call?.callType === 'video')
 
 const statusLabel = computed(() => {
-  if (props.phase === 'incoming') return '语音来电'
+  const video = isVideoCall.value
+  if (props.phase === 'incoming') return video ? '视频来电' : '语音来电'
   if (props.phase === 'outgoing') return '等待对方接听'
-  if (props.phase === 'connecting') return '正在建立语音连接'
+  if (props.phase === 'connecting') return video ? '正在建立视频连接' : '正在建立语音连接'
   if (props.phase === 'connected') return formatDuration(props.call?.durationSeconds ?? 0)
-  if (props.call?.status === 'missed') return '未接来电'
+  if (props.call?.status === 'missed') return video ? '未接视频通话' : '未接来电'
   if (props.call?.status === 'rejected') return '对方已拒绝'
   if (props.call?.status === 'cancelled') return '通话已取消'
   if (props.call?.status === 'ended') return '通话已结束'
-  return '语音通话'
+  return video ? '视频通话' : '语音通话'
 })
+
+const eyebrowLabel = computed(() => isVideoCall.value ? 'EchoIM Video' : 'EchoIM Voice')
 
 const canAccept = computed(() => props.phase === 'incoming')
 const canCancel = computed(() => props.phase === 'outgoing')
 const canEnd = computed(() => props.phase === 'connecting' || props.phase === 'connected')
 
+// Bind remote stream to video/audio elements
 watch(
-  () => [props.remoteStream, remoteAudio.value] as const,
-  ([stream, audio]) => {
-    if (!audio) return
-    audio.srcObject = stream
+  () => [props.remoteStream, remoteVideo.value, remoteAudio.value] as const,
+  ([stream, video, audio]) => {
+    if (video) {
+      video.srcObject = stream
+    }
+    if (audio) {
+      audio.srcObject = stream
+    }
+  },
+  { immediate: true },
+)
+
+// Bind local stream to local video element
+watch(
+  () => [props.localStream, localVideo.value] as const,
+  ([stream, video]) => {
+    if (video) {
+      video.srcObject = stream
+    }
   },
   { immediate: true },
 )
@@ -54,6 +80,12 @@ watch(
 onBeforeUnmount(() => {
   if (remoteAudio.value) {
     remoteAudio.value.srcObject = null
+  }
+  if (remoteVideo.value) {
+    remoteVideo.value.srcObject = null
+  }
+  if (localVideo.value) {
+    localVideo.value.srcObject = null
   }
 })
 
@@ -66,32 +98,77 @@ function formatDuration(durationSeconds: number) {
 
 <template>
   <transition name="call-overlay">
-    <aside v-if="visible && call" class="call-overlay" :class="{ 'is-minimized': minimized }">
-      <audio ref="remoteAudio" autoplay playsinline />
+    <aside v-if="visible && call" class="call-overlay" :class="{ 'is-minimized': minimized, 'is-video': isVideoCall }">
+      <!-- Audio-only element for audio calls (hidden for video calls, video element handles audio too) -->
+      <audio v-if="!isVideoCall" ref="remoteAudio" autoplay playsinline />
+
+      <!-- Remote video (fullscreen background when video call and not minimized) -->
+      <video
+        v-if="isVideoCall && !minimized"
+        ref="remoteVideo"
+        class="call-overlay__remote-video"
+        autoplay
+        playsinline
+      />
+
+      <!-- Local video PiP (bottom-right corner when video call and not minimized) -->
+      <div v-if="isVideoCall && !minimized" class="call-overlay__local-pip">
+        <video
+          ref="localVideo"
+          class="call-overlay__local-video"
+          autoplay
+          playsinline
+          muted
+        />
+        <div v-if="props.localCameraOff" class="call-overlay__local-video-off">
+          <AvatarBadge
+            :name="call.peerDisplayName"
+            :avatar-url="call.peerAvatarUrl"
+            :seed="call.peerUserId"
+            type="user"
+            size="sm"
+          />
+        </div>
+      </div>
+
       <div class="call-overlay__shell">
         <div class="call-overlay__header">
-          <span class="call-overlay__eyebrow">EchoIM Voice</span>
+          <span class="call-overlay__eyebrow">{{ eyebrowLabel }}</span>
           <button class="call-overlay__ghost" type="button" @click="emit('toggle-minimized')">
             <TopRight />
             {{ minimized ? '展开' : '最小化' }}
           </button>
         </div>
 
+        <!-- Full-size body (non-minimized) -->
         <div v-if="!minimized" class="call-overlay__body">
-          <AvatarBadge
-            :name="call.peerDisplayName"
-            :avatar-url="call.peerAvatarUrl"
-            :seed="call.peerUserId"
-            type="user"
-            size="lg"
-          />
-          <div class="call-overlay__copy">
-            <strong>{{ call.peerDisplayName }}</strong>
-            <p>{{ statusLabel }}</p>
-          </div>
+          <!-- For audio calls: show avatar + status -->
+          <template v-if="!isVideoCall">
+            <AvatarBadge
+              :name="call.peerDisplayName"
+              :avatar-url="call.peerAvatarUrl"
+              :seed="call.peerUserId"
+              type="user"
+              size="lg"
+            />
+            <div class="call-overlay__copy">
+              <strong>{{ call.peerDisplayName }}</strong>
+              <p>{{ statusLabel }}</p>
+            </div>
+          </template>
+
+          <!-- For video calls: show status overlay at top -->
+          <template v-else>
+            <div class="call-overlay__video-status">
+              <strong>{{ call.peerDisplayName }}</strong>
+              <p>{{ statusLabel }}</p>
+            </div>
+          </template>
+
           <p v-if="error" class="call-overlay__error">{{ error }}</p>
         </div>
 
+        <!-- Minimized body -->
         <div v-else class="call-overlay__mini">
           <AvatarBadge
             :name="call.peerDisplayName"
@@ -116,6 +193,17 @@ function formatDuration(durationSeconds: number) {
           >
             <Microphone />
             {{ localMuted ? '取消静音' : '静音' }}
+          </button>
+          <button
+            v-if="isVideoCall"
+            class="call-overlay__action"
+            :class="{ 'is-active': localCameraOff }"
+            type="button"
+            :disabled="!canEnd"
+            @click="emit('toggle-camera')"
+          >
+            <component :is="localCameraOff ? VideoPause : VideoCamera" />
+            {{ localCameraOff ? '打开摄像头' : '关闭摄像头' }}
           </button>
           <button
             v-if="canAccept"
@@ -169,6 +257,21 @@ function formatDuration(durationSeconds: number) {
   width: min(360px, calc(100vw - 28px));
 }
 
+/* Video call: full-screen overlay */
+.call-overlay.is-video {
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.call-overlay.is-video.is-minimized {
+  right: 22px;
+  bottom: 22px;
+  width: min(280px, calc(100vw - 28px));
+  height: auto;
+}
+
 .call-overlay__shell {
   display: grid;
   gap: 14px;
@@ -180,6 +283,19 @@ function formatDuration(durationSeconds: number) {
     color-mix(in srgb, var(--surface-overlay) 94%, rgba(7, 17, 24, 0.05));
   box-shadow: var(--shadow-overlay);
   backdrop-filter: blur(28px);
+}
+
+/* Video call shell: transparent overlay on top of video */
+.call-overlay.is-video:not(.is-minimized) .call-overlay__shell {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, transparent 30%, transparent 70%, rgba(0, 0, 0, 0.65) 100%);
+  box-shadow: none;
+  backdrop-filter: none;
+  align-content: space-between;
+  padding: 24px;
 }
 
 .call-overlay.is-minimized {
@@ -204,6 +320,11 @@ function formatDuration(durationSeconds: number) {
   text-transform: uppercase;
 }
 
+/* Video call eyebrow: white text */
+.call-overlay.is-video:not(.is-minimized) .call-overlay__eyebrow {
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .call-overlay__ghost,
 .call-overlay__action {
   min-height: var(--btn-min-size);
@@ -222,6 +343,13 @@ function formatDuration(durationSeconds: number) {
     background var(--motion-fast) var(--motion-ease-out),
     color var(--motion-fast) var(--motion-ease-out),
     box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+/* Video call ghost button: semi-transparent */
+.call-overlay.is-video:not(.is-minimized) .call-overlay__ghost {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .call-overlay__ghost {
@@ -271,9 +399,39 @@ function formatDuration(durationSeconds: number) {
   font-size: var(--text-sm);
 }
 
+/* Video call error: white text on dark bg */
+.call-overlay.is-video:not(.is-minimized) .call-overlay__error {
+  color: #ff8a80;
+}
+
 .call-overlay__actions {
   flex-wrap: wrap;
   justify-content: center;
+}
+
+/* Video call action buttons: semi-transparent */
+.call-overlay.is-video:not(.is-minimized) .call-overlay__action {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.call-overlay.is-video:not(.is-minimized) .call-overlay__action.is-active {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.call-overlay.is-video:not(.is-minimized) .call-overlay__action.is-accept {
+  border-color: rgba(76, 175, 80, 0.5);
+  background: rgba(76, 175, 80, 0.25);
+  color: #a5d6a7;
+}
+
+.call-overlay.is-video:not(.is-minimized) .call-overlay__action.is-danger {
+  border-color: rgba(244, 67, 54, 0.4);
+  background: rgba(244, 67, 54, 0.2);
+  color: #ef9a9a;
 }
 
 .call-overlay__action.is-active {
@@ -315,6 +473,69 @@ function formatDuration(durationSeconds: number) {
   background: color-mix(in srgb, var(--status-danger) 14%, var(--interactive-secondary-bg-hover));
 }
 
+/* ---- Remote video (fullscreen background) ---- */
+.call-overlay__remote-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  background: #000;
+}
+
+/* ---- Local video PiP ---- */
+.call-overlay__local-pip {
+  position: absolute;
+  z-index: 2;
+  bottom: 100px;
+  right: 24px;
+  width: 140px;
+  height: 186px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+  background: #1a1a2e;
+}
+
+.call-overlay__local-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror */
+}
+
+.call-overlay__local-video-off {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--surface-card) 85%, #000);
+}
+
+/* ---- Video status overlay (peer name during video call) ---- */
+.call-overlay__video-status {
+  text-align: center;
+  padding-top: 8px;
+}
+
+.call-overlay__video-status strong {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.call-overlay__video-status p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--text-sm);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 .call-overlay-enter-active,
 .call-overlay-leave-active {
   transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
@@ -326,12 +547,25 @@ function formatDuration(durationSeconds: number) {
   transform: translateY(14px) scale(0.98);
 }
 
+/* Video call transitions: fade only, no slide */
+.call-overlay.is-video.call-overlay-enter-from,
+.call-overlay.is-video.call-overlay-leave-to {
+  transform: none;
+}
+
 @media (max-width: 767px) {
-  .call-overlay {
+  .call-overlay:not(.is-video) {
     right: 14px;
     left: 14px;
     bottom: 14px;
     width: auto;
+  }
+
+  .call-overlay__local-pip {
+    width: 100px;
+    height: 133px;
+    bottom: 90px;
+    right: 16px;
   }
 }
 </style>

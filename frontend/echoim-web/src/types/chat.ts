@@ -120,7 +120,7 @@ export interface SecurityEventSummary {
 export type ConversationType = 1 | 2 | 3
 export type MessageType = 'TEXT' | 'STICKER' | 'IMAGE' | 'GIF' | 'FILE' | 'SYSTEM' | 'VOICE'
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'ready' | 'reconnecting'
-export type CallType = 'audio'
+export type CallType = 'audio' | 'video'
 export type CallSessionStatus = 'ringing' | 'accepted' | 'rejected' | 'cancelled' | 'ended' | 'missed' | 'failed'
 export type CallEndReason = 'hangup' | 'reject' | 'timeout' | 'busy' | 'offline' | 'error'
 export type CallPhase = 'idle' | 'incoming' | 'outgoing' | 'connecting' | 'connected' | 'ended'

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { ConversationSummary } from '@/types/chat'
+import type { CallType, ConversationSummary } from '@/types/chat'
 import type { ApiCallSessionSummary, WsCallSignalPayload, WsCallSummaryPayload } from '@/types/api'
 import { EchoWsClient } from '@/services/ws'
 import { acceptCall, cancelCall, createCall, endCall, fetchCall, rejectCall } from '@/services/calls'
@@ -17,6 +17,7 @@ export const useCallStore = defineStore('call', () => {
   const phase = ref<CallPhase>('idle')
   const minimized = ref(false)
   const localMuted = ref(false)
+  const localCameraOff = ref(false)
   const busy = ref(false)
   const error = ref<string | null>(null)
   const localStream = ref<MediaStream | null>(null)
@@ -34,9 +35,9 @@ export const useCallStore = defineStore('call', () => {
     wsClient = client
   }
 
-  async function startOutgoingCall(conversation: ConversationSummary) {
+  async function startOutgoingCall(conversation: ConversationSummary, callType: CallType = 'audio') {
     if (conversation.conversationType !== 1 || conversation.specialType === 'SAVED_MESSAGES') {
-      throw new Error('当前会话不支持发起语音通话')
+      throw new Error('当前会话不支持发起通话')
     }
     if (!conversation.peerUserId) {
       throw new Error('当前会话缺少对端用户标识')
@@ -46,15 +47,16 @@ export const useCallStore = defineStore('call', () => {
     error.value = null
 
     try {
-      await ensureLocalAudio()
-      const summary = normalizeCall(await createCall({ conversationId: conversation.conversationId, callType: 'audio' }))
+      await ensureLocalMedia(callType)
+      const summary = normalizeCall(await createCall({ conversationId: conversation.conversationId, callType }))
       setActiveCall(summary)
       phase.value = 'outgoing'
       minimized.value = false
       await ensurePeerConnection(summary)
     } catch (nextError) {
       clearMediaState()
-      error.value = toErrorMessage(nextError, '发起语音通话失败')
+      const label = callType === 'video' ? '发起视频通话失败' : '发起语音通话失败'
+      error.value = toErrorMessage(nextError, label)
       throw nextError
     } finally {
       busy.value = false
@@ -68,7 +70,7 @@ export const useCallStore = defineStore('call', () => {
     error.value = null
 
     try {
-      await ensureLocalAudio()
+      await ensureLocalMedia(activeCall.value.callType ?? 'audio')
       const summary = normalizeCall(await acceptCall(activeCall.value.callId))
       setActiveCall(summary)
       phase.value = 'connecting'
@@ -76,7 +78,8 @@ export const useCallStore = defineStore('call', () => {
       await ensurePeerConnection(summary)
     } catch (nextError) {
       clearMediaState()
-      error.value = toErrorMessage(nextError, '接听语音通话失败')
+      const label = (activeCall.value?.callType === 'video') ? '接听视频通话失败' : '接听语音通话失败'
+      error.value = toErrorMessage(nextError, label)
       throw nextError
     } finally {
       busy.value = false
@@ -134,6 +137,15 @@ export const useCallStore = defineStore('call', () => {
     localMuted.value = !localMuted.value
     stream.getAudioTracks().forEach((track) => {
       track.enabled = !localMuted.value
+    })
+  }
+
+  function toggleCamera() {
+    const stream = localStream.value
+    if (!stream) return
+    localCameraOff.value = !localCameraOff.value
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = !localCameraOff.value
     })
   }
 
@@ -231,6 +243,7 @@ export const useCallStore = defineStore('call', () => {
     phase.value = 'idle'
     minimized.value = false
     localMuted.value = false
+    localCameraOff.value = false
     busy.value = false
     error.value = null
   }
@@ -255,23 +268,37 @@ export const useCallStore = defineStore('call', () => {
     }
   }
 
-  async function ensureLocalAudio() {
+  async function ensureLocalMedia(callType: CallType = 'audio') {
+    const wantsVideo = callType === 'video'
     if (localStream.value) {
-      localStream.value.getAudioTracks().forEach((track) => {
-        track.enabled = true
-      })
-      localMuted.value = false
-      return localStream.value
+      const hasVideo = localStream.value.getVideoTracks().length > 0
+      if (wantsVideo && !hasVideo) {
+        localStream.value.getTracks().forEach((track) => track.stop())
+        localStream.value = null
+      } else {
+        localStream.value.getAudioTracks().forEach((track) => { track.enabled = true })
+        localStream.value.getVideoTracks().forEach((track) => { track.enabled = true })
+        localMuted.value = false
+        localCameraOff.value = false
+        return localStream.value
+      }
     }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    const videoConstraints: MediaStreamConstraints['video'] = wantsVideo ? {
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 24, max: 30 },
+      facingMode: 'user',
+    } : false
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: videoConstraints })
     localMuted.value = false
+    localCameraOff.value = false
     localStream.value = stream
     return stream
   }
 
   async function ensurePeerConnection(summary: CallSessionSummary) {
     if (peerConnection) return peerConnection
-    const stream = await ensureLocalAudio()
+    const stream = await ensureLocalMedia(summary.callType ?? 'audio')
     const connection = new RTCPeerConnection({
       iceServers: summary.iceServers.map((server) => ({
         urls: [...server.urls],
@@ -282,7 +309,7 @@ export const useCallStore = defineStore('call', () => {
     pendingIceCandidates = []
     remoteStream.value = new MediaStream()
 
-    stream.getAudioTracks().forEach((track) => {
+    stream.getTracks().forEach((track) => {
       connection.addTrack(track, stream)
     })
 
@@ -307,19 +334,20 @@ export const useCallStore = defineStore('call', () => {
 
     connection.onconnectionstatechange = () => {
       const state = connection.connectionState
+      const callLabel = (summary.callType === 'video') ? '视频' : '语音'
       if (state === 'connected') {
         phase.value = 'connected'
         error.value = null
         return
       }
       if (state === 'failed') {
-        error.value = '语音连接已中断'
+        error.value = `${callLabel}连接已中断`
         phase.value = 'ended'
         clearPeerConnection()
         return
       }
       if (state === 'disconnected') {
-        error.value = '语音连接已断开'
+        error.value = `${callLabel}连接已断开`
       }
     }
 
@@ -360,6 +388,7 @@ export const useCallStore = defineStore('call', () => {
     localStream.value?.getTracks().forEach((track) => track.stop())
     localStream.value = null
     localMuted.value = false
+    localCameraOff.value = false
   }
 
   function applyTerminalSummary(summary: CallSessionSummary) {
@@ -407,6 +436,7 @@ export const useCallStore = defineStore('call', () => {
     phase,
     minimized,
     localMuted,
+    localCameraOff,
     busy,
     error,
     localStream,
@@ -422,6 +452,7 @@ export const useCallStore = defineStore('call', () => {
     endCurrentCall,
     toggleMinimized,
     toggleMute,
+    toggleCamera,
     syncActiveCall,
     handleWsEvent,
     resetState,

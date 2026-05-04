@@ -858,12 +858,13 @@ async function handleConversationAction(command: 'toggle-top' | 'toggle-mute' | 
   uiStore.setTopbarMenuOpen(false)
 }
 
-async function handleStartCall() {
+async function handleStartCall(callType: 'audio' | 'video' = 'audio') {
   if (!chatStore.activeConversation) return
   try {
-    await callStore.startOutgoingCall(chatStore.activeConversation)
+    await callStore.startOutgoingCall(chatStore.activeConversation, callType)
   } catch (error) {
-    chatStore.errors.noticeMessage = error instanceof Error ? error.message : '发起语音通话失败'
+    const label = callType === 'video' ? '发起视频通话失败' : '发起语音通话失败'
+    chatStore.errors.noticeMessage = error instanceof Error ? error.message : label
   }
 }
 
@@ -1584,7 +1585,7 @@ function registerDebugHooks() {
           @action="handleConversationAction"
           @update:menu-open="uiStore.setTopbarMenuOpen"
           @open-profile="openProfile"
-          @start-call="handleStartCall"
+          @start-call="(callType) => handleStartCall(callType)"
         />
         <div
           v-if="transientBanner"
@@ -1686,8 +1687,10 @@ function registerDebugHooks() {
       :phase="callStore.phase"
       :minimized="callStore.minimized"
       :local-muted="callStore.localMuted"
+      :local-camera-off="callStore.localCameraOff"
       :busy="callStore.busy"
       :error="callStore.error"
+      :local-stream="callStore.localStream"
       :remote-stream="callStore.remoteStream"
       @accept="callStore.acceptIncomingCall"
       @reject="callStore.rejectIncomingCall"
@@ -1695,6 +1698,7 @@ function registerDebugHooks() {
       @end="callStore.endCurrentCall"
       @toggle-minimized="callStore.toggleMinimized"
       @toggle-mute="callStore.toggleMute"
+      @toggle-camera="callStore.toggleCamera"
     />
 
     <ConversationProfileDrawer
