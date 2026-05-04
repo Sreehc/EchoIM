@@ -62,23 +62,57 @@ docker exec -i echoim-mysql sh -lc 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --defa
 
 ## 主要表结构
 
+### 核心表
+
 | 表名 | 说明 |
 |------|------|
 | `im_user` | 用户账号 |
 | `im_conversation` | 会话 |
-| `im_conversation_user` | 会话成员关系 |
+| `im_conversation_user` | 会话成员关系（含草稿字段） |
 | `im_message` | 消息 |
-| `im_message_read` | 消息已读状态 |
+| `im_message_receipt` | 消息回执（送达 / 已读） |
+| `im_message_reaction` | 消息表情回应 |
+| `im_message_pin` | 消息置顶 |
 | `im_friend` | 好友关系 |
 | `im_friend_request` | 好友申请 |
 | `im_group` | 群组 / 频道 |
-| `im_group_member` | 群组成员 |
-| `im_file` | 文件资源 |
-| `im_sticker` | 贴纸 |
-| `im_security_event` | 安全事件日志 |
-| `im_system_config` | 系统配置 |
-| `im_beauty_no` | 靓号池 |
-| `im_trusted_device` | 可信设备 |
+| `im_group_member` | 群组成员（含禁言字段） |
+| `im_file` | 文件资源（含缩略图） |
+
+### 群组扩展表
+
+| 表名 | 说明 |
+|------|------|
+| `im_group_invite` | 群邀请链接 |
+| `im_group_join_request` | 入群申请 |
+
+### 安全与隐私表
+
+| 表名 | 说明 |
+|------|------|
+| `im_block_user` | 用户屏蔽关系 |
+| `im_auth_trusted_device` | 可信设备 |
+| `im_auth_security_event` | 安全事件日志 |
+| `im_sensitive_word` | 敏感词库 |
+
+### 定时与草稿
+
+| 表名 | 说明 |
+|------|------|
+| `im_scheduled_message` | 定时消息 |
+
+### 运营管理表
+
+| 表名 | 说明 |
+|------|------|
+| `im_report` | 举报记录 |
+| `im_system_notice` | 系统公告 |
+| `im_user_ban` | 用户封禁记录 |
+| `sys_admin_user` | 管理员账号 |
+| `sys_config` | 系统配置 |
+| `sys_version` | 版本信息 |
+| `sys_beauty_no` | 靓号池 |
+| `sys_operation_log` | 管理操作日志 |
 
 ## 验证命令
 
