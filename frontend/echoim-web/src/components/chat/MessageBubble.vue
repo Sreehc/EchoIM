@@ -45,9 +45,10 @@ const emit = defineEmits<{
   unpin: []
   'self-destruct': [messageId: number]
   'view-read-details': [messageId: number]
+  report: [messageId: number]
 }>()
 
-type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'delete' | 'retry' | 'pin' | 'unpin' | 'read-details'
+type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'delete' | 'retry' | 'pin' | 'unpin' | 'read-details' | 'report'
 
 const isSelf = computed(() => props.message.fromUserId === props.currentUserId)
 const isSystem = computed(() => props.message.msgType === 'SYSTEM')
@@ -298,6 +299,10 @@ const contextMenuActions = computed(() => {
     actions.push({ key: 'read-details', label: '已读详情', testId: 'message-context-read-details' })
   }
 
+  if (!isSelf.value && !props.message.recalled && props.message.messageId > 0) {
+    actions.push({ key: 'report', label: '举报', danger: true, testId: 'message-context-report' })
+  }
+
   if (isSelf.value && props.message.sendStatus === 2) {
     actions.push({ key: 'retry', label: '重试发送', testId: 'message-context-retry' })
   }
@@ -421,6 +426,11 @@ function handleContextCommand(command: MessageContextCommand) {
 
   if (command === 'read-details') {
     emit('view-read-details', props.message.messageId)
+    return
+  }
+
+  if (command === 'report') {
+    emit('report', props.message.messageId)
     return
   }
 

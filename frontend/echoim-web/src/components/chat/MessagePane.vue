@@ -49,6 +49,7 @@ const emit = defineEmits<{
   'pin-message': [messageId: number]
   'unpin-message': [messageId: number]
   'view-read-details': [messageId: number]
+  report: [messageId: number]
 }>()
 
 const scroller = ref()
@@ -335,6 +336,7 @@ function jumpToMessage(messageId: number) {
           @pin="emit('pin-message', entry.message.messageId)"
           @unpin="emit('unpin-message', entry.message.messageId)"
           @view-read-details="emit('view-read-details', $event)"
+          @report="emit('report', $event)"
           @start-edit="emit('start-edit-message', entry.message)"
           @update:editing-draft="emit('update:editing-draft', $event)"
           @cancel-edit="emit('cancel-edit-message')"

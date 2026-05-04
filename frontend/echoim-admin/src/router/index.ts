@@ -51,6 +51,18 @@ const router = createRouter({
           component: () => import('@/views/version/VersionList.vue'),
           meta: { title: '版本管理' },
         },
+        {
+          path: 'reports',
+          name: 'reports',
+          component: () => import('@/views/report/ReportList.vue'),
+          meta: { title: '举报管理' },
+        },
+        {
+          path: 'sensitive-words',
+          name: 'sensitive-words',
+          component: () => import('@/views/sensitive-word/SensitiveWordList.vue'),
+          meta: { title: '敏感词管理' },
+        },
       ],
     },
   ],

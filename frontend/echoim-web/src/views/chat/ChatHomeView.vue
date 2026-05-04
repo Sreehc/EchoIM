@@ -51,6 +51,7 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups'
 import { forwardMessages, getMessageReadDetails } from '@/services/messages'
+import { submitReport } from '@/services/reports'
 import * as scheduledMessageService from '@/services/scheduledMessages'
 import { STICKER_LIBRARY } from '@/stickers/library'
 import { ChatRound, Close, Guide, Search, UserFilled } from '@element-plus/icons-vue'
@@ -113,6 +114,14 @@ const scheduledPanelOpen = ref(false)
 const readDetailsVisible = ref(false)
 const readDetailsLoading = ref(false)
 const readDetailsData = ref<MessageReadDetail | null>(null)
+const reportDialog = reactive({
+  visible: false,
+  targetType: 1 as 1 | 2,
+  targetId: 0,
+  reason: '',
+  description: '',
+  submitting: false,
+})
 const composeDialog = reactive<{
   visible: boolean
   mode: ComposeAction
@@ -1495,6 +1504,31 @@ async function handleViewReadDetails(messageId: number) {
   }
 }
 
+function handleReportMessage(messageId: number) {
+  reportDialog.targetType = 1
+  reportDialog.targetId = messageId
+  reportDialog.reason = ''
+  reportDialog.description = ''
+  reportDialog.visible = true
+}
+
+async function handleSubmitReport() {
+  if (!reportDialog.reason) {
+    ElMessage.warning('请选择举报原因')
+    return
+  }
+  reportDialog.submitting = true
+  try {
+    await submitReport(reportDialog.targetType, reportDialog.targetId, reportDialog.reason, reportDialog.description || undefined)
+    ElMessage.success('举报已提交')
+    reportDialog.visible = false
+  } catch {
+    // error handled by http interceptor
+  } finally {
+    reportDialog.submitting = false
+  }
+}
+
 function handleReplyMessage(message: ChatMessage) {
   replyingMessage.value = message
 }
@@ -2022,6 +2056,7 @@ function registerDebugHooks() {
             @pin-message="handlePinMessage"
             @unpin-message="handleUnpinMessage"
             @view-read-details="handleViewReadDetails"
+            @report="handleReportMessage"
             @view-profile="openChatFromContact"
             @open-image-viewer="handleOpenImageViewer"
             @self-destruct-message="handleSelfDestructMessage"
@@ -2041,6 +2076,28 @@ function registerDebugHooks() {
             :loading="readDetailsLoading"
             @update:visible="readDetailsVisible = $event"
           />
+
+          <el-dialog v-model="reportDialog.visible" title="举报" width="440px" destroy-on-close append-to-body>
+            <el-form label-width="80px">
+              <el-form-item label="举报原因">
+                <el-select v-model="reportDialog.reason" placeholder="请选择举报原因" style="width: 100%">
+                  <el-option label="垃圾广告" value="spam" />
+                  <el-option label="色情内容" value="pornography" />
+                  <el-option label="暴力威胁" value="violence" />
+                  <el-option label="骚扰欺凌" value="harassment" />
+                  <el-option label="虚假信息" value="misinformation" />
+                  <el-option label="其他" value="other" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="详细描述">
+                <el-input v-model="reportDialog.description" type="textarea" :rows="3" placeholder="可选，补充说明" maxlength="200" show-word-limit />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="reportDialog.visible = false">取消</el-button>
+              <el-button type="primary" :loading="reportDialog.submitting" @click="handleSubmitReport">提交举报</el-button>
+            </template>
+          </el-dialog>
           <div
             v-if="chatStore.activeConversation.groupStatus === 2"
             class="chat-page__dissolved"

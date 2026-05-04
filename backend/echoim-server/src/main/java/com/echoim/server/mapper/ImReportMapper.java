@@ -1,0 +1,19 @@
+package com.echoim.server.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.echoim.server.entity.ImReportEntity;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+import java.util.Map;
+
+@Mapper
+public interface ImReportMapper extends BaseMapper<ImReportEntity> {
+
+    List<Map<String, Object>> selectReportPage(@Param("status") Integer status,
+                                                @Param("offset") long offset,
+                                                @Param("pageSize") long pageSize);
+
+    long countReports(@Param("status") Integer status);
+}

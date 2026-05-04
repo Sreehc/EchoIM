@@ -400,6 +400,56 @@ CREATE TABLE IF NOT EXISTS im_scheduled_message (
   KEY idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='定时消息表';
 
+CREATE TABLE IF NOT EXISTS im_report (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '举报ID',
+  reporter_user_id BIGINT NOT NULL COMMENT '举报人ID',
+  target_type TINYINT NOT NULL COMMENT '1消息 2用户',
+  target_id BIGINT NOT NULL COMMENT '目标ID（消息ID或用户ID）',
+  reason VARCHAR(50) NOT NULL COMMENT '举报原因分类',
+  description VARCHAR(500) DEFAULT NULL COMMENT '举报描述',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '0待处理 1已忽略 2已警告 3已禁言 4已封号',
+  handled_by BIGINT DEFAULT NULL COMMENT '处理人ID',
+  handled_at DATETIME DEFAULT NULL COMMENT '处理时间',
+  handle_remark VARCHAR(500) DEFAULT NULL COMMENT '处理备注',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_status (status),
+  KEY idx_target (target_type, target_id),
+  KEY idx_reporter (reporter_user_id),
+  KEY idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='举报记录表';
+
+CREATE TABLE IF NOT EXISTS im_system_notice (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
+  title VARCHAR(200) NOT NULL COMMENT '公告标题',
+  content TEXT NOT NULL COMMENT '公告内容',
+  notice_type TINYINT NOT NULL DEFAULT 1 COMMENT '1全员 2指定用户',
+  target_user_ids TEXT DEFAULT NULL COMMENT '指定用户ID列表JSON',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '1已发布 2已撤回',
+  published_by BIGINT NOT NULL COMMENT '发布人ID',
+  published_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_status (status),
+  KEY idx_published_at (published_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统公告表';
+
+CREATE TABLE IF NOT EXISTS im_user_ban (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '封禁ID',
+  user_id BIGINT NOT NULL COMMENT '被封禁用户ID',
+  ban_type TINYINT NOT NULL DEFAULT 1 COMMENT '1临时 2永久',
+  reason VARCHAR(500) NOT NULL COMMENT '封禁原因',
+  ban_minutes INT DEFAULT NULL COMMENT '封禁时长（分钟），NULL为永久',
+  expire_at DATETIME DEFAULT NULL COMMENT '封禁过期时间',
+  banned_by BIGINT NOT NULL COMMENT '操作人ID',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '1生效中 2已解除',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_user_id (user_id),
+  KEY idx_status (status),
+  KEY idx_expire_at (expire_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='用户封禁记录表';
+
 -- Redis key 规划建议
 -- echoim:online:user:{userId}
 -- echoim:route:user:{userId}

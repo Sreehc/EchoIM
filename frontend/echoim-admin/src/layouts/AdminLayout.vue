@@ -38,6 +38,14 @@
           <el-icon><Upload /></el-icon>
           <template #title>版本管理</template>
         </el-menu-item>
+        <el-menu-item index="/reports">
+          <el-icon><Warning /></el-icon>
+          <template #title>举报管理</template>
+        </el-menu-item>
+        <el-menu-item index="/sensitive-words">
+          <el-icon><Filter /></el-icon>
+          <template #title>敏感词管理</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -86,6 +94,8 @@ import {
   Expand,
   ArrowDown,
   DataAnalysis,
+  Warning,
+  Filter,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
