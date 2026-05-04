@@ -257,7 +257,7 @@ location /ws/ {
 - [产品需求](docs/prd/) — 功能清单、非功能需求
 - [用户指南](docs/user-manual/) — 功能使用说明
 - [UI/UX 设计](docs/design/) — 设计系统、布局、交互设计
-- [未来优化](docs/roadmap/) — 工程化、性能、功能、安全、运维优化方向
+- [未来优化](docs/future/) — 工程化、性能、功能、安全、运维优化方向
 
 ## 许可证
 
