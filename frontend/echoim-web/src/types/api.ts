@@ -386,3 +386,20 @@ export interface ApiBlockedUserItem {
   avatarUrl: string | null
   blockedAt: string | null
 }
+
+export interface ApiMessageReadDetailItem {
+  userId: number
+  nickname: string
+  avatarUrl: string | null
+  readStatus: number
+  readAt: string | null
+}
+
+export interface ApiMessageReadDetail {
+  messageId: number
+  totalMembers: number
+  readCount: number
+  unreadCount: number
+  readList: ApiMessageReadDetailItem[]
+  unreadList: ApiMessageReadDetailItem[]
+}

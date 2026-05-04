@@ -1,4 +1,4 @@
-import type { ApiMessageItem } from '@/types/api'
+import type { ApiMessageItem, ApiMessageReadDetail } from '@/types/api'
 import { getJson, postJson, putJson } from './http'
 
 export function recallMessage(messageId: number) {
@@ -34,4 +34,8 @@ export function unpinMessage(messageId: number) {
 
 export function listPinnedMessages(conversationId: number) {
   return getJson<ApiMessageItem[]>(`/api/messages/pinned?conversationId=${conversationId}`)
+}
+
+export function getMessageReadDetails(messageId: number) {
+  return getJson<ApiMessageReadDetail>(`/api/messages/${messageId}/receipts`)
 }

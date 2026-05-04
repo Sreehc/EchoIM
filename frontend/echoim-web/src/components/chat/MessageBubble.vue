@@ -44,9 +44,10 @@ const emit = defineEmits<{
   pin: []
   unpin: []
   'self-destruct': [messageId: number]
+  'view-read-details': [messageId: number]
 }>()
 
-type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'delete' | 'retry' | 'pin' | 'unpin'
+type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'delete' | 'retry' | 'pin' | 'unpin' | 'read-details'
 
 const isSelf = computed(() => props.message.fromUserId === props.currentUserId)
 const isSystem = computed(() => props.message.msgType === 'SYSTEM')
@@ -162,6 +163,25 @@ const statusMeta = computed(() => {
           : 'sent',
   }
 })
+
+const statusTooltip = computed(() => {
+  if (props.message.sendStatus !== 1 || props.conversationType === 2) {
+    return statusMeta.value.label
+  }
+  const parts: string[] = [statusMeta.value.label]
+  if (props.message.deliveredAt) {
+    parts.push(`送达: ${formatReadTime(props.message.deliveredAt)}`)
+  }
+  if (props.message.readAt) {
+    parts.push(`已读: ${formatReadTime(props.message.readAt)}`)
+  }
+  return parts.join('\n')
+})
+
+function formatReadTime(value: string): string {
+  const date = new Date(value)
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
 const channelViewCount = computed(() => {
   if (!isSelf.value || props.conversationType !== 3 || props.message.sendStatus !== 1) {
     return null
@@ -272,6 +292,10 @@ const contextMenuActions = computed(() => {
     actions.push({ key: 'edit', label: '编辑', testId: 'message-context-edit' })
     actions.push({ key: 'recall', label: '撤回', danger: true, testId: 'message-context-recall' })
     actions.push({ key: 'delete', label: '删除并撤回', danger: true, testId: 'message-context-delete' })
+  }
+
+  if (isSelf.value && props.conversationType === 2 && !props.message.recalled && props.message.sendStatus === 1 && props.message.messageId > 0) {
+    actions.push({ key: 'read-details', label: '已读详情', testId: 'message-context-read-details' })
   }
 
   if (isSelf.value && props.message.sendStatus === 2) {
@@ -392,6 +416,11 @@ function handleContextCommand(command: MessageContextCommand) {
 
   if (command === 'delete') {
     emit('delete-for-everyone')
+    return
+  }
+
+  if (command === 'read-details') {
+    emit('view-read-details', props.message.messageId)
     return
   }
 
@@ -633,6 +662,7 @@ onUnmounted(() => {
               class="message-bubble__status"
               :class="`is-${statusMeta.tone}`"
               :aria-label="statusMeta.label"
+              :title="statusTooltip"
               data-testid="message-status"
             >
               {{ statusMeta.glyph }}
@@ -668,6 +698,7 @@ onUnmounted(() => {
           class="message-bubble__status"
           :class="`is-${statusMeta.tone}`"
           :aria-label="statusMeta.label"
+          :title="statusTooltip"
           data-testid="message-status"
         >
           {{ statusMeta.glyph }}

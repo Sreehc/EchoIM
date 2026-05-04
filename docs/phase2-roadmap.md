@@ -3,7 +3,7 @@
 > 创建日期：2026-05-04
 > 前置条件：一期工程全部五个阶段已完成，系统具备完整的即时通讯、语音通话、管理后台能力
 > 目标：从"功能可用"升级为"体验优秀、安全可靠、可规模运营"
-> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成 + 阶段九 9.1-9.2 完成
+> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成 + 阶段九全部完成
 
 ---
 
@@ -210,23 +210,32 @@
 
 ### 9.3 消息已读详情
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 9.3.1 | 群消息已读详情 | P1 | 1d | 点击消息"已读"状态展示已读/未读成员列表，显示最后阅读时间 |
-| 9.3.2 | 消息送达/已读时间 | P2 | 0.5d | 消息详情中展示送达时间、已读时间 |
+> **实现完成（2026-05-04）**：阶段九 9.3 消息已读详情全部 2 项任务在代码层面均已实现。
+> 后端 im_message_receipt 表已有完整数据支撑，新增 GET /api/messages/{id}/receipts 接口查询群消息已读详情，
+> 返回已读/未读成员列表及最后阅读时间。前端 MessageReadDetails 组件展示已读/未读 Tab 列表，
+> MessageBubble 右键菜单新增"已读详情"选项。单聊消息气泡鼠标悬停状态标识可查看送达/已读时间。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 9.3.1 | 群消息已读详情 | P1 | 1d | ✅ 已完成 | 后端：`MessageReadDetailVo.java` + `MessageReadDetailItemVo.java` + `ImMessageReceiptMapper.selectReadDetailsByMessageId` + `MessageReceiptMapper.xml` 新增 SQL + `MessageViewServiceImpl.getMessageReadDetails()`（校验群成员权限）+ `MessageController` GET `/{id}/receipts` + `ErrorCode.MESSAGE_NOT_FOUND`；前端：`MessageReadDetails.vue`（el-dialog + el-tabs 已读/未读列表 + AvatarBadge）+ `services/messages.ts` getMessageReadDetails() + `types/chat.ts` MessageReadDetail/MessageReadDetailItem + `MessageBubble.vue` 'read-details' 右键菜单项 + `MessagePane.vue` view-read-details 事件透传 + `ChatHomeView.vue` handleViewReadDetails + MessageReadDetails 组件集成 |
+| 9.3.2 | 消息送达/已读时间 | P2 | 0.5d | ✅ 已完成 | 前端：`MessageBubble.vue` statusTooltip 计算属性（拼接送达时间/已读时间）+ 状态标识 title 属性展示 tooltip + formatReadTime 辅助函数；后端数据已由 MessageViewServiceImpl.enrichMessages() 填充 deliveredAt/readAt 字段 |
 
 ### 9.4 消息搜索增强
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 9.4.1 | 搜索结果高亮 | P1 | 0.5d | 全局搜索结果中关键词高亮，点击跳转到消息位置 |
-| 9.4.2 | 按类型筛选 | P2 | 0.5d | 搜索支持按消息类型筛选（图片、文件、链接） |
-| 9.4.3 | 日期范围筛选 | P2 | 0.5d | 搜索支持按日期范围缩小结果 |
+> **实现完成（2026-05-04）**：阶段九 9.4 消息搜索增强全部 3 项任务在代码层面均已实现。
+> 全局搜索结果中消息预览关键词高亮（highlightText），搜索对话框新增消息类型筛选下拉框和日期范围选择器，
+> 后端 GlobalSearchService/ImMessageMapper 支持 msgType/dateFrom/dateTo 过滤条件。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 9.4.1 | 搜索结果高亮 | P1 | 0.5d | ✅ 已完成 | 前端：`ChatHomeView.vue` 消息搜索结果预览使用 highlightText() 高亮关键词 + `.search-sheet__highlight` 样式 + `utils/format.ts` highlightText 函数已存在 |
+| 9.4.2 | 按类型筛选 | P2 | 0.5d | ✅ 已完成 | 后端：`GlobalSearchService` 新增 search 重载（msgType/dateFrom/dateTo 参数）+ `GlobalSearchServiceImpl.normalizeMsgType()` 类型映射 + `ImMessageMapper.selectGlobalSearchMessages` 新增 msgType 参数 + `MessageMapper.xml` 动态 AND 条件 + `SearchController` 新增 msgType 请求参数；前端：`services/search.ts` searchGlobal 新增 msgType 参数 + `ChatHomeView.vue` globalSearchState.filterType + el-select 消息类型下拉框 |
+| 9.4.3 | 日期范围筛选 | P2 | 0.5d | ✅ 已完成 | 后端：同 9.4.2，`MessageMapper.xml` 新增 dateFrom/dateTo 动态条件 + `SearchController` @DateTimeFormat 参数；前端：`ChatHomeView.vue` globalSearchState.filterDateFrom/filterDateTo + el-date-picker 日期选择器 + 日期转 ISO 传参 |
 
 **验收标准：**
-- 消息可以设置定时发送，到期自动投递
-- 群聊中可以查看每条消息的已读详情
-- 全局搜索支持关键词高亮和类型筛选
+- 消息可以设置定时发送，到期自动投递 ✅
+- 群聊中可以查看每条消息的已读详情 ✅
+- 全局搜索支持关键词高亮和类型筛选 ✅
 
 ---
 

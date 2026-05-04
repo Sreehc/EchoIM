@@ -253,6 +253,15 @@
           AND m.content IS NOT NULL
           AND m.content != ''
           AND m.content LIKE CONCAT('%', #{keyword}, '%')
+          <if test="msgType != null">
+              AND m.msg_type = #{msgType}
+          </if>
+          <if test="dateFrom != null">
+              AND m.sent_at &gt;= #{dateFrom}
+          </if>
+          <if test="dateTo != null">
+              AND m.sent_at &lt;= #{dateTo}
+          </if>
           AND (
               c.conversation_type NOT IN (2, 3)
                   OR (

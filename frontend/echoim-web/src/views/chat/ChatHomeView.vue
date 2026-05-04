@@ -12,6 +12,7 @@ import MessagePane from '@/components/chat/MessagePane.vue'
 import PinnedMessagesBanner from '@/components/chat/PinnedMessagesBanner.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
 import ScheduledMessagesPanel from '@/components/chat/ScheduledMessagesPanel.vue'
+import MessageReadDetails from '@/components/chat/MessageReadDetails.vue'
 import type { VoiceRecordResult } from '@/components/chat/VoiceRecorder.vue'
 import ConversationProfileDrawer from '@/components/chat/ConversationProfileDrawer.vue'
 import AvatarBadge from '@/components/chat/AvatarBadge.vue'
@@ -49,7 +50,7 @@ import {
   updateGroup,
   updateGroupMemberRole,
 } from '@/services/groups'
-import { forwardMessages } from '@/services/messages'
+import { forwardMessages, getMessageReadDetails } from '@/services/messages'
 import * as scheduledMessageService from '@/services/scheduledMessages'
 import { STICKER_LIBRARY } from '@/stickers/library'
 import { ChatRound, Close, Guide, Search, UserFilled } from '@element-plus/icons-vue'
@@ -65,13 +66,14 @@ import type {
   GroupMemberItem,
   LeftPanelMode,
   MentionItem,
+  MessageReadDetail,
   MessageReplySource,
   StickerDefinition,
   UpdateCurrentUserProfilePayload,
   UserSearchItem,
 } from '@/types/chat'
 import { adaptConversationSummary, adaptGlobalSearchMessage } from '@/adapters/chat'
-import { formatConversationTime } from '@/utils/format'
+import { formatConversationTime, highlightText } from '@/utils/format'
 import { buildPublicProfilePath } from '@/utils/publicProfiles'
 
 type ConversationActionCommand = 'open-tab' | 'mark-unread' | 'toggle-top' | 'toggle-mute' | 'archive' | 'delete'
@@ -108,6 +110,9 @@ const forwardSelectionMode = ref(false)
 const selectedForwardMessageIds = ref<number[]>([])
 const totpSetupData = ref<{ secret: string; uri: string; recoveryCodes: string[] } | null>(null)
 const scheduledPanelOpen = ref(false)
+const readDetailsVisible = ref(false)
+const readDetailsLoading = ref(false)
+const readDetailsData = ref<MessageReadDetail | null>(null)
 const composeDialog = reactive<{
   visible: boolean
   mode: ComposeAction
@@ -172,6 +177,9 @@ const globalSearchState = reactive<{
   conversations: ConversationSummary[]
   users: UserSearchItem[]
   messages: GlobalSearchMessageItem[]
+  filterType: string
+  filterDateFrom: string
+  filterDateTo: string
 }>({
   visible: false,
   keyword: '',
@@ -180,6 +188,9 @@ const globalSearchState = reactive<{
   conversations: [],
   users: [],
   messages: [],
+  filterType: '',
+  filterDateFrom: '',
+  filterDateTo: '',
 })
 const forwardDialog = reactive<{
   visible: boolean
@@ -572,6 +583,9 @@ function openGlobalSearch() {
   globalSearchState.conversations = []
   globalSearchState.users = []
   globalSearchState.messages = []
+  globalSearchState.filterType = ''
+  globalSearchState.filterDateFrom = ''
+  globalSearchState.filterDateTo = ''
 }
 
 async function runGlobalSearch() {
@@ -586,7 +600,11 @@ async function runGlobalSearch() {
   globalSearchState.loading = true
   globalSearchState.error = null
   try {
-    const result = await searchGlobal(keyword)
+    const result = await searchGlobal(keyword, {
+      msgType: globalSearchState.filterType || undefined,
+      dateFrom: globalSearchState.filterDateFrom ? new Date(globalSearchState.filterDateFrom).toISOString() : undefined,
+      dateTo: globalSearchState.filterDateTo ? new Date(globalSearchState.filterDateTo + 'T23:59:59').toISOString() : undefined,
+    })
     globalSearchState.conversations = result.conversations.map(adaptConversationSummary)
     globalSearchState.users = result.users
     globalSearchState.messages = result.messages.map(adaptGlobalSearchMessage)
@@ -1463,6 +1481,20 @@ async function handleUnpinMessage(messageId: number) {
   }
 }
 
+async function handleViewReadDetails(messageId: number) {
+  readDetailsVisible.value = true
+  readDetailsLoading.value = true
+  readDetailsData.value = null
+  try {
+    const data = await getMessageReadDetails(messageId)
+    readDetailsData.value = data as unknown as MessageReadDetail
+  } catch {
+    readDetailsData.value = null
+  } finally {
+    readDetailsLoading.value = false
+  }
+}
+
 function handleReplyMessage(message: ChatMessage) {
   replyingMessage.value = message
 }
@@ -1989,6 +2021,7 @@ function registerDebugHooks() {
             @toggle-reaction="handleToggleReaction"
             @pin-message="handlePinMessage"
             @unpin-message="handleUnpinMessage"
+            @view-read-details="handleViewReadDetails"
             @view-profile="openChatFromContact"
             @open-image-viewer="handleOpenImageViewer"
             @self-destruct-message="handleSelfDestructMessage"
@@ -2001,6 +2034,12 @@ function registerDebugHooks() {
             :visible="scheduledPanelOpen"
             @close="scheduledPanelOpen = false"
             @message-sent="handleScheduledMessageSent"
+          />
+          <MessageReadDetails
+            :visible="readDetailsVisible"
+            :detail="readDetailsData"
+            :loading="readDetailsLoading"
+            @update:visible="readDetailsVisible = $event"
           />
           <div
             v-if="chatStore.activeConversation.groupStatus === 2"
@@ -2270,6 +2309,32 @@ function registerDebugHooks() {
           <span class="search-sheet__hero-shortcut">Cmd/Ctrl + K</span>
         </div>
         <el-input v-model="globalSearchState.keyword" placeholder="输入关键词，搜索会话、用户或消息内容" clearable />
+        <div class="search-sheet__filters">
+          <el-select v-model="globalSearchState.filterType" placeholder="消息类型" clearable size="small" style="width: 140px" @change="runGlobalSearch">
+            <el-option label="图片" value="IMAGE" />
+            <el-option label="文件" value="FILE" />
+            <el-option label="语音" value="VOICE" />
+            <el-option label="GIF" value="GIF" />
+          </el-select>
+          <el-date-picker
+            v-model="globalSearchState.filterDateFrom"
+            type="date"
+            placeholder="开始日期"
+            size="small"
+            style="width: 150px"
+            value-format="YYYY-MM-DD"
+            @change="runGlobalSearch"
+          />
+          <el-date-picker
+            v-model="globalSearchState.filterDateTo"
+            type="date"
+            placeholder="结束日期"
+            size="small"
+            style="width: 150px"
+            value-format="YYYY-MM-DD"
+            @change="runGlobalSearch"
+          />
+        </div>
         <div v-if="globalSearchState.error" class="compose-dialog__error">{{ globalSearchState.error }}</div>
         <div class="search-sheet__summary">
           <span v-if="globalSearchState.loading">正在搜索…</span>
@@ -2354,7 +2419,12 @@ function registerDebugHooks() {
                   <time class="search-sheet__time">{{ formatConversationTime(message.sentAt) }}</time>
                 </div>
                 <span class="search-sheet__meta">{{ message.senderName }}</span>
-                <p>{{ message.preview }}</p>
+                <p>
+                  <template v-for="(seg, si) in highlightText(message.preview, globalSearchState.keyword)" :key="`sp-${message.messageId}-${si}`">
+                    <mark v-if="seg.matched" class="search-sheet__highlight">{{ seg.text }}</mark>
+                    <template v-else>{{ seg.text }}</template>
+                  </template>
+                </p>
               </div>
             </button>
             <div v-if="!globalSearchState.loading && !globalSearchState.messages.length" class="search-sheet__empty">
@@ -3051,6 +3121,20 @@ function registerDebugHooks() {
   color: var(--text-quaternary);
   font-size: var(--text-sm);
   text-align: center;
+}
+
+.search-sheet__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search-sheet__highlight {
+  padding: 0 0.08em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--interactive-selected-bg) 72%, white);
+  color: var(--text-primary);
 }
 
 :deep(.global-search-dialog .el-dialog) {

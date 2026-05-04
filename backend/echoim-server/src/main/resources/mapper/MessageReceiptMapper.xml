@@ -51,4 +51,22 @@
         </foreach>
         GROUP BY m.id
     </select>
+
+    <select id="selectReadDetailsByMessageId" resultType="com.echoim.server.vo.message.MessageReadDetailItemVo">
+        SELECT gm.user_id AS userId,
+               COALESCE(NULLIF(gm.nick_name, ''), u.nickname) AS nickname,
+               u.avatar_url AS avatarUrl,
+               CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END AS readStatus,
+               r.receipt_at AS readAt
+        FROM im_group_member gm
+        JOIN im_user u ON u.id = gm.user_id
+        LEFT JOIN im_message_receipt r
+               ON r.message_id = #{messageId}
+              AND r.user_id = gm.user_id
+              AND r.receipt_type = 2
+        WHERE gm.group_id = #{groupId}
+          AND gm.status = 1
+          AND gm.user_id != #{excludeUserId}
+        ORDER BY readStatus DESC, r.receipt_at ASC, gm.id ASC
+    </select>
 </mapper>

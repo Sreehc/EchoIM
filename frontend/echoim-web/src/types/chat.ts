@@ -300,6 +300,23 @@ export interface MessageReplySource {
   sourcePreview: string | null
 }
 
+export interface MessageReadDetailItem {
+  userId: number
+  nickname: string
+  avatarUrl: string | null
+  readStatus: number
+  readAt: string | null
+}
+
+export interface MessageReadDetail {
+  messageId: number
+  totalMembers: number
+  readCount: number
+  unreadCount: number
+  readList: MessageReadDetailItem[]
+  unreadList: MessageReadDetailItem[]
+}
+
 export interface UserSearchItem {
   userId: number
   userNo: string

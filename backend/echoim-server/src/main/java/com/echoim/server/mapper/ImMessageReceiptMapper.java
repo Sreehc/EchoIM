@@ -24,4 +24,8 @@ public interface ImMessageReceiptMapper extends BaseMapper<ImMessageReceiptEntit
     List<MessageReceiptStatVo> selectReceiptStatsByMessageIds(@Param("messageIds") List<Long> messageIds);
 
     List<MessageReceiptStatVo> selectChannelViewStatsByMessageIds(@Param("messageIds") List<Long> messageIds);
+
+    List<com.echoim.server.vo.message.MessageReadDetailItemVo> selectReadDetailsByMessageId(@Param("messageId") Long messageId,
+                                                                                            @Param("groupId") Long groupId,
+                                                                                            @Param("excludeUserId") Long excludeUserId);
 }

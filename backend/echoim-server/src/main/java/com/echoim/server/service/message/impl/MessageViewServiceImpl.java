@@ -2,6 +2,8 @@ package com.echoim.server.service.message.impl;
 
 import com.echoim.server.entity.ImMessageEntity;
 import com.echoim.server.im.model.WsMessageItem;
+import com.echoim.server.mapper.ImGroupMemberMapper;
+import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
 import com.echoim.server.service.message.MessageViewService;
@@ -9,6 +11,8 @@ import com.echoim.server.vo.conversation.MessageItemVo;
 import com.echoim.server.vo.message.MentionVo;
 import com.echoim.server.vo.message.MessageForwardSourceVo;
 import com.echoim.server.vo.message.MessageReactionStatVo;
+import com.echoim.server.vo.message.MessageReadDetailItemVo;
+import com.echoim.server.vo.message.MessageReadDetailVo;
 import com.echoim.server.vo.message.MessageReplySourceVo;
 import com.echoim.server.vo.message.MessageReceiptStatVo;
 import com.echoim.server.vo.message.StickerPayloadVo;
@@ -29,13 +33,19 @@ public class MessageViewServiceImpl implements MessageViewService {
 
     private final ImMessageReceiptMapper imMessageReceiptMapper;
     private final ImMessageReactionMapper imMessageReactionMapper;
+    private final ImMessageMapper imMessageMapper;
+    private final ImGroupMemberMapper imGroupMemberMapper;
     private final ObjectMapper objectMapper;
 
     public MessageViewServiceImpl(ImMessageReceiptMapper imMessageReceiptMapper,
                                   ImMessageReactionMapper imMessageReactionMapper,
+                                  ImMessageMapper imMessageMapper,
+                                  ImGroupMemberMapper imGroupMemberMapper,
                                   ObjectMapper objectMapper) {
         this.imMessageReceiptMapper = imMessageReceiptMapper;
         this.imMessageReactionMapper = imMessageReactionMapper;
+        this.imMessageMapper = imMessageMapper;
+        this.imGroupMemberMapper = imGroupMemberMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -88,6 +98,41 @@ public class MessageViewServiceImpl implements MessageViewService {
                 item.setViewCount(stats.get(0).getViewCount());
             }
         }
+    }
+
+    @Override
+    public MessageReadDetailVo getMessageReadDetails(Long viewerUserId, Long messageId) {
+        ImMessageEntity message = imMessageMapper.selectById(messageId);
+        if (message == null) {
+            throw new com.echoim.server.common.exception.BizException(com.echoim.server.common.constant.ErrorCode.MESSAGE_NOT_FOUND, "消息不存在");
+        }
+        Long groupId = message.getGroupId();
+        if (groupId == null) {
+            throw new com.echoim.server.common.exception.BizException(com.echoim.server.common.constant.ErrorCode.PARAM_ERROR, "仅群聊消息支持查看已读详情");
+        }
+        // verify viewer is an active group member
+        var member = imGroupMemberMapper.selectActiveByGroupIdAndUserId(groupId, viewerUserId);
+        if (member == null) {
+            throw new com.echoim.server.common.exception.BizException(com.echoim.server.common.constant.ErrorCode.FORBIDDEN, "无权查看该消息已读详情");
+        }
+
+        List<MessageReadDetailItemVo> allDetails = imMessageReceiptMapper.selectReadDetailsByMessageId(messageId, groupId, message.getFromUserId());
+
+        List<MessageReadDetailItemVo> readList = allDetails.stream()
+                .filter(d -> Integer.valueOf(1).equals(d.getReadStatus()))
+                .toList();
+        List<MessageReadDetailItemVo> unreadList = allDetails.stream()
+                .filter(d -> Integer.valueOf(0).equals(d.getReadStatus()))
+                .toList();
+
+        MessageReadDetailVo result = new MessageReadDetailVo();
+        result.setMessageId(messageId);
+        result.setTotalMembers(allDetails.size());
+        result.setReadCount(readList.size());
+        result.setUnreadCount(unreadList.size());
+        result.setReadList(readList);
+        result.setUnreadList(unreadList);
+        return result;
     }
 
     private Map<Long, MessageReceiptStatVo> loadReceiptMap(List<MessageItemVo> messages, Long viewerUserId) {

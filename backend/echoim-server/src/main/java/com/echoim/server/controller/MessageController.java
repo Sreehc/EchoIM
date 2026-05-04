@@ -8,7 +8,9 @@ import com.echoim.server.dto.message.EditMessageRequestDto;
 import com.echoim.server.dto.message.ForwardMessageRequestDto;
 import com.echoim.server.dto.message.ReactionMessageRequestDto;
 import com.echoim.server.service.message.MessageCommandService;
+import com.echoim.server.service.message.MessageViewService;
 import com.echoim.server.vo.conversation.MessageItemVo;
+import com.echoim.server.vo.message.MessageReadDetailVo;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,9 +23,12 @@ import java.util.Map;
 public class MessageController {
 
     private final MessageCommandService messageCommandService;
+    private final MessageViewService messageViewService;
 
-    public MessageController(MessageCommandService messageCommandService) {
+    public MessageController(MessageCommandService messageCommandService,
+                             MessageViewService messageViewService) {
         this.messageCommandService = messageCommandService;
+        this.messageViewService = messageViewService;
     }
 
     @PutMapping("/{id}/recall")
@@ -74,5 +79,11 @@ public class MessageController {
     @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-list-pinned", permits = 30, windowSeconds = 60, message = "查询过于频繁")
     public ApiResponse<List<MessageItemVo>> listPinnedMessages(@RequestParam Long conversationId) {
         return ApiResponse.success(messageCommandService.listPinnedMessages(LoginUserContext.requireUserId(), conversationId));
+    }
+
+    @GetMapping("/{id}/receipts")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-read-details", permits = 30, windowSeconds = 60, message = "查询过于频繁")
+    public ApiResponse<MessageReadDetailVo> getMessageReadDetails(@PathVariable Long id) {
+        return ApiResponse.success(messageViewService.getMessageReadDetails(LoginUserContext.requireUserId(), id));
     }
 }

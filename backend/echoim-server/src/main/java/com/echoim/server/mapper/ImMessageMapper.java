@@ -7,6 +7,7 @@ import com.echoim.server.vo.search.GlobalSearchMessageItemVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -44,7 +45,10 @@ public interface ImMessageMapper extends BaseMapper<ImMessageEntity> {
 
     List<GlobalSearchMessageItemVo> selectGlobalSearchMessages(@Param("userId") Long userId,
                                                                @Param("keyword") String keyword,
-                                                               @Param("limit") long limit);
+                                                               @Param("limit") long limit,
+                                                               @Param("msgType") Integer msgType,
+                                                               @Param("dateFrom") LocalDateTime dateFrom,
+                                                               @Param("dateTo") LocalDateTime dateTo);
 
     ImMessageEntity selectLatestByConversationId(@Param("conversationId") Long conversationId);
 }

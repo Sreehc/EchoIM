@@ -11,6 +11,7 @@ import com.echoim.server.vo.user.UserSearchItemVo;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -31,6 +32,12 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
 
     @Override
     public GlobalSearchResponseVo search(Long currentUserId, String keyword, Integer conversationLimit, Integer userLimit, Integer messageLimit) {
+        return search(currentUserId, keyword, conversationLimit, userLimit, messageLimit, null, null, null);
+    }
+
+    @Override
+    public GlobalSearchResponseVo search(Long currentUserId, String keyword, Integer conversationLimit, Integer userLimit, Integer messageLimit,
+                                         String msgType, LocalDateTime dateFrom, LocalDateTime dateTo) {
         GlobalSearchResponseVo responseVo = new GlobalSearchResponseVo();
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         if (!StringUtils.hasText(normalizedKeyword)) {
@@ -51,7 +58,8 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
                 .limit(nextConversationLimit)
                 .toList();
         List<UserSearchItemVo> users = imUserMapper.selectSearchPage(currentUserId, normalizedKeyword, 0, nextUserLimit);
-        List<GlobalSearchMessageItemVo> messages = imMessageMapper.selectGlobalSearchMessages(currentUserId, normalizedKeyword, nextMessageLimit);
+        List<GlobalSearchMessageItemVo> messages = imMessageMapper.selectGlobalSearchMessages(currentUserId, normalizedKeyword, nextMessageLimit,
+                normalizeMsgType(msgType), dateFrom, dateTo);
 
         responseVo.setConversations(conversations);
         responseVo.setUsers(users);
@@ -68,5 +76,19 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
 
     private boolean containsIgnoreCase(String value, String keyword) {
         return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
+    }
+
+    private Integer normalizeMsgType(String msgType) {
+        if (msgType == null || msgType.isBlank()) {
+            return null;
+        }
+        return switch (msgType.toUpperCase(Locale.ROOT)) {
+            case "IMAGE" -> 3;
+            case "FILE" -> 5;
+            case "VOICE" -> 7;
+            case "GIF" -> 4;
+            case "STICKER" -> 2;
+            default -> null;
+        };
     }
 }
