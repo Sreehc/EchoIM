@@ -254,6 +254,30 @@ export interface VoicePayload {
   waveform: number[]
 }
 
+export interface ScheduledMessage {
+  id: number
+  conversationId: number
+  conversationType: ConversationType
+  toUserId: number | null
+  groupId: number | null
+  msgType: number
+  content: string | null
+  extraJson: unknown
+  fileId: number | null
+  scheduledAt: string
+  status: number
+  errorMessage: string | null
+  sentMessageId: number | null
+  createdAt: string
+}
+
+export const SCHEDULED_MESSAGE_STATUS = {
+  PENDING: 1,
+  SENT: 2,
+  CANCELLED: 3,
+  FAILED: 4,
+} as const
+
 export interface MentionItem {
   userId: number
   displayName: string

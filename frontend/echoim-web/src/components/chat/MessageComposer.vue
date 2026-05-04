@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ChatDotRound, Close, Paperclip, Timer } from '@element-plus/icons-vue'
+import { ChatDotRound, Close, Clock, Paperclip, Timer } from '@element-plus/icons-vue'
 import type { GroupMemberItem, MentionItem, StickerDefinition } from '@/types/chat'
 import type { VoiceRecordResult } from './VoiceRecorder.vue'
 import VoiceRecorder from './VoiceRecorder.vue'
@@ -42,6 +42,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   send: [content: string, mentions: MentionItem[], selfDestructSeconds?: number]
+  'scheduled-send': [content: string, mentions: MentionItem[], scheduledAt: string]
+  'open-scheduled-panel': []
   'upload-file': [file: File]
   'upload-files': [files: File[]]
   'send-sticker': [sticker: StickerDefinition]
@@ -57,7 +59,20 @@ const stickerTrayOpen = ref(false)
 const voiceRecorderOpen = ref(false)
 const selfDestructSeconds = ref(0)
 const selfDestructMenuOpen = ref(false)
+const scheduledSendOpen = ref(false)
+const scheduledDate = ref('')
+const scheduledTime = ref('')
 const replyPreview = computed(() => props.replyingMessage?.content || props.replyingMessage?.file?.fileName || '原消息')
+
+const minScheduledDateTime = computed(() => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 5) // Minimum 5 minutes from now
+  return now.toISOString().slice(0, 16)
+})
+
+const canSchedule = computed(() => {
+  return scheduledDate.value && scheduledTime.value
+})
 
 // @mention state
 const mentionSelectorVisible = ref(false)
@@ -83,6 +98,28 @@ function submit() {
   draft.value = ''
   pendingMentions.value = []
   closeMentionSelector()
+}
+
+function submitScheduled() {
+  if (!props.canSend) return
+
+  const content = draft.value.trim()
+  if (!content) return
+  if (!canSchedule.value) return
+
+  // Collect all mentions that are actually in the text
+  const mentionsInText = pendingMentions.value.filter((m) =>
+    content.includes(`@${m.displayName}`) || content.includes(`@${m.userId}`)
+  )
+
+  const scheduledAt = `${scheduledDate.value}T${scheduledTime.value}:00`
+  emit('scheduled-send', content, mentionsInText, scheduledAt)
+  draft.value = ''
+  pendingMentions.value = []
+  closeMentionSelector()
+  scheduledSendOpen.value = false
+  scheduledDate.value = ''
+  scheduledTime.value = ''
 }
 
 function onKeydown(event: Event | KeyboardEvent) {
@@ -307,6 +344,76 @@ function handleVoiceCancel() {
             </div>
           </transition>
         </div>
+        <div class="composer__scheduled-wrapper">
+          <button
+            class="composer__icon"
+            :class="{ 'is-active': scheduledSendOpen }"
+            type="button"
+            aria-label="定时发送"
+            data-testid="scheduled-send-toggle"
+            @click="scheduledSendOpen = !scheduledSendOpen"
+          >
+            <Clock />
+          </button>
+          <transition name="scheduled-menu-fade">
+            <div v-if="scheduledSendOpen" class="composer__scheduled-menu">
+              <div class="composer__scheduled-header">
+                <strong>定时发送</strong>
+                <p>消息将在指定时间自动发送</p>
+              </div>
+              <div class="composer__scheduled-fields">
+                <el-date-picker
+                  v-model="scheduledDate"
+                  type="date"
+                  placeholder="选择日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  :disabled-date="(date: Date) => date < new Date(new Date().setHours(0, 0, 0, 0))"
+                  size="small"
+                />
+                <el-time-picker
+                  v-model="scheduledTime"
+                  placeholder="选择时间"
+                  format="HH:mm"
+                  value-format="HH:mm"
+                  size="small"
+                />
+              </div>
+              <div class="composer__scheduled-actions">
+                <button
+                  class="composer__scheduled-confirm"
+                  type="button"
+                  :disabled="!canSchedule || !hasText"
+                  @click="submitScheduled"
+                >
+                  确认定时
+                </button>
+                <button
+                  class="composer__scheduled-cancel"
+                  type="button"
+                  @click="scheduledSendOpen = false; scheduledDate = ''; scheduledTime = ''"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </transition>
+        </div>
+        <button
+          class="composer__icon"
+          type="button"
+          aria-label="查看定时消息"
+          data-testid="scheduled-panel-toggle"
+          @click="emit('open-scheduled-panel')"
+        >
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
+            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="1.8"/>
+            <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
         <el-input
           v-model="draft"
           :autosize="{ minRows: 1, maxRows: 4 }"
@@ -657,6 +764,106 @@ function handleVoiceCancel() {
 
 .self-destruct-menu-fade-enter-from,
 .self-destruct-menu-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px) scale(0.98);
+}
+
+.composer__scheduled-wrapper {
+  position: relative;
+}
+
+.composer__scheduled-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 260px;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+}
+
+.composer__scheduled-header {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.composer__scheduled-header strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.composer__scheduled-header p {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.composer__scheduled-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.composer__scheduled-fields :deep(.el-date-editor) {
+  width: 100%;
+}
+
+.composer__scheduled-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.composer__scheduled-confirm,
+.composer__scheduled-cancel {
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease-out);
+}
+
+.composer__scheduled-confirm {
+  background: var(--interactive-primary-bg);
+  color: white;
+  border-color: var(--interactive-primary-bg);
+}
+
+.composer__scheduled-confirm:hover:not(:disabled) {
+  background: var(--interactive-primary-bg-hover);
+}
+
+.composer__scheduled-confirm:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.composer__scheduled-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.composer__scheduled-cancel:hover {
+  background: var(--interactive-secondary-bg-hover);
+}
+
+.scheduled-menu-fade-enter-active,
+.scheduled-menu-fade-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.scheduled-menu-fade-enter-from,
+.scheduled-menu-fade-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(4px) scale(0.98);
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ContactsPanel from '@/components/chat/ContactsPanel.vue'
 import ChatTopbar from '@/components/chat/ChatTopbar.vue'
@@ -11,6 +11,7 @@ import type { ImageViewerImage } from '@/components/chat/ImageViewer.vue'
 import MessagePane from '@/components/chat/MessagePane.vue'
 import PinnedMessagesBanner from '@/components/chat/PinnedMessagesBanner.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
+import ScheduledMessagesPanel from '@/components/chat/ScheduledMessagesPanel.vue'
 import type { VoiceRecordResult } from '@/components/chat/VoiceRecorder.vue'
 import ConversationProfileDrawer from '@/components/chat/ConversationProfileDrawer.vue'
 import AvatarBadge from '@/components/chat/AvatarBadge.vue'
@@ -49,6 +50,7 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups'
 import { forwardMessages } from '@/services/messages'
+import * as scheduledMessageService from '@/services/scheduledMessages'
 import { STICKER_LIBRARY } from '@/stickers/library'
 import { ChatRound, Close, Guide, Search, UserFilled } from '@element-plus/icons-vue'
 import type {
@@ -105,6 +107,7 @@ const jumpMessageId = ref<number | null>(null)
 const forwardSelectionMode = ref(false)
 const selectedForwardMessageIds = ref<number[]>([])
 const totpSetupData = ref<{ secret: string; uri: string; recoveryCodes: string[] } | null>(null)
+const scheduledPanelOpen = ref(false)
 const composeDialog = reactive<{
   visible: boolean
   mode: ComposeAction
@@ -1502,6 +1505,34 @@ async function handleSendTextMessage(content: string, mentions?: MentionItem[], 
   clearReplyMessage()
 }
 
+async function handleScheduledSend(content: string, mentions?: MentionItem[], scheduledAt?: string) {
+  if (!scheduledAt) return
+
+  const conversation = chatStore.activeConversation
+  if (!conversation) return
+
+  try {
+    await scheduledMessageService.createScheduledMessage({
+      conversationId: conversation.conversationId,
+      msgType: 1, // TEXT
+      content,
+      scheduledAt,
+      mentions: mentions && mentions.length > 0 ? mentions : undefined,
+    })
+    ElMessage.success('定时消息已创建')
+    clearReplyMessage()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '创建定时消息失败')
+  }
+}
+
+function handleScheduledMessageSent() {
+  // Refresh conversation messages when a scheduled message is sent immediately
+  if (chatStore.activeConversationId) {
+    chatStore.loadConversationMessages(chatStore.activeConversationId, true)
+  }
+}
+
 async function handleUploadAttachment(file: File) {
   attachmentUploading.value = true
   attachmentError.value = null
@@ -1965,6 +1996,12 @@ function registerDebugHooks() {
           <div v-if="typingLabel" class="chat-page__typing" data-testid="typing-indicator">
             {{ typingLabel }}
           </div>
+          <ScheduledMessagesPanel
+            :conversation-id="chatStore.activeConversationId"
+            :visible="scheduledPanelOpen"
+            @close="scheduledPanelOpen = false"
+            @message-sent="handleScheduledMessageSent"
+          />
           <div
             v-if="chatStore.activeConversation.groupStatus === 2"
             class="chat-page__dissolved"
@@ -1988,6 +2025,8 @@ function registerDebugHooks() {
             "
             @cancel-reply="clearReplyMessage"
             @send="handleSendTextMessage"
+            @scheduled-send="handleScheduledSend"
+            @open-scheduled-panel="scheduledPanelOpen = true"
             @upload-file="handleUploadAttachment"
             @upload-files="handleUploadMultipleFiles"
             @send-sticker="handleSendSticker"

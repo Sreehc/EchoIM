@@ -376,6 +376,29 @@ CREATE TABLE IF NOT EXISTS im_sensitive_word (
   KEY idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='敏感词库表';
 
+CREATE TABLE IF NOT EXISTS im_scheduled_message (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '定时消息ID',
+  user_id BIGINT NOT NULL COMMENT '发送人ID',
+  conversation_id BIGINT NOT NULL COMMENT '会话ID',
+  conversation_type TINYINT NOT NULL COMMENT '1单聊 2群聊 3频道',
+  to_user_id BIGINT DEFAULT NULL COMMENT '接收人ID，单聊时使用',
+  group_id BIGINT DEFAULT NULL COMMENT '群ID，群聊时使用',
+  msg_type TINYINT NOT NULL DEFAULT 1 COMMENT '1文本 2表情 3图片 4GIF 5文件 6系统消息 7语音',
+  content TEXT DEFAULT NULL COMMENT '消息内容',
+  extra_json JSON DEFAULT NULL COMMENT '扩展数据',
+  file_id BIGINT DEFAULT NULL COMMENT '文件ID',
+  scheduled_at DATETIME NOT NULL COMMENT '计划发送时间',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '1待发送 2已发送 3已取消 4发送失败',
+  error_message VARCHAR(255) DEFAULT NULL COMMENT '失败原因',
+  sent_message_id BIGINT DEFAULT NULL COMMENT '实际发送的消息ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_user_id (user_id),
+  KEY idx_conversation_id (conversation_id),
+  KEY idx_scheduled_at (scheduled_at),
+  KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='定时消息表';
+
 -- Redis key 规划建议
 -- echoim:online:user:{userId}
 -- echoim:route:user:{userId}
