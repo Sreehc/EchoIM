@@ -12,6 +12,8 @@ import com.echoim.server.vo.auth.LoginResponseVo;
 import com.echoim.server.vo.auth.RecoveryVerifyVo;
 import com.echoim.server.vo.auth.RegisterResponseVo;
 import com.echoim.server.vo.auth.SecurityEventItemVo;
+import com.echoim.server.vo.auth.TotpSetupVo;
+import com.echoim.server.vo.auth.TotpStatusVo;
 import com.echoim.server.vo.auth.TrustedDeviceItemVo;
 import com.echoim.server.vo.user.UserProfileVo;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +21,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 import java.util.List;
 
@@ -193,6 +197,46 @@ public class AuthController {
         return ApiResponse.success(authService.listSecurityEvents(LoginUserContext.requireUserId()));
     }
 
+    @RequireLogin
+    @GetMapping("/totp/status")
+    public ApiResponse<TotpStatusVo> totpStatus() {
+        return ApiResponse.success(authService.getTotpStatus(LoginUserContext.requireUserId()));
+    }
+
+    @RequireLogin
+    @PostMapping("/totp/setup")
+    public ApiResponse<TotpSetupVo> setupTotp() {
+        return ApiResponse.success(authService.setupTotp(LoginUserContext.requireUserId()));
+    }
+
+    @RequireLogin
+    @PostMapping("/totp/enable")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "totp-enable", permits = 5, windowSeconds = 60, message = "操作过于频繁")
+    public ApiResponse<Void> enableTotp(@Valid @RequestBody EnableTotpRequest request) {
+        authService.enableTotp(LoginUserContext.requireUserId(), request.code(), request.secret(), request.recoveryCodes());
+        return ApiResponse.success();
+    }
+
+    @RequireLogin
+    @PostMapping("/totp/disable")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "totp-disable", permits = 5, windowSeconds = 60, message = "操作过于频繁")
+    public ApiResponse<Void> disableTotp(@Valid @RequestBody DisableTotpRequest request) {
+        authService.disableTotp(LoginUserContext.requireUserId(), request.code());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/login/totp/verify")
+    @RateLimit(keyType = RateLimit.KeyType.IP, name = "auth-totp-verify", permits = 10, windowSeconds = 60, message = "验证过于频繁")
+    public ApiResponse<LoginResponseVo> verifyTotpLogin(@Valid @RequestBody TotpVerifyRequest request,
+                                                        HttpServletRequest servletRequest) {
+        return ApiResponse.success(authService.verifyTotpLogin(
+                request.challengeTicket(),
+                request.code(),
+                resolveIp(servletRequest),
+                resolveUserAgent(servletRequest)
+        ));
+    }
+
     private String resolveIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
@@ -266,6 +310,24 @@ public class AuthController {
             @NotBlank(message = "邮箱不能为空") String email,
             @NotBlank(message = "验证码不能为空") String code,
             @NotBlank(message = "当前密码不能为空") String currentPassword
+    ) {
+    }
+
+    public record TotpVerifyRequest(
+            @NotBlank(message = "challengeTicket 不能为空") String challengeTicket,
+            @NotBlank(message = "验证码不能为空") String code
+    ) {
+    }
+
+    public record EnableTotpRequest(
+            @NotBlank(message = "验证码不能为空") String code,
+            @NotBlank(message = "密钥不能为空") String secret,
+            List<String> recoveryCodes
+    ) {
+    }
+
+    public record DisableTotpRequest(
+            @NotBlank(message = "验证码不能为空") String code
     ) {
     }
 }

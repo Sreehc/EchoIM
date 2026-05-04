@@ -47,4 +47,29 @@ public interface AuthService {
     void revokeAllTrustedDevices(Long userId);
 
     List<SecurityEventItemVo> listSecurityEvents(Long userId);
+
+    /**
+     * Generate TOTP setup info (secret + URI + recovery codes)
+     */
+    TotpSetupVo setupTotp(Long userId);
+
+    /**
+     * Enable TOTP after verifying the first code
+     */
+    void enableTotp(Long userId, String code, String secret, List<String> recoveryCodes);
+
+    /**
+     * Disable TOTP (requires current TOTP code or recovery code)
+     */
+    void disableTotp(Long userId, String code);
+
+    /**
+     * Verify TOTP during login (returns new login response if valid)
+     */
+    LoginResponseVo verifyTotpLogin(String challengeTicket, String code, String ip, String userAgent);
+
+    /**
+     * Get TOTP status for a user
+     */
+    TotpStatusVo getTotpStatus(Long userId);
 }

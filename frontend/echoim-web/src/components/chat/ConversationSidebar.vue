@@ -105,6 +105,10 @@ const props = defineProps<{
   usernameChecking?: boolean
   usernameAvailable?: boolean | null
   usernameMessage?: string | null
+  totpEnabled?: boolean
+  totpRecoveryCodesRemaining?: number
+  totpLoading?: boolean
+  totpSetupData?: { secret: string; uri: string; recoveryCodes: string[] } | null
 }>()
 
 const emit = defineEmits<{
@@ -139,6 +143,10 @@ const emit = defineEmits<{
   'conversation-action': [payload: { command: ConversationContextAction; conversationId: number }]
   'update:conversation-folder': [value: ConversationFolder]
   'compose-action': [value: ComposeAction]
+  'setup-totp': []
+  'enable-totp': [payload: { code: string; secret: string; recoveryCodes: string[] }]
+  'disable-totp': [code: string]
+  'load-totp-status': []
   logout: []
 }>()
 
@@ -166,6 +174,13 @@ const emailForm = reactive({
   currentPassword: '',
   code: '',
   localError: '',
+})
+const totpSetupData = computed(() => props.totpSetupData ?? null)
+const totpEnableCode = ref('')
+const totpDisableCode = ref('')
+const totpQrCodeUrl = computed(() => {
+  if (!totpSetupData.value?.uri) return ''
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpSetupData.value.uri)}`
 })
 const profileDraft = reactive<{
   username: string
@@ -441,6 +456,7 @@ watch(
     if (mode === 'settings' && section === 'security') {
       emit('refresh-trusted-devices')
       emit('refresh-security-events')
+      emit('load-totp-status')
     }
     if (mode === 'settings' && section === 'privacy') {
       emit('refresh-blocked-users')
@@ -795,6 +811,50 @@ function submitEmailBind() {
     code: emailForm.code.trim(),
     currentPassword: emailForm.currentPassword,
   })
+}
+
+async function handleSetupTotp() {
+  emit('clear-profile-error')
+  emit('clear-profile-notice')
+  emit('setup-totp')
+}
+
+function handleEnableTotp() {
+  emit('clear-profile-error')
+  emit('clear-profile-notice')
+
+  if (!totpEnableCode.value.trim()) {
+    return
+  }
+
+  if (!totpSetupData.value) {
+    return
+  }
+
+  emit('enable-totp', {
+    code: totpEnableCode.value.trim(),
+    secret: totpSetupData.value.secret,
+    recoveryCodes: totpSetupData.value.recoveryCodes,
+  })
+  totpEnableCode.value = ''
+  totpSetupData.value = null
+}
+
+function handleDisableTotp() {
+  emit('clear-profile-error')
+  emit('clear-profile-notice')
+
+  if (!totpDisableCode.value.trim()) {
+    return
+  }
+
+  emit('disable-totp', totpDisableCode.value.trim())
+  totpDisableCode.value = ''
+}
+
+function cancelTotpSetup() {
+  totpSetupData.value = null
+  totpEnableCode.value = ''
 }
 
 function formatSecurityDetail(detail: string | null | undefined) {
@@ -1687,6 +1747,70 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
                     <el-button type="primary" class="security-actions__primary" :loading="passwordSaving" @click="submitPassword">更新密码</el-button>
                     <el-button plain class="security-actions__secondary" data-testid="sidebar-logout" @click="handleLogout">退出登录</el-button>
                   </div>
+                </div>
+              </details>
+
+              <details class="security-disclosure">
+                <summary class="security-disclosure__summary">
+                  <div class="security-disclosure__lead">
+                    <span class="security-disclosure__icon"><Lock /></span>
+                    <div class="security-disclosure__copy">
+                      <strong>两步验证</strong>
+                      <p>{{ totpEnabled ? '已启用 TOTP 验证' : '使用验证器应用增强账号安全' }}</p>
+                    </div>
+                  </div>
+                  <span class="security-disclosure__meta">{{ totpEnabled ? '已启用' : '未启用' }}</span>
+                </summary>
+                <div class="security-disclosure__body">
+                  <div v-if="totpLoading" class="settings-empty">正在加载…</div>
+                  <template v-else>
+                    <div v-if="totpEnabled" class="totp-status">
+                      <div class="totp-status__info">
+                        <p>两步验证已启用，登录时需要输入验证器应用中的验证码。</p>
+                        <p>剩余恢复码：{{ totpRecoveryCodesRemaining }} 个</p>
+                      </div>
+                      <el-form label-position="top" class="profile-form">
+                        <el-form-item label="验证码">
+                          <el-input v-model="totpDisableCode" placeholder="6 位验证码" maxlength="6" />
+                        </el-form-item>
+                      </el-form>
+                      <div class="sidebar-actions">
+                        <el-button type="danger" :loading="totpLoading" @click="handleDisableTotp">关闭两步验证</el-button>
+                      </div>
+                    </div>
+                    <div v-else class="totp-setup">
+                      <div v-if="!totpSetupData" class="totp-setup__start">
+                        <p>启用两步验证后，登录时需要输入验证器应用（如 Google Authenticator）中的验证码。</p>
+                        <div class="sidebar-actions">
+                          <el-button type="primary" :loading="totpLoading" @click="handleSetupTotp">开始设置</el-button>
+                        </div>
+                      </div>
+                      <div v-else class="totp-setup__config">
+                        <p class="totp-setup__instruction">使用验证器应用扫描下方二维码，或手动输入密钥：</p>
+                        <div class="totp-setup__secret">
+                          <code>{{ totpSetupData.secret }}</code>
+                        </div>
+                        <div class="totp-setup__qr">
+                          <img :src="totpQrCodeUrl" alt="TOTP 二维码" />
+                        </div>
+                        <div v-if="totpSetupData.recoveryCodes.length" class="totp-setup__recovery">
+                          <strong>恢复码（请妥善保管）</strong>
+                          <div class="totp-recovery-codes">
+                            <code v-for="code in totpSetupData.recoveryCodes" :key="code">{{ code }}</code>
+                          </div>
+                        </div>
+                        <el-form label-position="top" class="profile-form">
+                          <el-form-item label="验证码">
+                            <el-input v-model="totpEnableCode" placeholder="输入验证器应用中的 6 位验证码" maxlength="6" />
+                          </el-form-item>
+                        </el-form>
+                        <div class="sidebar-actions">
+                          <el-button type="primary" :loading="totpLoading" @click="handleEnableTotp">启用两步验证</el-button>
+                          <el-button plain :loading="totpLoading" @click="cancelTotpSetup">取消</el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </details>
             </div>
@@ -3931,5 +4055,86 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   .security-actions--split {
     grid-template-columns: 1fr;
   }
+}
+
+.totp-status,
+.totp-setup {
+  display: grid;
+  gap: 12px;
+}
+
+.totp-status__info p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.46;
+}
+
+.totp-setup__start p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.46;
+}
+
+.totp-setup__instruction {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.46;
+}
+
+.totp-setup__secret {
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
+  text-align: center;
+}
+
+.totp-setup__secret code {
+  font: 600 var(--text-sm)/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+
+.totp-setup__qr {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: white;
+}
+
+.totp-setup__qr img {
+  width: 180px;
+  height: 180px;
+}
+
+.totp-setup__recovery {
+  display: grid;
+  gap: 8px;
+}
+
+.totp-setup__recovery strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.totp-recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.totp-recovery-codes code {
+  padding: 6px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
+  font: 500 var(--text-xs)/1 var(--font-mono);
+  text-align: center;
+  letter-spacing: 0.04em;
 }
 </style>

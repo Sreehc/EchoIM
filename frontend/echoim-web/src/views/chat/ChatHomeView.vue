@@ -104,6 +104,7 @@ const attachmentError = ref<string | null>(null)
 const jumpMessageId = ref<number | null>(null)
 const forwardSelectionMode = ref(false)
 const selectedForwardMessageIds = ref<number[]>([])
+const totpSetupData = ref<{ secret: string; uri: string; recoveryCodes: string[] } | null>(null)
 const composeDialog = reactive<{
   visible: boolean
   mode: ComposeAction
@@ -1317,6 +1318,32 @@ async function handleUnblockUser(userId: number) {
   await authStore.handleUnblockUser(userId)
 }
 
+async function handleSetupTotp() {
+  try {
+    const result = await authStore.setupTotp()
+    totpSetupData.value = result
+  } catch {
+    // Error handled by store
+  }
+}
+
+async function handleEnableTotp(payload: { code: string; secret: string; recoveryCodes: string[] }) {
+  try {
+    await authStore.enableTotp(payload.code, payload.secret, payload.recoveryCodes)
+    totpSetupData.value = null
+  } catch {
+    // Error handled by store
+  }
+}
+
+async function handleDisableTotp(code: string) {
+  try {
+    await authStore.disableTotp(code)
+  } catch {
+    // Error handled by store
+  }
+}
+
 async function handleLoadOlderMessages() {
   const conversationId = chatStore.activeConversationId
   if (!conversationId) return
@@ -1801,6 +1828,10 @@ function registerDebugHooks() {
       :username-checking="usernameCheck.checking"
       :username-available="usernameCheck.available"
       :username-message="usernameCheck.message"
+      :totp-enabled="authStore.totpEnabled"
+      :totp-recovery-codes-remaining="authStore.totpRecoveryCodesRemaining"
+      :totp-loading="authStore.totpLoading"
+      :totp-setup-data="totpSetupData"
       @update:search-query="chatStore.setSearchQuery"
       @update:conversation-folder="uiStore.setConversationFolder"
       @update:panel-scroll-top="uiStore.setPanelScrollTop(uiStore.leftPanelMode, $event)"
@@ -1823,6 +1854,10 @@ function registerDebugHooks() {
       @refresh-security-events="handleRefreshSecurityEvents"
       @refresh-blocked-users="handleRefreshBlockedUsers"
       @unblock-user="handleUnblockUser"
+      @setup-totp="handleSetupTotp"
+      @enable-totp="handleEnableTotp"
+      @disable-totp="handleDisableTotp"
+      @load-totp-status="authStore.loadTotpStatus"
       @clear-profile-error="authStore.clearProfileError"
       @clear-profile-notice="authStore.clearProfileNotice"
       @conversation-action="handleConversationContextAction"

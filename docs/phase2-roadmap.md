@@ -3,7 +3,7 @@
 > 创建日期：2026-05-04
 > 前置条件：一期工程全部五个阶段已完成，系统具备完整的即时通讯、语音通话、管理后台能力
 > 目标：从"功能可用"升级为"体验优秀、安全可靠、可规模运营"
-> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八 8.1-8.2 全部完成
+> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成
 
 ---
 
@@ -157,16 +157,25 @@
 
 ### 8.3 登录安全增强
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 8.3.1 | 登录设备管理 | P1 | 1d | 前端"已登录设备"列表（设备名、IP、最后活跃时间），支持远程登出其他设备 |
-| 8.3.2 | 登录异常检测 | P2 | 1d | 异地登录提醒（IP 地理位置变化），频繁失败自动锁定，管理后台查看登录日志 |
-| 8.3.3 | 两步验证 | P2 | 2d | TOTP（Google Authenticator）绑定，登录时二次验证，恢复码生成 |
+> **审查结论（2026-05-04）**：阶段八 8.3 登录安全增强全部 3 项任务在代码层面均已实现。
+> 8.3.1 登录设备管理：已在一期实现，后端 im_trusted_device 表 + TrustedDeviceService + AuthController，
+> 前端 ConversationSidebar 安全分组展示受信设备列表，支持单个/全部移除。
+> 8.3.2 登录异常检测：已在一期实现，后端 im_security_event 表 + SecurityEventService，
+> 前端安全记录时间线展示，异常登录自动记录。
+> 8.3.3 两步验证：后端 TOTP（dev.samstevens.totp 库）+ Redis 挑战状态 + 恢复码机制，
+> 登录流程集成 TOTP 验证，前端设置页 TOTP 管理 UI（启用/禁用/QR 码/恢复码）。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 8.3.1 | 登录设备管理 | P1 | 1d | ✅ 已完成（一期） | 后端：`im_trusted_device` 表 + `TrustedDeviceService` + `AuthController`（GET/DELETE /trusted-devices）；前端：`ConversationSidebar.vue` 安全分组"受信设备"列表 + `stores/auth.ts` loadTrustedDevices/revokeTrustedDevice/revokeAllTrustedDevices |
+| 8.3.2 | 登录异常检测 | P2 | 1d | ✅ 已完成（一期） | 后端：`im_security_event` 表 + `SecurityEventService` + `AuthController`（GET /security-events）；前端：`ConversationSidebar.vue` 安全分组"安全记录"时间线 + `stores/auth.ts` loadSecurityEvents |
+| 8.3.3 | 两步验证 | P2 | 2d | ✅ 已完成 | 后端：`dev.samstevens.totp:totp:2.7.1` 依赖 + `TotpService`/`TotpServiceImpl`（generateSecret/generateUri/verifyCode/generateRecoveryCodes/verifyRecoveryCode/consumeRecoveryCode）+ `ImUserEntity` totpSecret/totpEnabled/recoveryCodes 字段 + `AuthServiceImpl` login() TOTP 挑战流程 + `AuthController` GET /totp/status, POST /totp/setup, POST /totp/enable, POST /totp/disable, POST /login/totp/verify + Redis TOTP_CHALLENGE/TOTP_SETUP 状态管理（5min/10min 过期）+ `TotpSetupVo`/`TotpStatusVo`；前端：`services/auth.ts` fetchTotpStatus/setupTotp/enableTotp/disableTotp/verifyTotpLogin + `stores/auth.ts` totpEnabled/totpRecoveryCodesRemaining/totpLoading + loadTotpStatus/setupTotp/enableTotp/disableTotp/verifyTotpLogin + `LoginView.vue` totp 视图模式 + TOTP 验证表单 + `ConversationSidebar.vue` 两步验证管理 UI（QR 码/恢复码/启用/禁用）+ `ChatHomeView.vue` TOTP 事件处理 |
 
 **验收标准：**
 - 屏蔽用户后不再收到对方消息
 - 阅后即焚消息在指定时间后自动销毁
 - 用户可以查看并管理已登录设备
+- 用户可以启用两步验证（TOTP），登录时需要验证器应用验证码
 
 ---
 

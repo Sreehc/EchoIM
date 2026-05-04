@@ -83,3 +83,23 @@ export function revokeAllTrustedDevicesRequest() {
 export function fetchSecurityEventsRequest() {
   return getJson<ApiSecurityEventSummary[]>('/api/auth/security-events')
 }
+
+export function fetchTotpStatusRequest() {
+  return getJson<{ enabled: boolean; recoveryCodesRemaining: number }>('/api/auth/totp/status')
+}
+
+export function setupTotpRequest() {
+  return postJson<{ secret: string; uri: string; recoveryCodes: string[] }>('/api/auth/totp/setup')
+}
+
+export function enableTotpRequest(payload: { code: string; secret: string; recoveryCodes: string[] }) {
+  return postJson<void>('/api/auth/totp/enable', payload)
+}
+
+export function disableTotpRequest(payload: { code: string }) {
+  return postJson<void>('/api/auth/totp/disable', payload)
+}
+
+export function verifyTotpLoginRequest(payload: { challengeTicket: string; code: string }) {
+  return postJson<ApiLoginResponse>('/api/auth/login/totp/verify', payload)
+}

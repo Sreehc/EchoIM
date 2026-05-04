@@ -15,7 +15,10 @@ import type { ApiBlockedUserItem } from '@/types/api'
 import {
   bindEmailRequest,
   changePasswordRequest,
+  disableTotpRequest,
+  enableTotpRequest,
   fetchSecurityEventsRequest,
+  fetchTotpStatusRequest,
   fetchTrustedDevicesRequest,
   loginRequest,
   logoutRequest,
@@ -26,9 +29,11 @@ import {
   revokeTrustedDeviceRequest,
   sendEmailBindCodeRequest,
   sendRecoveryCodeRequest,
+  setupTotpRequest,
   trustedDeviceLoginRequest,
   verifyLoginChallengeRequest,
   verifyRecoveryCodeRequest,
+  verifyTotpLoginRequest,
 } from '@/services/auth'
 import { fetchBlockedUsers, unblockUser } from '@/services/blocks'
 import { HttpError } from '@/services/http'
@@ -60,6 +65,9 @@ export const useAuthStore = defineStore('auth', () => {
   const blockedUsers = ref<ApiBlockedUserItem[]>([])
   const profileError = ref<string | null>(null)
   const profileNotice = ref<string | null>(null)
+  const totpEnabled = ref(false)
+  const totpRecoveryCodesRemaining = ref(0)
+  const totpLoading = ref(false)
   let refreshPromise: Promise<AuthSession | null> | null = null
   let refreshTimer: number | null = null
 
@@ -466,6 +474,75 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loadTotpStatus() {
+    totpLoading.value = true
+    try {
+      const status = await fetchTotpStatusRequest()
+      totpEnabled.value = status.enabled
+      totpRecoveryCodesRemaining.value = status.recoveryCodesRemaining
+    } finally {
+      totpLoading.value = false
+    }
+  }
+
+  async function setupTotp() {
+    totpLoading.value = true
+    try {
+      return await setupTotpRequest()
+    } finally {
+      totpLoading.value = false
+    }
+  }
+
+  async function enableTotp(code: string, secret: string, recoveryCodes: string[]) {
+    totpLoading.value = true
+    try {
+      await enableTotpRequest({ code, secret, recoveryCodes })
+      totpEnabled.value = true
+      totpRecoveryCodesRemaining.value = recoveryCodes.length
+      profileNotice.value = '两步验证已启用'
+    } catch (error) {
+      profileError.value = error instanceof Error ? error.message : '启用两步验证失败'
+      throw error
+    } finally {
+      totpLoading.value = false
+    }
+  }
+
+  async function disableTotp(code: string) {
+    totpLoading.value = true
+    try {
+      await disableTotpRequest({ code })
+      totpEnabled.value = false
+      totpRecoveryCodesRemaining.value = 0
+      profileNotice.value = '两步验证已关闭'
+    } catch (error) {
+      profileError.value = error instanceof Error ? error.message : '关闭两步验证失败'
+      throw error
+    } finally {
+      totpLoading.value = false
+    }
+  }
+
+  async function verifyTotpLogin(challengeTicket: string, code: string, rememberMe: boolean, deviceFingerprint: string) {
+    isLoading.value = true
+
+    try {
+      const response = normalizeLoginFlow(await verifyTotpLoginRequest({ challengeTicket, code }))
+      if (response.status !== 'authenticated') {
+        throw new Error('登录状态异常')
+      }
+      applyAuthenticatedSession(response, {
+        rememberMe,
+        deviceFingerprint,
+        persistStoredAccount: rememberMe,
+      })
+      return response
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   function removeStoredAccount(userId: number) {
     storedAccounts.value = storedAccounts.value.filter((item) => item.userInfo.userId !== userId)
     persistStoredAccounts(storedAccounts.value)
@@ -702,6 +779,9 @@ export const useAuthStore = defineStore('auth', () => {
     trustedDevicesLoading,
     securityEventsLoading,
     blockedUsersLoading,
+    totpEnabled,
+    totpRecoveryCodesRemaining,
+    totpLoading,
     trustedDevices,
     securityEvents,
     blockedUsers,
@@ -712,6 +792,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     verifyLoginChallenge,
     resendLoginChallenge,
+    verifyTotpLogin,
     logout,
     activateStoredAccount,
     sendRecoveryCode,
@@ -725,6 +806,10 @@ export const useAuthStore = defineStore('auth', () => {
     loadSecurityEvents,
     loadBlockedUsers,
     handleUnblockUser,
+    loadTotpStatus,
+    setupTotp,
+    enableTotp,
+    disableTotp,
     removeStoredAccount,
     clearSession,
     ensureCurrentProfile,

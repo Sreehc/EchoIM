@@ -24,6 +24,9 @@ public class ImUserEntity {
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String totpSecret;
+    private Integer totpEnabled;
+    private String recoveryCodes;
 
     public Long getId() {
         return id;
@@ -135,5 +138,29 @@ public class ImUserEntity {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getTotpSecret() {
+        return totpSecret;
+    }
+
+    public void setTotpSecret(String totpSecret) {
+        this.totpSecret = totpSecret;
+    }
+
+    public Integer getTotpEnabled() {
+        return totpEnabled;
+    }
+
+    public void setTotpEnabled(Integer totpEnabled) {
+        this.totpEnabled = totpEnabled;
+    }
+
+    public String getRecoveryCodes() {
+        return recoveryCodes;
+    }
+
+    public void setRecoveryCodes(String recoveryCodes) {
+        this.recoveryCodes = recoveryCodes;
     }
 }

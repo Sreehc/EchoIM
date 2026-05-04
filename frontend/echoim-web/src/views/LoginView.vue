@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { getDeviceFingerprint, getDeviceName } from '@/utils/device'
 
-type ViewMode = 'accounts' | 'login' | 'register' | 'challenge' | 'recovery-email' | 'recovery-code' | 'recovery-reset'
+type ViewMode = 'accounts' | 'login' | 'register' | 'challenge' | 'totp' | 'recovery-email' | 'recovery-code' | 'recovery-reset'
 type StatusTone = 'error' | 'info' | 'success'
 
 const authStore = useAuthStore()
@@ -46,6 +46,10 @@ const challengeForm = reactive({
   code: '',
 })
 
+const totpForm = reactive({
+  code: '',
+})
+
 const recoveryForm = reactive({
   email: '',
   code: '',
@@ -57,6 +61,7 @@ const currentTitle = computed(() => {
   if (viewMode.value === 'accounts') return '选择账号'
   if (viewMode.value === 'register') return '注册账号'
   if (viewMode.value === 'challenge') return '邮箱验证'
+  if (viewMode.value === 'totp') return '两步验证'
   if (viewMode.value === 'recovery-email') return '找回账号或密码'
   if (viewMode.value === 'recovery-code') return '输入验证码'
   if (viewMode.value === 'recovery-reset') return '重置密码'
@@ -135,6 +140,14 @@ async function submit() {
       return
     }
 
+    if (response.status === 'totp_required') {
+      challengeTicket.value = response.challengeTicket ?? ''
+      totpForm.code = ''
+      viewMode.value = 'totp'
+      setStatus('请输入验证器应用中的验证码', 'info')
+      return
+    }
+
     await router.push('/chat')
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '登录失败', 'error')
@@ -151,6 +164,22 @@ async function verifyChallenge() {
       rememberMe: form.rememberMe,
       deviceFingerprint,
     })
+    await router.push('/chat')
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '验证失败', 'error')
+  }
+}
+
+async function verifyTotp() {
+  clearStatus()
+
+  try {
+    await authStore.verifyTotpLogin(
+      challengeTicket.value,
+      totpForm.code.trim(),
+      form.rememberMe,
+      deviceFingerprint,
+    )
     await router.push('/chat')
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '验证失败', 'error')
@@ -442,6 +471,21 @@ function handlePasswordEvent(event: Event) {
         </el-button>
       </el-form>
 
+      <el-form v-else-if="viewMode === 'totp'" class="login-card__form" @submit.prevent="verifyTotp">
+        <el-form-item>
+          <el-input
+            v-model="totpForm.code"
+            placeholder="6 位验证码"
+            aria-label="TOTP 验证码"
+            maxlength="6"
+          />
+        </el-form-item>
+        <p class="login-card__hint">打开验证器应用，输入 6 位动态验证码</p>
+        <el-button class="login-card__submit" native-type="submit" type="primary" :loading="authStore.isLoading">
+          验证
+        </el-button>
+      </el-form>
+
       <el-form v-else-if="viewMode === 'recovery-email'" class="login-card__form" @submit.prevent="submitRecoveryEmail">
         <el-form-item>
           <el-input
@@ -544,6 +588,14 @@ function handlePasswordEvent(event: Event) {
           @click="resendChallenge()"
         >
           重新发送验证码
+        </button>
+        <button
+          v-if="viewMode === 'totp'"
+          class="login-card__link"
+          type="button"
+          @click="openLoginForm(form.username)"
+        >
+          返回登录
         </button>
         <button
           v-if="viewMode === 'recovery-code'"

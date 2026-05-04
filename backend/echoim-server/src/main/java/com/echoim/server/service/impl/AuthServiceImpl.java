@@ -20,6 +20,7 @@ import com.echoim.server.mapper.ImAuthTrustedDeviceMapper;
 import com.echoim.server.mapper.ImUserMapper;
 import com.echoim.server.service.auth.AuthMailService;
 import com.echoim.server.service.auth.AuthService;
+import com.echoim.server.service.auth.TotpService;
 import com.echoim.server.service.token.TokenService;
 import com.echoim.server.vo.auth.CodeDispatchVo;
 import com.echoim.server.vo.auth.LoginResponseVo;
@@ -57,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
     private static final int USER_STATUS_NORMAL = 1;
     private static final String LOGIN_STATUS_AUTHENTICATED = "authenticated";
     private static final String LOGIN_STATUS_CHALLENGE_REQUIRED = "challenge_required";
+    private static final String LOGIN_STATUS_TOTP_REQUIRED = "totp_required";
     private static final String EVENT_SUCCESS = "SUCCESS";
     private static final String EVENT_FAILURE = "FAILURE";
     private static final String EVENT_LOGIN_SUCCESS = "LOGIN_SUCCESS";
@@ -76,6 +78,7 @@ public class AuthServiceImpl implements AuthService {
     private static final String EVENT_EMAIL_BIND_CODE_SENT = "EMAIL_BIND_CODE_SENT";
     private static final String EVENT_EMAIL_BOUND = "EMAIL_BOUND";
     private static final String LOGIN_CHALLENGE_KEY_PREFIX = "echoim:auth:login:challenge:";
+    private static final String TOTP_CHALLENGE_KEY_PREFIX = "echoim:auth:login:totp:";
     private static final String RECOVERY_CODE_KEY_PREFIX = "echoim:auth:recovery:code:";
     private static final String RECOVERY_TOKEN_KEY_PREFIX = "echoim:auth:recovery:token:";
     private static final String EMAIL_BIND_KEY_PREFIX = "echoim:auth:email:bind:";
@@ -95,6 +98,7 @@ public class AuthServiceImpl implements AuthService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
     private final ImOnlineService imOnlineService;
+    private final TotpService totpService;
 
     public AuthServiceImpl(ImUserMapper imUserMapper,
                            ImAuthTrustedDeviceMapper trustedDeviceMapper,
@@ -106,7 +110,8 @@ public class AuthServiceImpl implements AuthService {
                            AuthProperties authProperties,
                            StringRedisTemplate stringRedisTemplate,
                            ObjectMapper objectMapper,
-                           ImOnlineService imOnlineService) {
+                           ImOnlineService imOnlineService,
+                           TotpService totpService) {
         this.imUserMapper = imUserMapper;
         this.trustedDeviceMapper = trustedDeviceMapper;
         this.securityEventMapper = securityEventMapper;
@@ -118,6 +123,7 @@ public class AuthServiceImpl implements AuthService {
         this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
         this.imOnlineService = imOnlineService;
+        this.totpService = totpService;
     }
 
     @Override
@@ -152,6 +158,20 @@ public class AuthServiceImpl implements AuthService {
             recordSecurityEvent(userEntity.getId(), EVENT_LOGIN_FAILURE, EVENT_FAILURE, ip, userAgent,
                     Map.of("username", userEntity.getUsername(), "reason", "PASSWORD_INVALID"));
             throw new BizException(ErrorCode.UNAUTHORIZED, "用户名或密码错误");
+        }
+
+        // Check if TOTP 2FA is enabled
+        if (Integer.valueOf(1).equals(userEntity.getTotpEnabled())) {
+            String ticket = randomToken();
+            TotpChallengeState totpState = new TotpChallengeState();
+            totpState.setUserId(userEntity.getId());
+            totpState.setSentAt(System.currentTimeMillis());
+            totpState.setAttempts(0);
+            storeRedisJson(totpChallengeKey(ticket), totpState, 300); // 5 min expiry
+            LoginResponseVo responseVo = new LoginResponseVo();
+            responseVo.setStatus(LOGIN_STATUS_TOTP_REQUIRED);
+            responseVo.setChallengeTicket(ticket);
+            return responseVo;
         }
 
         boolean trustDevice = Boolean.TRUE.equals(requestDto.getTrustDevice());
@@ -527,6 +547,162 @@ public class AuthServiceImpl implements AuthService {
         return items;
     }
 
+    @Override
+    public TotpSetupVo setupTotp(Long userId) {
+        ImUserEntity user = requireUserById(userId);
+        if (Integer.valueOf(1).equals(user.getTotpEnabled())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "两步验证已启用");
+        }
+
+        String secret = totpService.generateSecret();
+        String uri = totpService.generateUri(secret, user.getUsername(), "EchoIM");
+        List<String> recoveryCodes = totpService.generateRecoveryCodes(8);
+
+        // Store temporarily in Redis (valid for 10 minutes)
+        TotpSetupState state = new TotpSetupState();
+        state.setSecret(secret);
+        state.setRecoveryCodes(recoveryCodes);
+        storeRedisJson(totpSetupKey(userId), state, 600);
+
+        TotpSetupVo vo = new TotpSetupVo();
+        vo.setSecret(secret);
+        vo.setUri(uri);
+        vo.setRecoveryCodes(recoveryCodes);
+        return vo;
+    }
+
+    @Override
+    public void enableTotp(Long userId, String code, String secret, List<String> recoveryCodes) {
+        ImUserEntity user = requireUserById(userId);
+        if (Integer.valueOf(1).equals(user.getTotpEnabled())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "两步验证已启用");
+        }
+
+        // Verify the code against the provided secret
+        if (!totpService.verifyCode(secret, code)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "验证码错误");
+        }
+
+        // Update user entity
+        user.setTotpSecret(secret);
+        user.setTotpEnabled(1);
+        try {
+            user.setRecoveryCodes(objectMapper.writeValueAsString(recoveryCodes));
+        } catch (JsonProcessingException e) {
+            throw new BizException(ErrorCode.SYSTEM_ERROR, "系统错误");
+        }
+        imUserMapper.updateById(user);
+
+        // Clean up Redis
+        stringRedisTemplate.delete(totpSetupKey(userId));
+
+        recordSecurityEvent(userId, "TOTP_ENABLED", EVENT_SUCCESS, null, null, Map.of());
+    }
+
+    @Override
+    public void disableTotp(Long userId, String code) {
+        ImUserEntity user = requireUserById(userId);
+        if (!Integer.valueOf(1).equals(user.getTotpEnabled())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "两步验证未启用");
+        }
+
+        // Verify TOTP code or recovery code
+        boolean verified = totpService.verifyCode(user.getTotpSecret(), code);
+        if (!verified && StringUtils.hasText(user.getRecoveryCodes())) {
+            verified = totpService.verifyRecoveryCode(user.getRecoveryCodes(), code);
+            if (verified) {
+                // Consume the recovery code
+                String updatedCodes = totpService.consumeRecoveryCode(user.getRecoveryCodes(), code);
+                user.setRecoveryCodes(updatedCodes);
+            }
+        }
+
+        if (!verified) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "验证码错误");
+        }
+
+        // Disable TOTP
+        user.setTotpSecret(null);
+        user.setTotpEnabled(0);
+        user.setRecoveryCodes(null);
+        imUserMapper.updateById(user);
+
+        recordSecurityEvent(userId, "TOTP_DISABLED", EVENT_SUCCESS, null, null, Map.of());
+    }
+
+    @Override
+    public LoginResponseVo verifyTotpLogin(String challengeTicket, String code, String ip, String userAgent) {
+        if (!StringUtils.hasText(challengeTicket) || !StringUtils.hasText(code)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "参数错误");
+        }
+
+        TotpChallengeState state = loadRedisJson(totpChallengeKey(challengeTicket), TotpChallengeState.class);
+        if (state == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED, "验证已过期，请重新登录");
+        }
+
+        if (state.getAttempts() >= 5) {
+            stringRedisTemplate.delete(totpChallengeKey(challengeTicket));
+            throw new BizException(ErrorCode.UNAUTHORIZED, "验证次数过多，请重新登录");
+        }
+
+        ImUserEntity userEntity = imUserMapper.selectById(state.getUserId());
+        if (userEntity == null || !Integer.valueOf(1).equals(userEntity.getTotpEnabled())) {
+            stringRedisTemplate.delete(totpChallengeKey(challengeTicket));
+            throw new BizException(ErrorCode.UNAUTHORIZED, "用户状态异常");
+        }
+
+        // Try TOTP code first
+        boolean verified = totpService.verifyCode(userEntity.getTotpSecret(), code.trim());
+
+        // If TOTP failed, try recovery code
+        if (!verified && StringUtils.hasText(userEntity.getRecoveryCodes())) {
+            verified = totpService.verifyRecoveryCode(userEntity.getRecoveryCodes(), code.trim());
+            if (verified) {
+                // Consume the recovery code
+                String updatedCodes = totpService.consumeRecoveryCode(userEntity.getRecoveryCodes(), code.trim());
+                userEntity.setRecoveryCodes(updatedCodes);
+                imUserMapper.updateById(userEntity);
+            }
+        }
+
+        if (!verified) {
+            state.setAttempts(state.getAttempts() + 1);
+            long ttlSeconds = remainingSeconds(totpChallengeKey(challengeTicket));
+            storeRedisJson(totpChallengeKey(challengeTicket), state, Math.max(1L, ttlSeconds));
+            recordSecurityEvent(state.getUserId(), "TOTP_VERIFY_FAILURE", EVENT_FAILURE, ip, userAgent, Map.of());
+            throw new BizException(ErrorCode.UNAUTHORIZED, "验证码错误");
+        }
+
+        stringRedisTemplate.delete(totpChallengeKey(challengeTicket));
+        recordSecurityEvent(state.getUserId(), EVENT_LOGIN_SUCCESS, EVENT_SUCCESS, ip, userAgent,
+                Map.of("username", userEntity.getUsername(), "method", "totp"));
+        return buildAuthenticatedResponse(userEntity, null, null);
+    }
+
+    @Override
+    public TotpStatusVo getTotpStatus(Long userId) {
+        ImUserEntity user = requireUserById(userId);
+        TotpStatusVo vo = new TotpStatusVo();
+        vo.setEnabled(Integer.valueOf(1).equals(user.getTotpEnabled()));
+        if (StringUtils.hasText(user.getRecoveryCodes())) {
+            try {
+                List<String> codes = objectMapper.readValue(user.getRecoveryCodes(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                vo.setRecoveryCodesRemaining(codes.size());
+            } catch (JsonProcessingException e) {
+                vo.setRecoveryCodesRemaining(0);
+            }
+        } else {
+            vo.setRecoveryCodesRemaining(0);
+        }
+        return vo;
+    }
+
+    private String totpSetupKey(Long userId) {
+        return "echoim:auth:totp:setup:" + userId;
+    }
+
     private ImUserEntity requireLoginUser(String username) {
         String normalizedUsername = UsernameRules.normalize(username);
         ImUserEntity userEntity = imUserMapper.selectByUsername(normalizedUsername);
@@ -851,6 +1027,10 @@ public class AuthServiceImpl implements AuthService {
         return LOGIN_CHALLENGE_KEY_PREFIX + ticket;
     }
 
+    private String totpChallengeKey(String ticket) {
+        return TOTP_CHALLENGE_KEY_PREFIX + ticket;
+    }
+
     private String recoveryCodeKey(String email) {
         return RECOVERY_CODE_KEY_PREFIX + email;
     }
@@ -969,6 +1149,57 @@ public class AuthServiceImpl implements AuthService {
 
         public void setAttempts(int attempts) {
             this.attempts = attempts;
+        }
+    }
+
+    public static class TotpChallengeState {
+        private Long userId;
+        private long sentAt;
+        private int attempts;
+
+        public Long getUserId() {
+            return userId;
+        }
+
+        public void setUserId(Long userId) {
+            this.userId = userId;
+        }
+
+        public long getSentAt() {
+            return sentAt;
+        }
+
+        public void setSentAt(long sentAt) {
+            this.sentAt = sentAt;
+        }
+
+        public int getAttempts() {
+            return attempts;
+        }
+
+        public void setAttempts(int attempts) {
+            this.attempts = attempts;
+        }
+    }
+
+    public static class TotpSetupState {
+        private String secret;
+        private List<String> recoveryCodes;
+
+        public String getSecret() {
+            return secret;
+        }
+
+        public void setSecret(String secret) {
+            this.secret = secret;
+        }
+
+        public List<String> getRecoveryCodes() {
+            return recoveryCodes;
+        }
+
+        public void setRecoveryCodes(List<String> recoveryCodes) {
+            this.recoveryCodes = recoveryCodes;
         }
     }
 
