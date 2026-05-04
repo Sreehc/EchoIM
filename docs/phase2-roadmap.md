@@ -3,7 +3,7 @@
 > 创建日期：2026-05-04
 > 前置条件：一期工程全部五个阶段已完成，系统具备完整的即时通讯、语音通话、管理后台能力
 > 目标：从"功能可用"升级为"体验优秀、安全可靠、可规模运营"
-> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成 + 阶段九全部完成
+> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成 + 阶段九全部完成 + 阶段十全部完成
 
 ---
 
@@ -245,32 +245,47 @@
 
 ### 10.1 数据看板
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 10.1.1 | 核心指标概览 | P0 | 2d | 总用户数、日活/月活、消息量趋势、新增用户趋势、在线峰值，ECharts 图表 |
-| 10.1.2 | 实时在线统计 | P1 | 1d | 当前在线用户数、各时段分布、WebSocket 连接数 |
-| 10.1.3 | 消息统计 | P2 | 1d | 各类型消息占比、群聊/单聊消息比例、高峰时段分析 |
+> **实现完成（2026-05-04）**：阶段十 10.1 数据看板全部 3 项任务在代码层面均已实现。
+> 后端 DashboardMapper 查询用户/消息/趋势/类型分布数据，DashboardService 聚合 WsMetrics 在线统计，
+> AdminDashboardController 提供 5 个 REST 端点。管理后台首页 Dashboard.vue 展示核心指标卡片、
+> 消息/用户趋势柱状图（7天/30天切换）、消息类型分布横向条形图、实时在线统计面板。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 10.1.1 | 核心指标概览 | P0 | 2d | ✅ 已完成 | 后端：`DashboardMapper.java` + `DashboardMapper.xml`（countTotalUsers/countNewUsersToday/countTotalMessages/countMessagesToday/selectMessageTrend/selectUserTrend/selectMessageTypeBreakdown）+ `DashboardService.java` + `DashboardServiceImpl.java` + `AdminDashboardController.java`（GET /api/admin/dashboard/overview, message-trend, user-trend, message-types, online-stats）；前端：`api/dashboard.ts` + `views/dashboard/Dashboard.vue`（摘要卡片 + 趋势柱状图 + 类型分布条形图 + 在线统计） |
+| 10.1.2 | 实时在线统计 | P1 | 1d | ✅ 已完成 | `DashboardServiceImpl.getOnlineStats()` 聚合 `ImSessionManager.allSessions().size()` + `WsMetrics.snapshot()`；Dashboard.vue 底部在线统计面板展示 currentOnline/messagesReceived/messagesSent/connectionsOpened/connectionsClosed/authFailures |
+| 10.1.3 | 消息统计 | P2 | 1d | ✅ 已完成 | `DashboardMapper.selectMessageTypeBreakdown` SQL 按 msg_type 分组统计；Dashboard.vue 右侧消息类型分布横向条形图（百分比 + 数值） |
 
 ### 10.2 内容审核
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 10.2.1 | 举报机制 | P0 | 1d | 用户可举报消息/用户，举报原因分类，举报记录存入 im_report 表 |
-| 10.2.2 | 举报处理 | P1 | 1d | 管理后台举报列表，审核处理（忽略/警告/禁言/封号），处理结果通知举报人 |
-| 10.2.3 | 敏感词管理 | P1 | 0.5d | 管理后台敏感词库 CRUD，支持正则，实时生效 |
+> **实现完成（2026-05-04）**：阶段十 10.2 内容审核全部 3 项任务在代码层面均已实现。
+> im_report 表 + ReportService 支持用户举报消息/用户，管理后台 ReportList.vue 展示举报列表并支持忽略/警告/禁言/封号处理。
+> 用户端 MessageBubble 右键菜单新增"举报"选项，弹出举报原因选择对话框。
+> 敏感词管理前端 SensitiveWordList.vue 已接入 AdminSensitiveWordController。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 10.2.1 | 举报机制 | P0 | 1d | ✅ 已完成 | 后端：`init.sql` im_report 表 + `ImReportEntity.java` + `ImReportMapper.java` + `ReportMapper.xml` + `ReportService.java` + `ReportServiceImpl.java`（submitReport 校验）+ `ReportController.java`（POST /api/reports）；前端用户端：`services/reports.ts` submitReport + `MessageBubble.vue` 'report' 右键菜单 + `MessagePane.vue` report 事件透传 + `ChatHomeView.vue` reportDialog（原因选择：spam/pornography/violence/harassment/misinformation/other） |
+| 10.2.2 | 举报处理 | P1 | 1d | ✅ 已完成 | 后端：`AdminReportController.java`（GET /api/admin/reports + PUT /{id}/handle action=1忽略/2警告/3禁言/4封号）+ `ReportServiceImpl.handleReport()`（封号时更新用户 status=2）；前端：`api/reports.ts` fetchReports/handleReport + `views/report/ReportList.vue`（状态筛选 + 分页 + 操作按钮） |
+| 10.2.3 | 敏感词管理 | P1 | 0.5d | ✅ 已完成 | 后端已有 `AdminSensitiveWordController`（GET/POST/DELETE/reload）；前端：`api/sensitive-words.ts` fetchSensitiveWords/addSensitiveWord/removeSensitiveWord/reloadSensitiveWordCache + `views/sensitive-word/SensitiveWordList.vue`（添加/删除/刷新缓存） |
 
 ### 10.3 运营工具
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 10.3.1 | 系统公告 | P1 | 1d | 管理后台发布系统公告（全员/指定用户），用户端弹窗或消息形式展示 |
-| 10.3.2 | 用户封禁增强 | P1 | 0.5d | 支持临时封禁（指定时长）、封禁原因、封禁历史记录 |
-| 10.3.3 | 操作日志 | P2 | 1d | 管理后台操作日志记录（登录、用户操作、群组操作），可查询可导出 |
+> **实现完成（2026-05-04）**：阶段十 10.3 运营工具全部 3 项任务在代码层面均已实现。
+> im_system_notice 表 + AdminNoticeController 支持发布/撤回全员或指定用户公告。
+> im_user_ban 表 + AdminBanController 支持临时/永久封禁及解除。
+> sys_operation_log 表 + AdminOperationLogController 支持按模块/操作人筛选查询。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 10.3.1 | 系统公告 | P1 | 1d | ✅ 已完成 | 后端：`init.sql` im_system_notice 表 + `ImSystemNoticeEntity.java` + `ImSystemNoticeMapper.java` + `NoticeMapper.xml` + `AdminNoticeController.java`（GET 分页/POST 创建/PUT 撤回）；前端：`api/notices.ts` + `views/notice/NoticeList.vue`（发布对话框 + 类型选择全员/指定用户 + 撤回操作） |
+| 10.3.2 | 用户封禁增强 | P1 | 0.5d | ✅ 已完成 | 后端：`init.sql` im_user_ban 表 + `ImUserBanEntity.java` + `ImUserBanMapper.java` + `BanMapper.xml` + `AdminBanController.java`（GET 历史/POST 封禁临时或永久/PUT 解除封禁 + 解封时检查其他活跃封禁）；前端：`api/bans.ts` + `views/ban/BanList.vue`（封禁对话框含时长选择 + 解除封禁） |
+| 10.3.3 | 操作日志 | P2 | 1d | ✅ 已完成 | 后端：`SysOperationLogEntity.java` + `SysOperationLogMapper.java` + `OperationLogMapper.xml`（LEFT JOIN sys_admin_user 获取操作人昵称）+ `AdminOperationLogController.java`（GET 按 adminUserId/moduleName 筛选）；前端：`api/operation-logs.ts` + `views/operation-log/OperationLogList.vue`（模块名筛选 + 分页表格） |
 
 **验收标准：**
-- 管理后台首页展示核心运营数据看板
-- 用户可以举报违规内容，管理员可以在后台审核处理
-- 管理员可以发布系统公告推送给用户
+- 管理后台首页展示核心运营数据看板 ✅
+- 用户可以举报违规内容，管理员可以在后台审核处理 ✅
+- 管理员可以发布系统公告推送给用户 ✅
 
 ---
 
