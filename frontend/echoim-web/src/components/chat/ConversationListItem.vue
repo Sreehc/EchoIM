@@ -23,6 +23,17 @@ const isOnline = computed(() => {
   return peerId != null && chatStore.isUserOnline(peerId)
 })
 
+const hasDraft = computed(() => {
+  // Check backend draftContent first, then fallback to localStorage
+  if (props.item.draftContent) return true
+  try {
+    const drafts = JSON.parse(localStorage.getItem('echoim_drafts') || '{}')
+    return Boolean(drafts[`draft_${props.item.conversationId}`])
+  } catch {
+    return false
+  }
+})
+
 function visibleUnreadCount(item: ConversationSummary) {
   return Math.max(item.unreadCount, item.manualUnread ? 1 : 0)
 }
@@ -60,7 +71,17 @@ function visibleUnreadCount(item: ConversationSummary) {
         </div>
       </div>
       <div class="conversation-item__foot">
-        <p>
+        <p v-if="hasDraft" class="conversation-item__draft">
+          <span class="conversation-item__draft-badge">草稿</span>
+          <template
+            v-for="(part, index) in highlightText(item.lastMessagePreview, props.searchQuery ?? '')"
+            :key="index"
+          >
+            <mark v-if="part.matched" class="conversation-item__highlight">{{ part.text }}</mark>
+            <span v-else>{{ part.text }}</span>
+          </template>
+        </p>
+        <p v-else>
           <template
             v-for="(part, index) in highlightText(item.lastMessagePreview, props.searchQuery ?? '')"
             :key="index"
@@ -277,5 +298,21 @@ function visibleUnreadCount(item: ConversationSummary) {
 
 .conversation-item.is-active .conversation-item__badge {
   background: color-mix(in srgb, var(--interactive-primary-bg) 82%, white);
+}
+
+.conversation-item__draft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conversation-item__draft-badge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-warning) 88%, white);
+  color: var(--text-primary);
+  font: 600 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.02em;
 }
 </style>

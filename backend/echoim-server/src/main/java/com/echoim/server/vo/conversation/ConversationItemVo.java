@@ -23,6 +23,7 @@ public class ConversationItemVo {
     private Boolean archived;
     private Boolean manualUnread;
     private String specialType;
+    private String draftContent;
     private java.util.List<String> folderHints;
 
     public Long getConversationId() {
@@ -167,6 +168,14 @@ public class ConversationItemVo {
 
     public void setManualUnread(Boolean manualUnread) {
         this.manualUnread = manualUnread;
+    }
+
+    public String getDraftContent() {
+        return draftContent;
+    }
+
+    public void setDraftContent(String draftContent) {
+        this.draftContent = draftContent;
     }
 
     public String getSpecialType() {

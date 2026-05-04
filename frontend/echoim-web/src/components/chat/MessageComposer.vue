@@ -17,6 +17,7 @@ const SELF_DESTRUCT_OPTIONS = [
 
 const props = withDefaults(
   defineProps<{
+    conversationId?: number | null
     enterToSend?: boolean
     canSend?: boolean
     disabledReason?: string
@@ -28,6 +29,7 @@ const props = withDefaults(
     currentUserId?: number
   }>(),
   {
+    conversationId: null,
     enterToSend: true,
     canSend: true,
     disabledReason: '当前会话暂不可发送消息',
@@ -64,6 +66,82 @@ const scheduledDate = ref('')
 const scheduledTime = ref('')
 const replyPreview = computed(() => props.replyingMessage?.content || props.replyingMessage?.file?.fileName || '原消息')
 
+// Draft auto-save to localStorage and backend
+import * as draftService from '@/services/drafts'
+
+const DRAFT_STORAGE_KEY = 'echoim_drafts'
+
+function getDraftKey(conversationId: number | null | undefined): string {
+  return `draft_${conversationId || 'none'}`
+}
+
+function loadDraftFromStorage() {
+  if (!props.conversationId) return
+  try {
+    const drafts = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || '{}')
+    draft.value = drafts[getDraftKey(props.conversationId)] || ''
+  } catch {
+    draft.value = ''
+  }
+}
+
+function saveDraftToStorage() {
+  if (!props.conversationId) return
+  try {
+    const drafts = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || '{}')
+    const key = getDraftKey(props.conversationId)
+    if (draft.value.trim()) {
+      drafts[key] = draft.value
+    } else {
+      delete drafts[key]
+    }
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts))
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+// Sync draft to backend (debounced)
+let syncDraftTimeout: ReturnType<typeof setTimeout> | null = null
+function syncDraftToBackend() {
+  if (!props.conversationId) return
+  if (syncDraftTimeout) clearTimeout(syncDraftTimeout)
+  syncDraftTimeout = setTimeout(async () => {
+    try {
+      await draftService.saveDraft(props.conversationId!, draft.value)
+    } catch {
+      // Ignore sync errors - localStorage is the primary store
+    }
+  }, 1000)
+}
+
+// Load draft when conversation changes
+watch(() => props.conversationId, async () => {
+  loadDraftFromStorage()
+  // Also try to load from backend (in case localStorage is stale)
+  if (props.conversationId) {
+    try {
+      const result = await draftService.loadDraft(props.conversationId)
+      if (result.draftContent && result.draftContent !== draft.value) {
+        draft.value = result.draftContent
+        saveDraftToStorage() // Update localStorage with backend value
+      }
+    } catch {
+      // Ignore load errors - localStorage value is already loaded
+    }
+  }
+}, { immediate: true })
+
+// Save draft on input changes (debounced)
+let saveDraftTimeout: ReturnType<typeof setTimeout> | null = null
+watch(draft, () => {
+  if (saveDraftTimeout) clearTimeout(saveDraftTimeout)
+  saveDraftTimeout = setTimeout(() => {
+    saveDraftToStorage()
+    syncDraftToBackend()
+  }, 500)
+})
+
 const minScheduledDateTime = computed(() => {
   const now = new Date()
   now.setMinutes(now.getMinutes() + 5) // Minimum 5 minutes from now
@@ -96,6 +174,7 @@ function submit() {
 
   emit('send', content, mentionsInText, selfDestructSeconds.value > 0 ? selfDestructSeconds.value : undefined)
   draft.value = ''
+  saveDraftToStorage() // Clear draft from storage
   pendingMentions.value = []
   closeMentionSelector()
 }
@@ -115,6 +194,7 @@ function submitScheduled() {
   const scheduledAt = `${scheduledDate.value}T${scheduledTime.value}:00`
   emit('scheduled-send', content, mentionsInText, scheduledAt)
   draft.value = ''
+  saveDraftToStorage() // Clear draft from storage
   pendingMentions.value = []
   closeMentionSelector()
   scheduledSendOpen.value = false

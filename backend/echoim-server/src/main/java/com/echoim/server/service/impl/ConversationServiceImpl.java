@@ -365,4 +365,23 @@ public class ConversationServiceImpl implements ConversationService {
     private long normalizePageSize(Long pageSize) {
         return pageSize == null || pageSize < 1 ? 20L : pageSize;
     }
+
+    @Override
+    public void saveDraft(Long userId, Long conversationId, String draftContent) {
+        ImConversationUserEntity entity = imConversationUserMapper.selectByConversationIdAndUserId(conversationId, userId);
+        if (entity == null) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "会话不存在");
+        }
+        entity.setDraftContent(draftContent);
+        imConversationUserMapper.updateById(entity);
+    }
+
+    @Override
+    public String loadDraft(Long userId, Long conversationId) {
+        ImConversationUserEntity entity = imConversationUserMapper.selectByConversationIdAndUserId(conversationId, userId);
+        if (entity == null) {
+            return null;
+        }
+        return entity.getDraftContent();
+    }
 }

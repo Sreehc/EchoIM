@@ -19,6 +19,7 @@ public class ImConversationUserEntity {
     private Integer isMute;
     private Integer isArchived;
     private Integer manualUnread;
+    private String draftContent;
     private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -93,6 +94,14 @@ public class ImConversationUserEntity {
 
     public void setManualUnread(Integer manualUnread) {
         this.manualUnread = manualUnread;
+    }
+
+    public String getDraftContent() {
+        return draftContent;
+    }
+
+    public void setDraftContent(String draftContent) {
+        this.draftContent = draftContent;
     }
 
     public Integer getDeleted() {

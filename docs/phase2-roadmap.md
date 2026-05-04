@@ -3,7 +3,7 @@
 > 创建日期：2026-05-04
 > 前置条件：一期工程全部五个阶段已完成，系统具备完整的即时通讯、语音通话、管理后台能力
 > 目标：从"功能可用"升级为"体验优秀、安全可靠、可规模运营"
-> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成
+> 最后更新：2026-05-04 — 阶段六全部完成 + 阶段七全部完成 + 阶段八全部完成 + 阶段九 9.1-9.2 完成
 
 ---
 
@@ -185,18 +185,28 @@
 
 ### 9.1 消息定时发送
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 9.1.1 | 定时发送 UI | P1 | 1d | 消息编辑器"定时发送"选项，选择发送时间，消息进入"待发送"状态 |
-| 9.1.2 | 定时任务执行 | P1 | 1d | 后端 ScheduledExecutor 或 Redis 延迟队列，到期自动发送，支持取消 |
-| 9.1.3 | 定时消息管理 | P2 | 0.5d | "待发送消息"列表，支持编辑、取消、立即发送 |
+> **实现完成（2026-05-04）**：阶段九 9.1 消息定时发送全部 3 项任务在代码层面均已实现。
+> 后端 im_scheduled_message 表 + ScheduledMessageService 定时任务执行（@Scheduled fixedDelay=5000），
+> 前端 MessageComposer 添加定时发送按钮（Clock 图标）和日期/时间选择器，
+> ScheduledMessagesPanel 组件展示待发送消息列表，支持取消和立即发送。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 9.1.1 | 定时发送 UI | P1 | 1d | ✅ 已完成 | 前端：`MessageComposer.vue` Clock 图标导入 + scheduledSendOpen/scheduledDate/scheduledTime refs + minScheduledDateTime/canSchedule 计算属性 + submitScheduled() 函数 + 定时发送按钮和日期/时间选择器 UI + `services/scheduledMessages.ts` createScheduledMessage API + `types/chat.ts` ScheduledMessage 接口和 SCHEDULED_MESSAGE_STATUS 常量 |
+| 9.1.2 | 定时任务执行 | P1 | 1d | ✅ 已完成 | 后端：`init.sql` im_scheduled_message 表 + `ImScheduledMessageEntity.java`（状态常量：STATUS_PENDING=1/STATUS_SENT=2/STATUS_CANCELLED=3/STATUS_FAILED=4）+ `ImScheduledMessageMapper.java` + `ScheduledMessageMapper.xml` + `ScheduledMessageService.java` 接口 + `ScheduledMessageServiceImpl.java`（@Scheduled(fixedDelay=5000) 定时执行 + executePendingMessages() + executeScheduledMessage() 创建 WsMessage 调用 singleChatService/groupChatService）+ `ScheduledMessageController.java` REST API + `EchoImServerApplication.java` @EnableScheduling |
+| 9.1.3 | 定时消息管理 | P2 | 0.5d | ✅ 已完成 | 前端：`ScheduledMessagesPanel.vue`（Props: conversationId/visible + Emits: close/message-sent + 加载/取消/立即发送功能 + formatScheduledTime/formatMessageType 辅助函数）+ `ChatHomeView.vue` scheduledPanelOpen ref + handleScheduledSend/handleScheduledMessageSent 函数 + MessageComposer @open-scheduled-panel 事件处理 + ScheduledMessagesPanel 组件集成 + `MessageComposer.vue` 日历图标按钮（emit open-scheduled-panel） |
 
 ### 9.2 消息草稿
 
-| 序号 | 任务 | 优先级 | 预估工时 | 说明 |
-|------|------|--------|---------|------|
-| 9.2.1 | 草稿自动保存 | P1 | 0.5d | 输入框内容变更时自动保存到本地（localStorage），切换会话不丢失 |
-| 9.2.2 | 草稿同步 | P2 | 1d | 草稿同步到后端，多端一致，会话列表显示"草稿"标记 |
+> **实现完成（2026-05-04）**：阶段九 9.2 消息草稿全部 2 项任务在代码层面均已实现。
+> 前端 MessageComposer 实现草稿自动保存到 localStorage（500ms 防抖），
+> 同步到后端 im_conversation_user.draft_content 字段（1000ms 防抖），
+> ConversationListItem 显示"草稿"标记，支持多端一致性。
+
+| 序号 | 任务 | 优先级 | 预估工时 | 状态 | 实现文件 |
+|------|------|--------|---------|------|---------|
+| 9.2.1 | 草稿自动保存 | P1 | 0.5d | ✅ 已完成 | 前端：`MessageComposer.vue` conversationId prop + DRAFT_STORAGE_KEY + getDraftKey() + loadDraftFromStorage() + saveDraftToStorage() + watch conversationId 加载草稿 + watch draft 500ms 防抖保存 + submit/submitScheduled 清除草稿 + `ChatHomeView.vue` conversation-id prop 传递 |
+| 9.2.2 | 草稿同步 | P2 | 1d | ✅ 已完成 | 后端：`init.sql` im_conversation_user 新增 draft_content 字段 + `ImConversationUserEntity.java` draftContent 字段 + `ConversationService.java` saveDraft/loadDraft 接口 + `ConversationServiceImpl.java` 实现 + `ConversationController.java` PUT/GET /{id}/draft API + `ConversationMapper.xml` ConversationItemColumns 新增 cu.draft_content AS draftContent + `ConversationItemVo.java` draftContent 字段；前端：`services/drafts.ts` saveDraft/loadDraft API + `MessageComposer.vue` syncDraftToBackend() 1000ms 防抖同步 + `types/chat.ts` ConversationSummary.draftContent + `ConversationListItem.vue` hasDraft 计算属性（优先检查后端 draftContent）+ "草稿"标记样式 |
 
 ### 9.3 消息已读详情
 
@@ -405,6 +415,7 @@
 | im_system_notice | 系统公告 | 十 |
 | im_admin_operation_log | 管理操作日志 | 十 |
 | im_login_device | 登录设备记录 | 八 |
+| im_scheduled_message | 定时消息 | 九 |
 
 ### 变更表
 
@@ -413,5 +424,5 @@
 | im_message | 新增 msgType=VOICE, extraJson 扩展 | 六 |
 | im_file | 新增 thumbnailUrl, waveform 字段 | 六 |
 | im_group_member | 新增 muteUntil 禁言截止时间 | 七 |
-| im_conversation_user | 新增 draftContent 草稿字段 | 九 |
+| im_conversation_user | 新增 draft_content 草稿字段 | 九 |
 | im_message_read | 新增 readAt 精确已读时间 | 九 |

@@ -107,6 +107,21 @@ public class ConversationController {
         return ApiResponse.success(Map.of("conversationId", id, "unread", request.unread()));
     }
 
+    @RequireLogin
+    @PutMapping("/{id}/draft")
+    public ApiResponse<Map<String, Object>> saveDraft(@PathVariable Long id,
+                                                      @Valid @RequestBody ConversationDraftRequest request) {
+        conversationService.saveDraft(LoginUserContext.requireUserId(), id, request.draftContent());
+        return ApiResponse.success(Map.of("conversationId", id));
+    }
+
+    @RequireLogin
+    @GetMapping("/{id}/draft")
+    public ApiResponse<Map<String, Object>> loadDraft(@PathVariable Long id) {
+        String draftContent = conversationService.loadDraft(LoginUserContext.requireUserId(), id);
+        return ApiResponse.success(Map.of("conversationId", id, "draftContent", draftContent != null ? draftContent : ""));
+    }
+
     public record ConversationTopRequest(
             @NotNull(message = "置顶状态不能为空") Integer isTop
     ) {
@@ -134,6 +149,11 @@ public class ConversationController {
 
     public record ConversationSingleCreateRequest(
             @NotNull(message = "目标用户不能为空") Long targetUserId
+    ) {
+    }
+
+    public record ConversationDraftRequest(
+            String draftContent
     ) {
     }
 }

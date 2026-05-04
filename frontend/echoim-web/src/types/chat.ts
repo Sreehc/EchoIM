@@ -177,6 +177,7 @@ export interface ConversationSummary {
   archived: boolean
   manualUnread: boolean
   specialType?: SpecialConversationType | null
+  draftContent?: string | null
   folderHints?: string[] | null
 }
 

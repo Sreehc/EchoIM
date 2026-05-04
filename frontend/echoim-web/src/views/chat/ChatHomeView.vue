@@ -2010,6 +2010,7 @@ function registerDebugHooks() {
           </div>
           <MessageComposer
             v-else
+            :conversation-id="chatStore.activeConversationId"
             :enter-to-send="uiStore.chatPreferences.enterToSend"
             :can-send="chatStore.activeConversation.canSend"
             :replying-message="replyingMessage"

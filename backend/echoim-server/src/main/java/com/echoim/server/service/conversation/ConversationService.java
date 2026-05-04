@@ -30,4 +30,8 @@ public interface ConversationService {
     void markConversationUnread(Long userId, Long conversationId, boolean unread);
 
     void deleteConversation(Long userId, Long conversationId);
+
+    void saveDraft(Long userId, Long conversationId, String draftContent);
+
+    String loadDraft(Long userId, Long conversationId);
 }

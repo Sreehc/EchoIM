@@ -80,7 +80,8 @@
                CASE
                    WHEN c.conversation_type = 1 AND LEFT(c.biz_key, 6) = 'saved_' THEN 'SAVED_MESSAGES'
                    ELSE NULL
-               END AS specialType
+               END AS specialType,
+               cu.draft_content AS draftContent
     </sql>
 
     <sql id="ConversationItemJoins">
