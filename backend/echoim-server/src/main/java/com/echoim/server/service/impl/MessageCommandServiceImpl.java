@@ -11,6 +11,7 @@ import com.echoim.server.entity.ImMessageReactionEntity;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImMessageEntity;
+import com.echoim.server.entity.ImMessagePinEntity;
 import com.echoim.server.im.model.WsChatSingleData;
 import com.echoim.server.im.model.WsGroupChatData;
 import com.echoim.server.im.model.WsMessage;
@@ -22,6 +23,7 @@ import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.mapper.ImMessagePinMapper;
 import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.service.config.SystemConfigService;
 import com.echoim.server.service.file.FileService;
@@ -56,6 +58,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     private static final String SAVED_BIZ_KEY_PREFIX = "saved_";
 
     private final ImMessageMapper imMessageMapper;
+    private final ImMessagePinMapper imMessagePinMapper;
     private final ImMessageReactionMapper imMessageReactionMapper;
     private final ImConversationMapper imConversationMapper;
     private final ImConversationUserMapper imConversationUserMapper;
@@ -69,6 +72,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     private final ObjectMapper objectMapper;
 
     public MessageCommandServiceImpl(ImMessageMapper imMessageMapper,
+                                     ImMessagePinMapper imMessagePinMapper,
                                      ImMessageReactionMapper imMessageReactionMapper,
                                      ImConversationMapper imConversationMapper,
                                      ImConversationUserMapper imConversationUserMapper,
@@ -81,6 +85,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
                                      AuditLogService auditLogService,
                                      ObjectMapper objectMapper) {
         this.imMessageMapper = imMessageMapper;
+        this.imMessagePinMapper = imMessagePinMapper;
         this.imMessageReactionMapper = imMessageReactionMapper;
         this.imConversationMapper = imConversationMapper;
         this.imConversationUserMapper = imConversationUserMapper;
@@ -199,6 +204,74 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         auditLogService.log("MESSAGE_REACTION", Map.of("userId", userId, "messageId", messageId, "emoji", normalizedEmoji));
         notifyMessageMutation(message, userId, null, "MESSAGE_REACTION");
         return buildMessageItem(message, userId);
+    }
+
+    @Override
+    @Transactional
+    public MessageItemVo pinMessage(Long userId, Long messageId) {
+        ImMessageEntity message = imMessageMapper.selectAccessibleEntityByIdAndUserId(messageId, userId);
+        if (message == null) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "消息不存在");
+        }
+        if (Integer.valueOf(MESSAGE_STATUS_RECALLED).equals(message.getSendStatus())) {
+            throw new BizException(ErrorCode.BUSINESS_CONFLICT, "已撤回消息不能置顶");
+        }
+
+        ImMessagePinEntity existing = imMessagePinMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessagePinEntity>()
+                        .eq(ImMessagePinEntity::getMessageId, messageId)
+                        .last("LIMIT 1"));
+        if (existing != null) {
+            return buildMessageItem(message, userId);
+        }
+
+        ImMessagePinEntity pin = new ImMessagePinEntity();
+        pin.setConversationId(message.getConversationId());
+        pin.setMessageId(messageId);
+        pin.setGroupId(message.getGroupId());
+        pin.setPinnedByUserId(userId);
+        pin.setCreatedAt(LocalDateTime.now());
+        imMessagePinMapper.insert(pin);
+
+        notifyMessageMutation(message, userId, WsMessageType.MESSAGE_PIN, "MESSAGE_PIN");
+        auditLogService.log("MESSAGE_PIN", Map.of("userId", userId, "messageId", messageId, "conversationId", message.getConversationId()));
+        return buildMessageItem(message, userId);
+    }
+
+    @Override
+    @Transactional
+    public MessageItemVo unpinMessage(Long userId, Long messageId) {
+        ImMessageEntity message = imMessageMapper.selectById(messageId);
+        if (message == null) {
+            throw new BizException(ErrorCode.CONVERSATION_NOT_FOUND, "消息不存在");
+        }
+        requireConversationMember(message.getConversationId(), userId);
+
+        int deleted = imMessagePinMapper.delete(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessagePinEntity>()
+                        .eq(ImMessagePinEntity::getMessageId, messageId));
+        if (deleted > 0) {
+            notifyMessageMutation(message, userId, WsMessageType.MESSAGE_UNPIN, "MESSAGE_UNPIN");
+            auditLogService.log("MESSAGE_UNPIN", Map.of("userId", userId, "messageId", messageId, "conversationId", message.getConversationId()));
+        }
+        return buildMessageItem(message, userId);
+    }
+
+    @Override
+    public List<MessageItemVo> listPinnedMessages(Long userId, Long conversationId) {
+        requireConversationMember(conversationId, userId);
+        List<Long> pinnedMessageIds = imMessagePinMapper.selectPinnedMessageIdsByConversationId(conversationId);
+        if (pinnedMessageIds.isEmpty()) {
+            return List.of();
+        }
+        List<ImMessageEntity> messages = imMessageMapper.selectBatchIds(pinnedMessageIds);
+        List<MessageItemVo> result = new ArrayList<>();
+        for (ImMessageEntity msg : messages) {
+            if (!Integer.valueOf(MESSAGE_STATUS_RECALLED).equals(msg.getSendStatus())) {
+                result.add(buildMessageItem(msg, userId));
+            }
+        }
+        return result;
     }
 
     private ImMessageEntity requireOwnedMessage(Long userId, Long messageId) {
@@ -373,6 +446,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         item.setFileId(entity.getFileId());
         item.setSendStatus(entity.getSendStatus());
         item.setSentAt(entity.getSentAt());
+        enrichPinStatus(entity.getId(), item);
         fileService.enrichWsMessage(viewerUserId, item);
         messageViewService.enrichWsMessage(viewerUserId, item, entity);
         return item;
@@ -393,9 +467,34 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         item.setFileId(entity.getFileId());
         item.setSendStatus(entity.getSendStatus());
         item.setSentAt(entity.getSentAt());
+        enrichPinStatus(entity.getId(), item);
         fileService.enrichMessages(viewerUserId, List.of(item));
         messageViewService.enrichMessages(viewerUserId, List.of(item));
         return item;
+    }
+
+    private void enrichPinStatus(Long messageId, MessageItemVo item) {
+        ImMessagePinEntity pin = imMessagePinMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessagePinEntity>()
+                        .eq(ImMessagePinEntity::getMessageId, messageId)
+                        .last("LIMIT 1"));
+        item.setPinned(pin != null);
+        if (pin != null) {
+            item.setPinnedByUserId(pin.getPinnedByUserId());
+            item.setPinnedAt(pin.getCreatedAt());
+        }
+    }
+
+    private void enrichPinStatus(Long messageId, WsMessageItem item) {
+        ImMessagePinEntity pin = imMessagePinMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImMessagePinEntity>()
+                        .eq(ImMessagePinEntity::getMessageId, messageId)
+                        .last("LIMIT 1"));
+        item.setPinned(pin != null);
+        if (pin != null) {
+            item.setPinnedByUserId(pin.getPinnedByUserId());
+            item.setPinnedAt(pin.getCreatedAt());
+        }
     }
 
     private LoginUser buildLoginUser(Long userId) {

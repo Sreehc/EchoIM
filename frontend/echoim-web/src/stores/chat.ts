@@ -23,7 +23,7 @@ import {
 } from '@/services/conversations'
 import { createGroup as createGroupRequest, fetchGroupDetail, fetchGroupMembers } from '@/services/groups'
 import { getJson, HttpError } from '@/services/http'
-import { editMessage as editMessageRequest, reactMessage as reactMessageRequest, recallMessage as recallMessageRequest } from '@/services/messages'
+import { editMessage as editMessageRequest, reactMessage as reactMessageRequest, recallMessage as recallMessageRequest, pinMessage as pinMessageRequest, unpinMessage as unpinMessageRequest } from '@/services/messages'
 import { EchoWsClient } from '@/services/ws'
 import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
@@ -55,6 +55,7 @@ import type {
   ConversationSummary,
   GroupCreatePayload,
   GroupGovernanceMeta,
+  MentionItem,
   MessageReplySource,
 } from '@/types/chat'
 
@@ -101,6 +102,9 @@ export const useChatStore = defineStore('chat', () => {
 
   // Online status tracking: userId → online
   const onlineUsers = ref<Set<number>>(new Set())
+
+  // @mention tracking: conversationIds where current user has been @mentioned
+  const mentionedConversationIds = ref<Set<number>>(new Set())
 
   let bootstrapPromise: Promise<void> | null = null
   let wsClient: EchoWsClient | null = null
@@ -231,6 +235,12 @@ export const useChatStore = defineStore('chat', () => {
   async function openConversation(conversationId: number) {
     activeConversationId.value = conversationId
     lastOpenedConversationId.value = conversationId
+
+    if (mentionedConversationIds.value.has(conversationId)) {
+      const next = new Set(mentionedConversationIds.value)
+      next.delete(conversationId)
+      mentionedConversationIds.value = next
+    }
 
     if (!runtimeMeta.value[conversationId]?.loaded) {
       await loadConversationMessages(conversationId)
@@ -504,6 +514,7 @@ export const useChatStore = defineStore('chat', () => {
     replySource?: MessageReplySource | null
     sticker?: ChatMessage['sticker']
     voice?: ChatMessage['voice']
+    mentions?: MentionItem[]
   }) {
     const conversation = activeConversation.value
     const nextMsgType = payload.msgType ?? 'TEXT'
@@ -558,7 +569,7 @@ export const useChatStore = defineStore('chat', () => {
     applyLatestMessageToConversation(conversation.conversationId, optimisticMessage, false)
 
     try {
-      sendMessageThroughRealtime(conversation, optimisticMessage)
+      sendMessageThroughRealtime(conversation, optimisticMessage, payload.mentions)
     } catch (error) {
       markMessageFailed(conversation.conversationId, clientMsgId, toErrorMessage(error, '消息发送失败'))
       errors.value.sendError = toErrorMessage(error, '消息发送失败')
@@ -656,6 +667,32 @@ export const useChatStore = defineStore('chat', () => {
       applyMessageMutation(target.conversationId, nextMessage)
     } catch (error) {
       errors.value.noticeMessage = toErrorMessage(error, '消息反应失败')
+      throw error
+    }
+  }
+
+  async function pinMessage(messageId: number) {
+    const target = findMessageById(messageId)
+    if (!target) return
+
+    try {
+      const nextMessage = adaptChatMessage(await pinMessageRequest(messageId))
+      applyMessageMutation(target.conversationId, nextMessage)
+    } catch (error) {
+      errors.value.noticeMessage = toErrorMessage(error, '置顶消息失败')
+      throw error
+    }
+  }
+
+  async function unpinMessage(messageId: number) {
+    const target = findMessageById(messageId)
+    if (!target) return
+
+    try {
+      const nextMessage = adaptChatMessage(await unpinMessageRequest(messageId))
+      applyMessageMutation(target.conversationId, nextMessage)
+    } catch (error) {
+      errors.value.noticeMessage = toErrorMessage(error, '取消置顶失败')
       throw error
     }
   }
@@ -798,7 +835,7 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
-    if (envelope.type === 'MESSAGE_RECALL' || envelope.type === 'MESSAGE_EDIT') {
+    if (envelope.type === 'MESSAGE_RECALL' || envelope.type === 'MESSAGE_EDIT' || envelope.type === 'MESSAGE_PIN' || envelope.type === 'MESSAGE_UNPIN') {
       const payload = envelope.data as { message: ApiMessageItem }
       if (!payload?.message) return
       applyMessageMutation(Number(payload.message.conversationId), adaptChatMessage(payload.message))
@@ -960,13 +997,21 @@ export const useChatStore = defineStore('chat', () => {
   function handleConversationChange(payload: WsConversationChangePayload) {
     upsertConversation(adaptConversationSummary(payload.conversation))
 
+    if (payload.atMentionedUserIds?.length && authStore.currentUser?.userId) {
+      if (payload.atMentionedUserIds.includes(authStore.currentUser.userId)) {
+        const next = new Set(mentionedConversationIds.value)
+        next.add(payload.conversation.conversationId)
+        mentionedConversationIds.value = next
+      }
+    }
+
     if (!payload.message) {
       return
     }
 
     const message = adaptChatMessage(payload.message)
 
-    if (payload.changeType === 'MESSAGE_RECALL' || payload.changeType === 'MESSAGE_EDIT') {
+    if (payload.changeType === 'MESSAGE_RECALL' || payload.changeType === 'MESSAGE_EDIT' || payload.changeType === 'MESSAGE_PIN' || payload.changeType === 'MESSAGE_UNPIN') {
       applyMessageMutation(message.conversationId, message)
       return
     }
@@ -1106,7 +1151,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function sendMessageThroughRealtime(conversation: ConversationSummary, message: ChatMessage) {
+  function sendMessageThroughRealtime(conversation: ConversationSummary, message: ChatMessage, mentions?: MentionItem[]) {
     if (!wsClient) {
       throw new Error('实时连接尚未建立')
     }
@@ -1128,7 +1173,7 @@ export const useChatStore = defineStore('chat', () => {
           msgType: message.msgType,
           content: message.content,
           fileId: message.fileId,
-          extraJson: buildMessageExtra(message),
+          extraJson: buildMessageExtraWithMentions(message, mentions),
         },
         message.clientMsgId,
       )
@@ -1151,7 +1196,7 @@ export const useChatStore = defineStore('chat', () => {
         msgType: message.msgType,
         content: message.content,
         fileId: message.fileId,
-        extraJson: buildMessageExtra(message),
+        extraJson: buildMessageExtraWithMentions(message, mentions),
       },
       message.clientMsgId,
     )
@@ -1167,6 +1212,14 @@ export const useChatStore = defineStore('chat', () => {
     }
     if (message.voice) {
       extra.voice = message.voice
+    }
+    return Object.keys(extra).length ? extra : undefined
+  }
+
+  function buildMessageExtraWithMentions(message: ChatMessage, mentions?: MentionItem[]) {
+    const extra = buildMessageExtra(message) ?? {}
+    if (mentions && mentions.length > 0) {
+      extra.mentions = mentions
     }
     return Object.keys(extra).length ? extra : undefined
   }
@@ -1535,6 +1588,8 @@ export const useChatStore = defineStore('chat', () => {
     recallMessage,
     editMessage,
     toggleReaction,
+    pinMessage,
+    unpinMessage,
     connectRealtime,
     disconnectRealtime,
     simulateRealtimeDrop,
@@ -1547,6 +1602,7 @@ export const useChatStore = defineStore('chat', () => {
     onlineUsers,
     isUserOnline,
     fetchOnlineStatus,
+    mentionedConversationIds,
     resetState,
   }
 })

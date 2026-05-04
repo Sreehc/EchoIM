@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Document, Picture } from '@element-plus/icons-vue'
 import type { ChatMessage, ConversationType } from '@/types/chat'
-import { formatMessageTime, highlightText } from '@/utils/format'
+import { formatMessageTime, highlightBubbleContent } from '@/utils/format'
 import { findStickerDefinition } from '@/stickers/library'
 import AvatarBadge from './AvatarBadge.vue'
 import VoicePlayer from './VoicePlayer.vue'
@@ -39,9 +39,12 @@ const emit = defineEmits<{
   'toggle-forward-selection': []
   'jump-to-source': [sourceMessageId: number]
   'open-image-viewer': [messageId: number, imageUrl: string]
+  'view-profile': [userId: number]
+  pin: []
+  unpin: []
 }>()
 
-type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'retry'
+type MessageContextCommand = 'copy' | 'reply' | 'forward' | 'edit' | 'recall' | 'retry' | 'pin' | 'unpin'
 
 const isSelf = computed(() => props.message.fromUserId === props.currentUserId)
 const isSystem = computed(() => props.message.msgType === 'SYSTEM')
@@ -154,10 +157,14 @@ const bubbleText = computed(() => {
 })
 const highlightedBubbleText = computed(() => {
   if (props.message.recalled) {
-    return [{ text: bubbleText.value, matched: false }]
+    return [{ text: bubbleText.value, matched: false, mention: false }]
   }
 
-  return highlightText(bubbleText.value, props.searchQuery ?? '')
+  return highlightBubbleContent(
+    bubbleText.value,
+    props.searchQuery,
+    props.message.mentions,
+  )
 })
 const canCopyMessage = computed(
   () => props.message.msgType === 'TEXT' && !props.message.recalled && Boolean(props.message.content?.trim()),
@@ -181,6 +188,14 @@ const contextMenuActions = computed(() => {
 
   if (canForwardMessage.value) {
     actions.push({ key: 'forward', label: '转发', testId: 'message-context-forward' })
+  }
+
+  if (!props.message.recalled && props.message.messageId > 0 && props.message.sendStatus === 1) {
+    if (props.message.pinned) {
+      actions.push({ key: 'unpin', label: '取消置顶', testId: 'message-context-unpin' })
+    } else {
+      actions.push({ key: 'pin', label: '置顶', testId: 'message-context-pin' })
+    }
   }
 
   if (canManageMessage.value && !props.editing) {
@@ -212,6 +227,10 @@ function formatFileSize(value: number | null) {
 function openAttachment(url: string | null | undefined) {
   if (!url) return
   window.open(url, '_blank', 'noopener')
+}
+
+function handleMentionClick(userId: number) {
+  emit('view-profile', userId)
 }
 
 function handleImageClick() {
@@ -277,6 +296,16 @@ function handleContextCommand(command: MessageContextCommand) {
 
   if (command === 'forward') {
     emit('forward')
+    return
+  }
+
+  if (command === 'pin') {
+    emit('pin')
+    return
+  }
+
+  if (command === 'unpin') {
+    emit('unpin')
     return
   }
 
@@ -399,6 +428,11 @@ onUnmounted(() => {
       }"
     >
       <span v-if="showSenderLabel" class="message-bubble__sender">{{ senderName }}</span>
+      <span v-if="message.pinned" class="message-bubble__pinned-badge" aria-label="已置顶">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M10.5 2l3.5 3.5-4.3 4.3L10.5 14l-1.3-4.3L5 13.5l.7-4.3L1.5 5 10.5 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <button
         v-if="message.replySource && !message.recalled"
         class="message-bubble__reply"
@@ -499,7 +533,8 @@ onUnmounted(() => {
         <div v-else class="message-bubble__text-layout">
           <p class="message-bubble__text">
             <template v-for="(part, index) in highlightedBubbleText" :key="`${message.messageId}-${index}`">
-              <mark v-if="part.matched" class="message-bubble__highlight">{{ part.text }}</mark>
+              <mark v-if="part.mention && part.mentionUserId" class="message-bubble__mention" @click.stop="handleMentionClick(part.mentionUserId!)">{{ part.text }}</mark>
+              <mark v-else-if="part.matched" class="message-bubble__highlight">{{ part.text }}</mark>
               <template v-else>{{ part.text }}</template>
             </template>
           </p>
@@ -816,6 +851,21 @@ onUnmounted(() => {
   color: var(--text-primary);
 }
 
+.message-bubble__mention {
+  padding: 0 0.08em;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--interactive-primary-bg) 12%, transparent);
+  color: var(--interactive-selected-fg);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+
+.message-bubble__mention:hover {
+  background: color-mix(in srgb, var(--interactive-primary-bg) 22%, transparent);
+}
+
 .message-bubble__meta {
   display: inline-flex;
   justify-content: flex-end;
@@ -1046,6 +1096,23 @@ onUnmounted(() => {
 .message-bubble__voice {
   min-width: 220px;
   padding: 4px 2px;
+}
+
+.message-bubble__pinned-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text-quaternary);
+  opacity: 0.6;
+}
+
+.message-bubble__pinned-badge svg {
+  width: 14px;
+  height: 14px;
 }
 
 .message-bubble__gif-badge {

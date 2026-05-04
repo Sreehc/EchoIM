@@ -6,6 +6,7 @@ import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.mapper.ImMessageReceiptMapper;
 import com.echoim.server.service.message.MessageViewService;
 import com.echoim.server.vo.conversation.MessageItemVo;
+import com.echoim.server.vo.message.MentionVo;
 import com.echoim.server.vo.message.MessageForwardSourceVo;
 import com.echoim.server.vo.message.MessageReactionStatVo;
 import com.echoim.server.vo.message.MessageReplySourceVo;
@@ -144,6 +145,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setReplySource(readReplySource(extraMap.get("replySource")));
         item.setSticker(readSticker(extraMap.get("sticker")));
         item.setVoice(readVoice(extraMap.get("voice")));
+        item.setMentions(readMentions(extraMap.get("mentions")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -167,6 +169,7 @@ public class MessageViewServiceImpl implements MessageViewService {
         item.setReplySource(readReplySource(extraMap.get("replySource")));
         item.setSticker(readSticker(extraMap.get("sticker")));
         item.setVoice(readVoice(extraMap.get("voice")));
+        item.setMentions(readMentions(extraMap.get("mentions")));
         if (item.getViewCount() == null) {
             item.setViewCount(0);
         }
@@ -219,6 +222,17 @@ public class MessageViewServiceImpl implements MessageViewService {
             return null;
         }
         return objectMapper.convertValue(value, VoicePayloadVo.class);
+    }
+
+    private List<MentionVo> readMentions(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        try {
+            return objectMapper.convertValue(value, new com.fasterxml.jackson.core.type.TypeReference<List<MentionVo>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private Map<Long, List<MessageReactionStatVo>> loadReactionMap(List<Long> messageIds, Long viewerUserId) {

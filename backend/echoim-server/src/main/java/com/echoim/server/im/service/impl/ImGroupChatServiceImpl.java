@@ -32,9 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class ImGroupChatServiceImpl implements ImGroupChatService {
@@ -138,6 +140,8 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         }
         imConversationMapper.updateLastMessage(conversation.getId(), entity.getId(), preview(entity, messageFile));
 
+        List<Long> mentionedUserIds = extractMentionedUserIds(entity.getExtraJson());
+
         WsMessageItem senderItem = toWsMessageItem(entity, loginUser.getUserId());
         fileService.enrichWsMessage(loginUser.getUserId(), senderItem);
         pushConversationChange(loginUser.getUserId(), conversation.getId(), senderItem);
@@ -145,7 +149,8 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
             WsMessageItem recipientItem = toWsMessageItem(entity, recipientUserId);
             fileService.enrichWsMessage(recipientUserId, recipientItem);
             pushGroupMessage(recipientUserId, message, recipientItem);
-            pushConversationChange(recipientUserId, conversation.getId(), recipientItem);
+            boolean isMentioned = mentionedUserIds.contains(recipientUserId);
+            pushConversationChange(recipientUserId, conversation.getId(), recipientItem, isMentioned);
         }
         return sendAckData(senderItem, false);
     }
@@ -388,10 +393,40 @@ public class ImGroupChatServiceImpl implements ImGroupChatService {
         imWsPushService.pushToUser(toUserId, WsMessageType.CHAT_GROUP, request.getTraceId(), request.getClientMsgId(), data);
     }
 
+    @SuppressWarnings("unchecked")
+    private List<Long> extractMentionedUserIds(String extraJson) {
+        if (extraJson == null || extraJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            Map<String, Object> extra = objectMapper.readValue(extraJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            Object mentionsObj = extra.get("mentions");
+            if (!(mentionsObj instanceof List<?> mentionsList)) {
+                return Collections.emptyList();
+            }
+            return mentionsList.stream()
+                    .filter(Map.class::isInstance)
+                    .map(item -> {
+                        Map<String, Object> map = (Map<String, Object>) item;
+                        Object userId = map.get("userId");
+                        return userId instanceof Number ? ((Number) userId).longValue() : null;
+                    })
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
     private void pushConversationChange(Long userId, Long conversationId, Object message) {
+        pushConversationChange(userId, conversationId, message, false);
+    }
+
+    private void pushConversationChange(Long userId, Long conversationId, Object message, boolean isMentioned) {
         var conversation = imConversationMapper.selectConversationItemByUserId(conversationId, userId);
         if (conversation != null) {
-            imWsPushService.pushConversationChange(userId, CHANGE_TYPE_MESSAGE_NEW, conversation, message);
+            java.util.List<Long> atUserIds = isMentioned ? List.of(userId) : null;
+            imWsPushService.pushConversationChange(userId, CHANGE_TYPE_MESSAGE_NEW, conversation, message, atUserIds);
         }
     }
 }

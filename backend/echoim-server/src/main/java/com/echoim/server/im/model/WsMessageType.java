@@ -25,5 +25,7 @@ public enum WsMessageType {
     OFFLINE_SYNC,
     TYPING,
     USER_ONLINE,
-    USER_OFFLINE
+    USER_OFFLINE,
+    MESSAGE_PIN,
+    MESSAGE_UNPIN
 }

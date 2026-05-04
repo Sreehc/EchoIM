@@ -222,6 +222,18 @@ CREATE TABLE IF NOT EXISTS im_message_reaction (
   KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='消息反应表';
 
+CREATE TABLE IF NOT EXISTS im_message_pin (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '消息置顶ID',
+  conversation_id BIGINT NOT NULL COMMENT '会话ID',
+  message_id BIGINT NOT NULL COMMENT '消息ID',
+  group_id BIGINT DEFAULT NULL COMMENT '群组ID',
+  pinned_by_user_id BIGINT NOT NULL COMMENT '置顶操作人ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '置顶时间',
+  UNIQUE KEY uk_message_pin (message_id),
+  KEY idx_conversation (conversation_id),
+  KEY idx_group (group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='消息置顶表';
+
 CREATE TABLE IF NOT EXISTS im_call_session (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '通话记录ID',
   conversation_id BIGINT NOT NULL COMMENT '会话ID',

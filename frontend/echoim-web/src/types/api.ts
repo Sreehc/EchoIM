@@ -136,6 +136,15 @@ export interface ApiMessageItem {
   reactions?: MessageReactionStat[] | null
   sticker?: StickerPayload | null
   voice?: VoicePayload | null
+  pinned?: boolean | null
+  pinnedByUserId?: number | null
+  pinnedAt?: string | null
+  mentions?: ApiMentionItem[] | null
+}
+
+export interface ApiMentionItem {
+  userId: number
+  displayName: string
 }
 
 export interface ApiOfflineSyncConversation {
@@ -185,6 +194,8 @@ export type WsMessageType =
   | 'TYPING'
   | 'USER_ONLINE'
   | 'USER_OFFLINE'
+  | 'MESSAGE_PIN'
+  | 'MESSAGE_UNPIN'
 
 export interface WsEnvelope<T = unknown> {
   type: WsMessageType
@@ -239,6 +250,7 @@ export interface WsConversationChangePayload {
   changeType: string
   conversation: ApiConversationItem
   message?: ApiMessageItem
+  atMentionedUserIds?: number[]
 }
 
 export interface WsCallSummaryPayload extends ApiCallSessionSummary {}

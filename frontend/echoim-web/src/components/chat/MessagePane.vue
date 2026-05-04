@@ -43,6 +43,9 @@ const emit = defineEmits<{
   'toggle-reaction': [payload: { messageId: number; emoji: string }]
   'update:search-match-count': [value: number]
   'open-image-viewer': [messageId: number, imageUrl: string]
+  'view-profile': [userId: number]
+  'pin-message': [messageId: number]
+  'unpin-message': [messageId: number]
 }>()
 
 const scroller = ref()
@@ -325,6 +328,9 @@ function jumpToMessage(messageId: number) {
           @toggle-forward-selection="emit('toggle-forward-selection', entry.message)"
           @toggle-reaction="emit('toggle-reaction', { messageId: entry.message.messageId, emoji: $event })"
           @jump-to-source="jumpToMessage"
+          @view-profile="emit('view-profile', $event)"
+          @pin="emit('pin-message', entry.message.messageId)"
+          @unpin="emit('unpin-message', entry.message.messageId)"
           @start-edit="emit('start-edit-message', entry.message)"
           @update:editing-draft="emit('update:editing-draft', $event)"
           @cancel-edit="emit('cancel-edit-message')"

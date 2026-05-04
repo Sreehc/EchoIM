@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { ChatDotRound, Close, Paperclip } from '@element-plus/icons-vue'
-import type { StickerDefinition } from '@/types/chat'
+import type { GroupMemberItem, MentionItem, StickerDefinition } from '@/types/chat'
 import type { VoiceRecordResult } from './VoiceRecorder.vue'
 import VoiceRecorder from './VoiceRecorder.vue'
+import MentionSelector from './MentionSelector.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -14,6 +15,8 @@ const props = withDefaults(
     attachmentUploading?: boolean
     attachmentError?: string | null
     stickers?: StickerDefinition[]
+    groupMembers?: GroupMemberItem[]
+    currentUserId?: number
   }>(),
   {
     enterToSend: true,
@@ -23,11 +26,13 @@ const props = withDefaults(
     attachmentUploading: false,
     attachmentError: null,
     stickers: () => [],
+    groupMembers: () => [],
+    currentUserId: 0,
   },
 )
 
 const emit = defineEmits<{
-  send: [content: string]
+  send: [content: string, mentions: MentionItem[]]
   'upload-file': [file: File]
   'upload-files': [files: File[]]
   'send-sticker': [sticker: StickerDefinition]
@@ -43,24 +48,113 @@ const stickerTrayOpen = ref(false)
 const voiceRecorderOpen = ref(false)
 const replyPreview = computed(() => props.replyingMessage?.content || props.replyingMessage?.file?.fileName || '原消息')
 
+// @mention state
+const mentionSelectorVisible = ref(false)
+const mentionQuery = ref('')
+const mentionStartIndex = ref(-1)
+const pendingMentions = ref<MentionItem[]>([])
+const mentionSelectorRef = ref<InstanceType<typeof MentionSelector> | null>(null)
+
+const isGroupChat = computed(() => props.groupMembers.length > 0)
+
 function submit() {
   if (!props.canSend) return
 
   const content = draft.value.trim()
   if (!content) return
 
-  emit('send', content)
+  // Collect all mentions that are actually in the text
+  const mentionsInText = pendingMentions.value.filter((m) =>
+    content.includes(`@${m.displayName}`) || content.includes(`@${m.userId}`)
+  )
+
+  emit('send', content, mentionsInText)
   draft.value = ''
+  pendingMentions.value = []
+  closeMentionSelector()
 }
 
 function onKeydown(event: Event | KeyboardEvent) {
   if (!(event instanceof KeyboardEvent)) return
   if (!props.canSend) return
 
+  // Let mention selector handle keys first
+  if (mentionSelectorVisible.value) {
+    if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(event.key)) {
+      mentionSelectorRef.value?.handleKeydown(event)
+      if (event.defaultPrevented) return
+    }
+  }
+
   if (props.enterToSend && event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     submit()
   }
+}
+
+function onInput() {
+  emit('typing')
+  if (!isGroupChat.value) return
+
+  const textarea = getInputElement()
+  if (!textarea) return
+
+  const cursorPos = textarea.selectionStart ?? draft.value.length
+  const textBeforeCursor = draft.value.slice(0, cursorPos)
+
+  // Find the last @ before cursor
+  const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+
+  if (lastAtIndex >= 0) {
+    // Check there's no space between @ and cursor (simple mention detection)
+    const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1)
+    if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+      mentionStartIndex.value = lastAtIndex
+      mentionQuery.value = textAfterAt
+      mentionSelectorVisible.value = true
+      return
+    }
+  }
+
+  closeMentionSelector()
+}
+
+function closeMentionSelector() {
+  mentionSelectorVisible.value = false
+  mentionQuery.value = ''
+  mentionStartIndex.value = -1
+}
+
+function handleMentionSelect(mention: MentionItem) {
+  const before = draft.value.slice(0, mentionStartIndex.value)
+  const cursorPos = getInputElement()?.selectionStart ?? draft.value.length
+  const after = draft.value.slice(cursorPos)
+
+  draft.value = `${before}@${mention.displayName} ${after}`
+
+  // Track the mention
+  const existing = pendingMentions.value.findIndex((m) => m.userId === mention.userId)
+  if (existing >= 0) {
+    pendingMentions.value[existing] = mention
+  } else {
+    pendingMentions.value.push(mention)
+  }
+
+  closeMentionSelector()
+
+  nextTick(() => {
+    const textarea = getInputElement()
+    if (textarea) {
+      const newPos = before.length + mention.displayName.length + 2
+      textarea.setSelectionRange(newPos, newPos)
+      textarea.focus()
+    }
+  })
+}
+
+function getInputElement(): HTMLTextAreaElement | null {
+  const textarea = document.querySelector('.composer__bar .el-textarea__inner')
+  return textarea instanceof HTMLTextAreaElement ? textarea : null
 }
 
 function openFilePicker() {
@@ -141,7 +235,16 @@ function handleVoiceCancel() {
           <strong>{{ sticker.title }}</strong>
         </button>
       </div>
-      <div class="composer__bar">
+      <div class="composer__bar" style="position: relative;">
+        <MentionSelector
+          ref="mentionSelectorRef"
+          :visible="mentionSelectorVisible"
+          :members="groupMembers"
+          :query="mentionQuery"
+          :current-user-id="currentUserId"
+          @select="handleMentionSelect"
+          @close="closeMentionSelector"
+        />
         <button class="composer__icon" type="button" aria-label="贴纸面板" @click="toggleStickerTray">
           <ChatDotRound />
         </button>
@@ -172,7 +275,7 @@ function handleVoiceCancel() {
           resize="none"
           type="textarea"
           aria-label="消息输入框"
-          @input="emit('typing')"
+          @input="onInput"
           @keydown="onKeydown"
         />
         <button

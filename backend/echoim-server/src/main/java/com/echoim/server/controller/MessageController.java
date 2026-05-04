@@ -12,6 +12,7 @@ import com.echoim.server.vo.conversation.MessageItemVo;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -49,5 +50,23 @@ public class MessageController {
     public ApiResponse<MessageItemVo> toggleReaction(@PathVariable Long id,
                                                      @Valid @RequestBody ReactionMessageRequestDto requestDto) {
         return ApiResponse.success(messageCommandService.toggleReaction(LoginUserContext.requireUserId(), id, requestDto.getEmoji()));
+    }
+
+    @PutMapping("/{id}/pin")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-pin", permits = 30, windowSeconds = 60, message = "操作过于频繁")
+    public ApiResponse<MessageItemVo> pinMessage(@PathVariable Long id) {
+        return ApiResponse.success(messageCommandService.pinMessage(LoginUserContext.requireUserId(), id));
+    }
+
+    @PutMapping("/{id}/unpin")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-unpin", permits = 30, windowSeconds = 60, message = "操作过于频繁")
+    public ApiResponse<MessageItemVo> unpinMessage(@PathVariable Long id) {
+        return ApiResponse.success(messageCommandService.unpinMessage(LoginUserContext.requireUserId(), id));
+    }
+
+    @GetMapping("/pinned")
+    @RateLimit(keyType = RateLimit.KeyType.USER, name = "message-list-pinned", permits = 30, windowSeconds = 60, message = "查询过于频繁")
+    public ApiResponse<List<MessageItemVo>> listPinnedMessages(@RequestParam Long conversationId) {
+        return ApiResponse.success(messageCommandService.listPinnedMessages(LoginUserContext.requireUserId(), conversationId));
     }
 }

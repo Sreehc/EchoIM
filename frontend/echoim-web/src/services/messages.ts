@@ -1,5 +1,5 @@
 import type { ApiMessageItem } from '@/types/api'
-import { postJson, putJson } from './http'
+import { getJson, postJson, putJson } from './http'
 
 export function recallMessage(messageId: number) {
   return putJson(`/api/messages/${messageId}/recall`)
@@ -18,4 +18,16 @@ export function forwardMessages(messageIds: number[], targetConversationIds: num
 
 export function reactMessage(messageId: number, emoji: string) {
   return putJson<ApiMessageItem>(`/api/messages/${messageId}/reaction`, { emoji })
+}
+
+export function pinMessage(messageId: number) {
+  return putJson<ApiMessageItem>(`/api/messages/${messageId}/pin`)
+}
+
+export function unpinMessage(messageId: number) {
+  return putJson<ApiMessageItem>(`/api/messages/${messageId}/unpin`)
+}
+
+export function listPinnedMessages(conversationId: number) {
+  return getJson<ApiMessageItem[]>(`/api/messages/pinned?conversationId=${conversationId}`)
 }

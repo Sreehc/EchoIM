@@ -20,13 +20,17 @@
                    WHEN 4 THEN 'GIF'
                    WHEN 5 THEN 'FILE'
                    WHEN 6 THEN 'SYSTEM'
+                   WHEN 7 THEN 'VOICE'
                    ELSE 'UNKNOWN'
                END AS msgType,
                m.content AS content,
                m.extra_json AS extraJsonRaw,
                m.file_id AS fileId,
                m.send_status AS sendStatus,
-               m.sent_at AS sentAt
+               m.sent_at AS sentAt,
+               CASE WHEN mp.id IS NOT NULL THEN true ELSE false END AS pinned,
+               mp.pinned_by_user_id AS pinnedByUserId,
+               mp.created_at AS pinnedAt
     </sql>
 
     <sql id="MessageAccessJoins">
@@ -37,6 +41,7 @@
                ON c.conversation_type IN (2, 3)
               AND gm.group_id = c.biz_id
               AND gm.user_id = #{userId}
+        LEFT JOIN im_message_pin mp ON mp.message_id = m.id
     </sql>
 
     <sql id="MessageAccessWhere">

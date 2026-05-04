@@ -15,6 +15,8 @@ const props = defineProps<{
 
 const chatStore = useChatStore()
 
+const isMentioned = computed(() => chatStore.mentionedConversationIds.has(props.item.conversationId))
+
 const isOnline = computed(() => {
   if (props.item.conversationType !== 1) return false
   const peerId = props.item.peerUserId
@@ -67,8 +69,9 @@ function visibleUnreadCount(item: ConversationSummary) {
             <span v-else>{{ part.text }}</span>
           </template>
         </p>
-        <div v-if="visibleUnreadCount(item)" class="conversation-item__meta">
-          <span class="conversation-item__badge">{{ visibleUnreadCount(item) }}</span>
+        <div v-if="visibleUnreadCount(item) || isMentioned" class="conversation-item__meta">
+          <span v-if="isMentioned" class="conversation-item__mention-badge">@</span>
+          <span v-if="visibleUnreadCount(item)" class="conversation-item__badge">{{ visibleUnreadCount(item) }}</span>
         </div>
       </div>
     </div>
@@ -250,6 +253,20 @@ function visibleUnreadCount(item: ConversationSummary) {
 
 .conversation-item.is-muted .conversation-item__badge {
   background: var(--text-quaternary);
+}
+
+.conversation-item__mention-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--interactive-primary-bg) 88%, white);
+  color: var(--text-on-brand);
+  font: 700 var(--text-2xs)/1 var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .conversation-item.is-active .conversation-item__time,

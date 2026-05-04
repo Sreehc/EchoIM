@@ -9,6 +9,7 @@ import CallOverlay from '@/components/chat/CallOverlay.vue'
 import ImageViewer from '@/components/chat/ImageViewer.vue'
 import type { ImageViewerImage } from '@/components/chat/ImageViewer.vue'
 import MessagePane from '@/components/chat/MessagePane.vue'
+import PinnedMessagesBanner from '@/components/chat/PinnedMessagesBanner.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
 import type { VoiceRecordResult } from '@/components/chat/VoiceRecorder.vue'
 import ConversationProfileDrawer from '@/components/chat/ConversationProfileDrawer.vue'
@@ -52,7 +53,9 @@ import type {
   FriendRequestItem,
   GlobalSearchMessageItem,
   GroupCreatePayload,
+  GroupMemberItem,
   LeftPanelMode,
+  MentionItem,
   MessageReplySource,
   StickerDefinition,
   UpdateCurrentUserProfilePayload,
@@ -667,6 +670,19 @@ function handleImageViewerForward(messageId: number) {
   }
 }
 
+const pinnedMessages = computed(() =>
+  chatStore.activeMessages.filter((m) => m.pinned).sort((a, b) => {
+    const aTime = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0
+    const bTime = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0
+    return bTime - aTime
+  }),
+)
+
+const activeGroupMembers = computed<GroupMemberItem[]>(() => {
+  if (chatStore.activeConversation?.conversationType === 1) return []
+  return chatStore.activeProfile?.members ?? []
+})
+
 function toggleForwardSelection(message: ChatMessage) {
   if (selectedForwardMessageIds.value.includes(message.messageId)) {
     selectedForwardMessageIds.value = selectedForwardMessageIds.value.filter((item) => item !== message.messageId)
@@ -1236,6 +1252,22 @@ async function handleToggleReaction(payload: { messageId: number; emoji: string 
   }
 }
 
+async function handlePinMessage(messageId: number) {
+  try {
+    await chatStore.pinMessage(messageId)
+  } catch {
+    return
+  }
+}
+
+async function handleUnpinMessage(messageId: number) {
+  try {
+    await chatStore.unpinMessage(messageId)
+  } catch {
+    return
+  }
+}
+
 function handleReplyMessage(message: ChatMessage) {
   replyingMessage.value = message
 }
@@ -1266,11 +1298,12 @@ function handleTypingInput() {
   }, 2000)
 }
 
-async function handleSendTextMessage(content: string) {
+async function handleSendTextMessage(content: string, mentions?: MentionItem[]) {
   attachmentError.value = null
   await chatStore.sendMessage({
     currentUserId: authStore.currentUser?.userId ?? 0,
     content,
+    mentions: mentions && mentions.length > 0 ? mentions : undefined,
     replySource: toReplySource(replyingMessage.value),
   })
   clearReplyMessage()
@@ -1678,6 +1711,11 @@ function registerDebugHooks() {
               <button type="button" @click="cancelForwardSelection">取消</button>
             </div>
           </div>
+          <PinnedMessagesBanner
+            :pinned-messages="pinnedMessages"
+            @jump-to-message="jumpMessageId = $event"
+            @unpin-message="handleUnpinMessage"
+          />
           <MessagePane
             :conversation-id="chatStore.activeConversation.conversationId"
             :messages="chatStore.activeMessages"
@@ -1712,6 +1750,9 @@ function registerDebugHooks() {
             @forward-message="handleForwardMessage"
             @toggle-forward-selection="toggleForwardSelection"
             @toggle-reaction="handleToggleReaction"
+            @pin-message="handlePinMessage"
+            @unpin-message="handleUnpinMessage"
+            @view-profile="openChatFromContact"
             @open-image-viewer="handleOpenImageViewer"
           />
           <div v-if="typingLabel" class="chat-page__typing" data-testid="typing-indicator">
@@ -1731,6 +1772,8 @@ function registerDebugHooks() {
             :attachment-uploading="attachmentUploading"
             :attachment-error="attachmentError"
             :stickers="STICKER_LIBRARY"
+            :group-members="activeGroupMembers"
+            :current-user-id="authStore.currentUser?.userId ?? 0"
             :disabled-reason="
               chatStore.activeConversation.conversationType === 3
                 ? '仅频道创建者可发送消息'

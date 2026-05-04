@@ -11,6 +11,8 @@ import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.entity.ImGroupEntity;
 import com.echoim.server.entity.ImGroupMemberEntity;
+import com.echoim.server.entity.ImMessageEntity;
+import com.echoim.server.im.model.WsMessageType;
 import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
@@ -137,12 +139,18 @@ public class GroupServiceImpl implements GroupService {
         }
 
         boolean touched = false;
+        boolean noticeChanged = false;
         if (StringUtils.hasText(requestDto.getGroupName())) {
             group.setGroupName(requestDto.getGroupName().trim());
             touched = true;
         }
         if (requestDto.getNotice() != null) {
-            group.setNotice(requestDto.getNotice().trim());
+            String newNotice = requestDto.getNotice().trim();
+            String oldNotice = group.getNotice();
+            if (!newNotice.equals(oldNotice == null ? "" : oldNotice)) {
+                group.setNotice(newNotice);
+                noticeChanged = true;
+            }
             touched = true;
         }
         if (!touched) {
@@ -150,7 +158,15 @@ public class GroupServiceImpl implements GroupService {
         }
 
         imGroupMapper.updateById(group);
-        ensureCollectiveConversation(group);
+        ImConversationEntity conversation = ensureCollectiveConversation(group);
+
+        if (noticeChanged) {
+            String noticeText = group.getNotice().isEmpty()
+                    ? String.format("%s 清除了群公告", operator.getNickName() != null ? operator.getNickName() : "管理员")
+                    : String.format("%s 更新了群公告：%s", operator.getNickName() != null ? operator.getNickName() : "管理员", group.getNotice());
+            pushSystemMessage(conversation.getId(), groupId, noticeText);
+        }
+
         return getGroupDetail(currentUserId, groupId);
     }
 
@@ -333,6 +349,40 @@ public class GroupServiceImpl implements GroupService {
         entity.setManualUnread(0);
         entity.setDeleted(deleted ? 1 : 0);
         imConversationUserMapper.insert(entity);
+    }
+
+    private void pushSystemMessage(Long conversationId, Long groupId, String content) {
+        Long seqNo = imMessageMapper.selectMaxSeqNoByConversationId(conversationId);
+        long nextSeq = seqNo == null ? 1 : seqNo + 1;
+        LocalDateTime now = LocalDateTime.now();
+
+        ImMessageEntity message = new ImMessageEntity();
+        message.setConversationId(conversationId);
+        message.setConversationType(CONVERSATION_TYPE_GROUP);
+        message.setSeqNo(nextSeq);
+        message.setClientMsgId("sys-" + UUID.randomUUID());
+        message.setFromUserId(0L);
+        message.setGroupId(groupId);
+        message.setMsgType(6);
+        message.setContent(content);
+        message.setSendStatus(1);
+        message.setSentAt(now);
+        message.setCreatedAt(now);
+        message.setUpdatedAt(now);
+        imMessageMapper.insert(message);
+
+        imConversationMapper.updateLastMessageState(conversationId, message.getId(), content, now);
+
+        List<ImConversationUserEntity> members = imConversationUserMapper.selectByConversationId(conversationId);
+        for (ImConversationUserEntity member : members) {
+            if (member.getDeleted() != null && member.getDeleted() == 1) {
+                continue;
+            }
+            var conversationItem = imConversationMapper.selectConversationItemByUserId(conversationId, member.getUserId());
+            if (conversationItem != null) {
+                imWsPushService.pushConversationChange(member.getUserId(), "MESSAGE_NEW", conversationItem, null);
+            }
+        }
     }
 
     private void freezeConversationAtCurrentSeq(Long groupId, Long userId, boolean keepConversation) {

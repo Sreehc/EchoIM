@@ -147,6 +147,10 @@ export function adaptChatMessage(item: ApiMessageItem): ChatMessage {
     reactions: adaptReactionStats(item.reactions),
     sticker: adaptSticker(item.sticker),
     voice: adaptVoice(item.voice),
+    pinned: Boolean(item.pinned),
+    pinnedByUserId: item.pinnedByUserId == null ? null : Number(item.pinnedByUserId),
+    pinnedAt: item.pinnedAt ? normalizeTime(item.pinnedAt) : null,
+    mentions: (item.mentions ?? []).map((m) => ({ userId: Number(m.userId), displayName: m.displayName })),
     errorMessage: null,
   }
 }

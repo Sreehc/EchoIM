@@ -74,11 +74,22 @@ public class ImWsPushService {
                                        String changeType,
                                        ConversationItemVo conversation,
                                        Object message) {
+        pushConversationChange(userId, changeType, conversation, message, null);
+    }
+
+    public void pushConversationChange(Long userId,
+                                       String changeType,
+                                       ConversationItemVo conversation,
+                                       Object message,
+                                       java.util.List<Long> atMentionedUserIds) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("changeType", changeType);
         data.put("conversation", conversation);
         if (message != null) {
             data.put("message", message);
+        }
+        if (atMentionedUserIds != null && !atMentionedUserIds.isEmpty()) {
+            data.put("atMentionedUserIds", atMentionedUserIds);
         }
         pushToUser(userId, WsMessageType.CONVERSATION_CHANGE, null, null, data);
     }

@@ -1,5 +1,6 @@
 package com.echoim.server.vo.conversation;
 
+import com.echoim.server.vo.message.MentionVo;
 import com.echoim.server.vo.message.MessageForwardSourceVo;
 import com.echoim.server.vo.message.MessageReactionStatVo;
 import com.echoim.server.vo.message.MessageReplySourceVo;
@@ -40,6 +41,10 @@ public class MessageItemVo {
     private java.util.List<MessageReactionStatVo> reactions;
     private StickerPayloadVo sticker;
     private VoicePayloadVo voice;
+    private Boolean pinned;
+    private Long pinnedByUserId;
+    private LocalDateTime pinnedAt;
+    private java.util.List<MentionVo> mentions;
     @JsonIgnore
     private String extraJsonRaw;
 
@@ -265,6 +270,38 @@ public class MessageItemVo {
 
     public void setVoice(VoicePayloadVo voice) {
         this.voice = voice;
+    }
+
+    public Boolean getPinned() {
+        return pinned;
+    }
+
+    public void setPinned(Boolean pinned) {
+        this.pinned = pinned;
+    }
+
+    public Long getPinnedByUserId() {
+        return pinnedByUserId;
+    }
+
+    public void setPinnedByUserId(Long pinnedByUserId) {
+        this.pinnedByUserId = pinnedByUserId;
+    }
+
+    public LocalDateTime getPinnedAt() {
+        return pinnedAt;
+    }
+
+    public void setPinnedAt(LocalDateTime pinnedAt) {
+        this.pinnedAt = pinnedAt;
+    }
+
+    public java.util.List<MentionVo> getMentions() {
+        return mentions;
+    }
+
+    public void setMentions(java.util.List<MentionVo> mentions) {
+        this.mentions = mentions;
     }
 
     public String getExtraJsonRaw() {

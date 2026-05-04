@@ -224,6 +224,10 @@ export interface ChatMessage {
   reactions?: MessageReactionStat[]
   sticker?: StickerPayload | null
   voice?: VoicePayload | null
+  pinned?: boolean
+  pinnedByUserId?: number | null
+  pinnedAt?: string | null
+  mentions?: MentionItem[]
   errorMessage?: string | null
 }
 
@@ -246,6 +250,11 @@ export interface StickerDefinition extends StickerPayload {
 export interface VoicePayload {
   duration: number
   waveform: number[]
+}
+
+export interface MentionItem {
+  userId: number
+  displayName: string
 }
 
 export interface MessageForwardSource {
