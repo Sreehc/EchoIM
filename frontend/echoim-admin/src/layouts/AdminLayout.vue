@@ -14,6 +14,10 @@
         active-text-color="#ffffff"
         class="admin-menu"
       >
+        <el-menu-item index="/">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>数据看板</template>
+        </el-menu-item>
         <el-menu-item index="/users">
           <el-icon><User /></el-icon>
           <template #title>用户管理</template>
@@ -81,6 +85,7 @@ import {
   Fold,
   Expand,
   ArrowDown,
+  DataAnalysis,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
