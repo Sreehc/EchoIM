@@ -1,0 +1,27 @@
+services:
+  echoim-frontend:
+    image: ${FRONTEND_IMAGE:-echoim-frontend:local}
+    build:
+      context: ${APP_SOURCE_DIR:-../..}
+      dockerfile: deploy/docker/frontend.Dockerfile
+    container_name: echoim-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18089:80"
+
+  echoim-backend:
+    image: ${BACKEND_IMAGE:-echoim-backend:local}
+    build:
+      context: ${BACKEND_SOURCE_DIR:-../../backend/echoim-server}
+      dockerfile: Dockerfile
+    container_name: echoim-backend
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-../../.env.example}
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:18081:8080"
+      - "127.0.0.1:18091:8091"

@@ -11,7 +11,7 @@ import java.util.Map;
 
 @RequireLogin
 @RestController
-@RequestMapping("/admin/configs")
+@RequestMapping({"/api/admin/configs", "/admin/configs"})
 public class AdminConfigController {
 
     @GetMapping

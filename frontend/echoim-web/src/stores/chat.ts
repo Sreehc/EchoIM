@@ -1012,17 +1012,15 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const params = userIds.map((id) => `userIds=${id}`).join('&')
       const res = await getJson<Record<number, boolean>>(`/api/im/online-status?${params}`)
-      if (res.code === 0 && res.data) {
-        const next = new Set(onlineUsers.value)
-        for (const [id, online] of Object.entries(res.data)) {
-          if (online) {
-            next.add(Number(id))
-          } else {
-            next.delete(Number(id))
-          }
+      const next = new Set(onlineUsers.value)
+      for (const [id, online] of Object.entries(res)) {
+        if (online) {
+          next.add(Number(id))
+        } else {
+          next.delete(Number(id))
         }
-        onlineUsers.value = next
       }
+      onlineUsers.value = next
     } catch {
       // best-effort; ignore failures
     }

@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RequireLogin
 @RestController
-@RequestMapping("/admin/users")
+@RequestMapping({"/api/admin/users", "/admin/users"})
 public class AdminUserController {
 
     @GetMapping

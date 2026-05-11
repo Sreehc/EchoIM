@@ -1,8 +1,8 @@
 package com.echoim.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.echoim.server.common.BizException;
-import com.echoim.server.common.ErrorCode;
+import com.echoim.server.common.constant.ErrorCode;
+import com.echoim.server.common.exception.BizException;
 import com.echoim.server.dto.message.CreateScheduledMessageRequestDto;
 import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;

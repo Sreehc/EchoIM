@@ -137,7 +137,7 @@ function handlePointerMove(event: PointerEvent) {
   }
 }
 
-function handlePointerUp(event: PointerEvent) {
+function handlePointerUp() {
   if (isDragging.value) {
     isDragging.value = false
     return

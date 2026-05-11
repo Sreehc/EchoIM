@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RequireLogin
 @RestController
-@RequestMapping("/admin/versions")
+@RequestMapping({"/api/admin/versions", "/admin/versions"})
 public class AdminVersionController {
 
     @GetMapping

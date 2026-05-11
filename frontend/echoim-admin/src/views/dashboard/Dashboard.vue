@@ -212,7 +212,7 @@ async function loadTrends() {
 }
 
 async function loadData() {
-  const [ov, mt, ot, os] = await Promise.all([
+  const [ov, mt, , os] = await Promise.all([
     fetchDashboardOverview(),
     fetchMessageTypeBreakdown(),
     loadTrends(),

@@ -7,6 +7,8 @@ import com.echoim.server.vo.auth.LoginResponseVo;
 import com.echoim.server.vo.auth.RecoveryVerifyVo;
 import com.echoim.server.vo.auth.RegisterResponseVo;
 import com.echoim.server.vo.auth.SecurityEventItemVo;
+import com.echoim.server.vo.auth.TotpSetupVo;
+import com.echoim.server.vo.auth.TotpStatusVo;
 import com.echoim.server.vo.auth.TrustedDeviceItemVo;
 import com.echoim.server.vo.user.UserProfileVo;
 

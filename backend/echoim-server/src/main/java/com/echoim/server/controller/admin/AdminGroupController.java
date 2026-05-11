@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RequireLogin
 @RestController
-@RequestMapping("/admin/groups")
+@RequestMapping({"/api/admin/groups", "/admin/groups"})
 public class AdminGroupController {
 
     @GetMapping

@@ -11,7 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/auth")
+@RequestMapping({"/api/admin/auth", "/admin/auth"})
 public class AdminAuthController {
 
     private final TokenService tokenService;

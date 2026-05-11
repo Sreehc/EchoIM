@@ -42,8 +42,6 @@ export function useVirtualScroll<T>(
     }))
   })
 
-  const offsetY = computed(() => visibleRange.value.start * itemHeight)
-
   function handleScroll(e: Event) {
     const target = e.target as HTMLElement
     scrollTop.value = target.scrollTop

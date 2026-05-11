@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ChatMessage } from '@/types/chat'
-import { formatMessageTime } from '@/utils/format'
 
 const props = defineProps<{
   pinnedMessages: ChatMessage[]

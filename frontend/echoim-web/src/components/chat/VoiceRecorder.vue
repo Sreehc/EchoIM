@@ -79,7 +79,7 @@ function handleCancel() {
 
 function handleSend() {
   if (!reviewBlob.value) return
-  emit({
+  emit('send', {
     blob: reviewBlob.value,
     duration: reviewDuration.value,
     waveform: reviewWaveform.value,

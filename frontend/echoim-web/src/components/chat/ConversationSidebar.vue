@@ -1574,7 +1574,7 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
             </div>
           </div>
 
-          <div v-else class="sidebar-stack sidebar-stack--security">
+          <div v-else-if="settingsSection === 'security'" class="sidebar-stack sidebar-stack--security">
             <div v-if="!currentProfile?.email" class="sidebar-notice sidebar-notice--warning">
               未绑定邮箱的账号无法使用找回密码和设备信任。
             </div>

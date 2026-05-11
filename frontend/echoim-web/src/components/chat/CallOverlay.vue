@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch, nextTick } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Microphone, Phone, TopRight, VideoCamera, VideoPause } from '@element-plus/icons-vue'
 import type { CallPhase, CallSessionSummary } from '@/types/chat'
 import AvatarBadge from './AvatarBadge.vue'

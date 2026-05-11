@@ -142,12 +142,6 @@ watch(draft, () => {
   }, 500)
 })
 
-const minScheduledDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 5) // Minimum 5 minutes from now
-  return now.toISOString().slice(0, 16)
-})
-
 const canSchedule = computed(() => {
   return scheduledDate.value && scheduledTime.value
 })

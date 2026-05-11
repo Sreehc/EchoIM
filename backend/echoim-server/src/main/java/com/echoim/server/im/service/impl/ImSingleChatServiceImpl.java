@@ -116,7 +116,7 @@ public class ImSingleChatServiceImpl implements ImSingleChatService {
         validateChatRequest(message, data);
 
         // Sensitive word filtering for text messages
-        if (MESSAGE_TYPE_TEXT == data.getMsgType() && StringUtils.hasText(data.getContent())) {
+        if (String.valueOf(MESSAGE_TYPE_TEXT).equals(data.getMsgType()) && StringUtils.hasText(data.getContent())) {
             if (sensitiveWordService.containsBlockedWords(data.getContent())) {
                 throw new BizException(ErrorCode.BUSINESS_CONFLICT, "消息包含敏感内容，已被拦截");
             }

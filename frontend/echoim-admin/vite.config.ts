@@ -5,7 +5,8 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/admin/' : '/',
   plugins: [
     vue(),
     AutoImport({ resolvers: [ElementPlusResolver()] }),
@@ -25,4 +26,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))
