@@ -221,7 +221,16 @@
 
 ---
 
-## 14. 离线同步 `/api/offline-sync`
+## 14. 系统公告 `/api/notices`
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/notices?pageNo=1&pageSize=20` | 获取当前用户可见公告列表（包含 `unreadCount`） |
+| PUT | `/api/notices/{noticeId}/read` | 标记公告已读 |
+
+---
+
+## 15. 离线同步 `/api/offline-sync`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -229,7 +238,7 @@
 
 ---
 
-## 15. 运维接口
+## 16. 运维接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -240,15 +249,16 @@
 
 ---
 
-## 16. 管理后台 API `/api/admin/*`
+## 17. 管理后台 API `/api/admin/*`
 
-### 16.1 认证
+### 17.1 认证
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/admin/auth/login` | 管理员登录 |
+| POST | `/api/admin/auth/logout` | 管理员退出 |
 
-### 16.2 数据看板
+### 17.2 数据看板
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -257,6 +267,14 @@
 | GET | `/api/admin/dashboard/user-trend?days=7` | 用户趋势 |
 | GET | `/api/admin/dashboard/message-types` | 消息类型分布 |
 | GET | `/api/admin/dashboard/online-stats` | 实时在线统计 |
+
+### 17.3 系统公告
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/admin/notices` | 公告列表（支持按状态分页） |
+| POST | `/api/admin/notices` | 发布公告（全员或指定用户） |
+| PUT | `/api/admin/notices/{id}/withdraw` | 撤回公告 |
 
 ### 16.3 用户管理
 

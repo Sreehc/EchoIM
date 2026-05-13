@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireAdmin;
 import com.echoim.server.common.PageResponse;
 import com.echoim.server.common.annotation.RequireLogin;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RequireLogin
+@RequireAdmin
 @RestController
 @RequestMapping({"/api/admin/users", "/admin/users"})
 public class AdminUserController {

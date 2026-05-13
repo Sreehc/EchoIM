@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireAdmin;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.mapper.SysOperationLogMapper;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RequireLogin
+@RequireAdmin
 @RestController
 @RequestMapping("/api/admin/operation-logs")
 public class AdminOperationLogController {

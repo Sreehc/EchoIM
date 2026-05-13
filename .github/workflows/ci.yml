@@ -64,7 +64,6 @@ jobs:
         app:
           - frontend/echoim-web
           - frontend/echoim-admin
-    continue-on-error: true
     defaults:
       run:
         working-directory: ${{ matrix.app }}

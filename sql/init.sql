@@ -434,6 +434,18 @@ CREATE TABLE IF NOT EXISTS im_system_notice (
   KEY idx_published_at (published_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统公告表';
 
+CREATE TABLE IF NOT EXISTS im_system_notice_read (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告已读记录ID',
+  notice_id BIGINT NOT NULL COMMENT '公告ID',
+  user_id BIGINT NOT NULL COMMENT '用户ID',
+  read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '已读时间',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_notice_user (notice_id, user_id),
+  KEY idx_user_id (user_id),
+  KEY idx_read_at (read_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统公告已读记录表';
+
 CREATE TABLE IF NOT EXISTS im_user_ban (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '封禁ID',
   user_id BIGINT NOT NULL COMMENT '被封禁用户ID',

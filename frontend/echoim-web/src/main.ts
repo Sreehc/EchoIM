@@ -4,6 +4,7 @@ import { router } from './router'
 import { pinia } from './stores/pinia'
 import { useAuthStore } from './stores/auth'
 import { useChatStore } from './stores/chat'
+import { useNoticeStore } from './stores/notices'
 import { configureHttpClient } from './services/http'
 import { initErrorReporting } from './services/errorReporter'
 import vLazyImage from './directives/lazyImage'
@@ -31,6 +32,7 @@ configureHttpClient({
   onUnauthorized: () => {
     useAuthStore(pinia).clearSession()
     useChatStore(pinia).resetState()
+    useNoticeStore(pinia).resetState()
     if (router.currentRoute.value.name !== 'login') {
       router.replace({ name: 'login' }).catch(() => undefined)
     }

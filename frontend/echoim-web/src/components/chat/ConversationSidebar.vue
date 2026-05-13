@@ -100,6 +100,7 @@ const props = defineProps<{
   securityEvents?: SecurityEventSummary[]
   blockedUsers?: ApiBlockedUserItem[]
   blockedUsersLoading?: boolean
+  noticeUnreadCount?: number
   profileError?: string | null
   profileNotice?: string | null
   usernameChecking?: boolean
@@ -123,6 +124,7 @@ const emit = defineEmits<{
   'update:chatPreferences': [value: Partial<ChatPreferences>]
   'open-panel': [mode: LeftPanelMode]
   'open-global-search': []
+  'open-notice-center': []
   'open-saved-messages': []
   'add-account': []
   'switch-account': [userId: number]
@@ -599,6 +601,12 @@ function handleOpenGlobalSearch() {
   emit('open-global-search')
 }
 
+function handleOpenNoticeCenter() {
+  closeGlobalMenu()
+  closeComposeMenu()
+  emit('open-notice-center')
+}
+
 function handleOpenSavedMessages() {
   closeGlobalMenu()
   closeComposeMenu()
@@ -1065,6 +1073,15 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
           </button>
           <div class="sidebar-panel__toolbar-actions">
             <button
+              class="sidebar-panel__menu-trigger sidebar-panel__menu-trigger--notice"
+              type="button"
+              aria-label="打开系统公告"
+              @click="handleOpenNoticeCenter"
+            >
+              <Bell />
+              <span v-if="noticeUnreadCount" class="sidebar-panel__badge">{{ noticeUnreadCount > 99 ? '99+' : noticeUnreadCount }}</span>
+            </button>
+            <button
               class="sidebar-panel__menu-trigger"
               type="button"
               aria-label="打开设置"
@@ -1226,6 +1243,11 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
               <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handleOpenGlobalSearch">
                 <span class="sidebar-global-menu__icon"><CirclePlus /></span>
                 <span class="sidebar-global-menu__label">全局搜索</span>
+              </button>
+              <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="handleOpenNoticeCenter">
+                <span class="sidebar-global-menu__icon"><Bell /></span>
+                <span class="sidebar-global-menu__label">系统公告</span>
+                <span v-if="noticeUnreadCount" class="sidebar-global-menu__meta">{{ noticeUnreadCount }} 未读</span>
               </button>
               <button class="sidebar-global-menu__item" type="button" role="menuitem" @click="openPanel('contacts')">
                 <span class="sidebar-global-menu__icon"><User /></span>
@@ -4136,5 +4158,26 @@ function isMenuItemActive(mode: LeftPanelMode, section?: SettingsSection) {
   font: 500 var(--text-xs)/1 var(--font-mono);
   text-align: center;
   letter-spacing: 0.04em;
+}
+
+.sidebar-panel__menu-trigger--notice {
+  position: relative;
+}
+
+.sidebar-panel__badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
 }
 </style>

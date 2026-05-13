@@ -5,6 +5,7 @@ import com.echoim.server.entity.ImConversationEntity;
 import com.echoim.server.entity.ImConversationUserEntity;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
+import com.echoim.server.mapper.ImFileMapper;
 import com.echoim.server.mapper.ImMessageMapper;
 import com.echoim.server.im.service.ImSingleChatService;
 import com.echoim.server.service.conversation.ConversationService;
@@ -28,6 +29,7 @@ class ConversationServiceImplTest {
     private ImConversationMapper imConversationMapper;
     private ImConversationUserMapper imConversationUserMapper;
     private ImMessageMapper imMessageMapper;
+    private ImFileMapper imFileMapper;
     private ImSingleChatService imSingleChatService;
     private FileService fileService;
     private MessageViewService messageViewService;
@@ -39,6 +41,7 @@ class ConversationServiceImplTest {
         imConversationMapper = mock(ImConversationMapper.class);
         imConversationUserMapper = mock(ImConversationUserMapper.class);
         imMessageMapper = mock(ImMessageMapper.class);
+        imFileMapper = mock(ImFileMapper.class);
         imSingleChatService = mock(ImSingleChatService.class);
         fileService = mock(FileService.class);
         messageViewService = mock(MessageViewService.class);
@@ -47,6 +50,7 @@ class ConversationServiceImplTest {
                 imConversationMapper,
                 imConversationUserMapper,
                 imMessageMapper,
+                imFileMapper,
                 imSingleChatService,
                 fileService,
                 messageViewService,

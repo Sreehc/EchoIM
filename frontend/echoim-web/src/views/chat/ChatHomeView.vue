@@ -13,12 +13,14 @@ import PinnedMessagesBanner from '@/components/chat/PinnedMessagesBanner.vue'
 import MessageComposer from '@/components/chat/MessageComposer.vue'
 import ScheduledMessagesPanel from '@/components/chat/ScheduledMessagesPanel.vue'
 import MessageReadDetails from '@/components/chat/MessageReadDetails.vue'
+import SystemNoticeCenter from '@/components/chat/SystemNoticeCenter.vue'
 import type { VoiceRecordResult } from '@/components/chat/VoiceRecorder.vue'
 import ConversationProfileDrawer from '@/components/chat/ConversationProfileDrawer.vue'
 import AvatarBadge from '@/components/chat/AvatarBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
 import { useChatStore } from '@/stores/chat'
+import { useNoticeStore } from '@/stores/notices'
 import { useUiStore } from '@/stores/ui'
 import { uploadFile } from '@/services/files'
 import { checkUsernameAvailability, searchUsers } from '@/services/user'
@@ -84,6 +86,7 @@ type ContactsTab = 'friends' | 'requests' | 'blocked'
 const authStore = useAuthStore()
 const callStore = useCallStore()
 const chatStore = useChatStore()
+const noticeStore = useNoticeStore()
 const uiStore = useUiStore()
 const route = useRoute()
 const router = useRouter()
@@ -114,6 +117,8 @@ const scheduledPanelOpen = ref(false)
 const readDetailsVisible = ref(false)
 const readDetailsLoading = ref(false)
 const readDetailsData = ref<MessageReadDetail | null>(null)
+const noticeCenterOpen = ref(false)
+const activeNoticeId = ref<number | null>(null)
 const reportDialog = reactive({
   visible: false,
   targetType: 1 as 1 | 2,
@@ -286,6 +291,10 @@ const transientBanner = computed(() => {
     return { tone: 'warning', message: chatStore.errors.noticeMessage }
   }
 
+  if (noticeStore.bannerMessage) {
+    return { tone: 'muted', message: noticeStore.bannerMessage }
+  }
+
   if (chatStore.errors.sendError) {
     return { tone: 'error', message: chatStore.errors.sendError }
   }
@@ -386,6 +395,7 @@ watch(
     try {
       await chatStore.bootstrap()
       await authStore.ensureCurrentProfile().catch(() => null)
+      await noticeStore.bootstrap().catch(() => null)
     } catch {
       return
     }
@@ -1261,6 +1271,7 @@ async function handleRetry() {
   try {
     await chatStore.bootstrap(true)
     await authStore.ensureCurrentProfile(true).catch(() => null)
+    await noticeStore.bootstrap(true).catch(() => null)
   } catch {
     return
   }
@@ -1278,7 +1289,10 @@ async function handleLogout() {
     forwardDialog.visible = false
     globalSearchState.visible = false
     contactsState.addDialogVisible = false
+    noticeCenterOpen.value = false
+    activeNoticeId.value = null
     chatStore.resetState()
+    noticeStore.resetState()
     uiStore.setGlobalMenuOpen(false)
     uiStore.setTopbarMenuOpen(false)
     uiStore.setProfileOpen(false)
@@ -1300,6 +1314,7 @@ async function handleSwitchAccount(userId: number) {
   }
   callStore.resetState()
   chatStore.resetState()
+  noticeStore.resetState()
   uiStore.setGlobalMenuOpen(false)
   uiStore.setTopbarMenuOpen(false)
   uiStore.setProfileOpen(false)
@@ -1307,9 +1322,31 @@ async function handleSwitchAccount(userId: number) {
   try {
     await chatStore.bootstrap(true)
     await authStore.ensureCurrentProfile(true)
+    await noticeStore.bootstrap(true)
   } catch {
     return
   }
+}
+
+function openNoticeCenter() {
+  noticeCenterOpen.value = true
+  noticeStore.clearBannerMessage()
+  if (!activeNoticeId.value && noticeStore.items.length > 0) {
+    activeNoticeId.value = noticeStore.items[0].noticeId
+  }
+}
+
+function closeNoticeCenter() {
+  noticeCenterOpen.value = false
+}
+
+function openNoticeDetail(noticeId: number) {
+  activeNoticeId.value = noticeId
+  void noticeStore.readNotice(noticeId).catch(() => undefined)
+}
+
+async function handleReadNotice(noticeId: number) {
+  await noticeStore.readNotice(noticeId)
 }
 
 function handleRemoveStoredAccount(userId: number) {

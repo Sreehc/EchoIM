@@ -5,6 +5,7 @@ public class LoginUser {
     private Long userId;
     private String username;
     private String tokenType;
+    private String roleCode;
     private Long expireAtMillis;
 
     public Long getUserId() {
@@ -29,6 +30,14 @@ public class LoginUser {
 
     public void setTokenType(String tokenType) {
         this.tokenType = tokenType;
+    }
+
+    public String getRoleCode() {
+        return roleCode;
+    }
+
+    public void setRoleCode(String roleCode) {
+        this.roleCode = roleCode;
     }
 
     public Long getExpireAtMillis() {

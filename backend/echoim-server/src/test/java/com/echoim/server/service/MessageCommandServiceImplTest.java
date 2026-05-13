@@ -12,6 +12,7 @@ import com.echoim.server.im.service.ImWsPushService;
 import com.echoim.server.mapper.ImConversationMapper;
 import com.echoim.server.mapper.ImConversationUserMapper;
 import com.echoim.server.mapper.ImMessageMapper;
+import com.echoim.server.mapper.ImMessagePinMapper;
 import com.echoim.server.mapper.ImMessageReactionMapper;
 import com.echoim.server.service.config.SystemConfigService;
 import com.echoim.server.service.file.FileService;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.*;
 class MessageCommandServiceImplTest {
 
     private ImMessageMapper imMessageMapper;
+    private ImMessagePinMapper imMessagePinMapper;
     private ImConversationMapper imConversationMapper;
     private ImConversationUserMapper imConversationUserMapper;
     private ImSingleChatService imSingleChatService;
@@ -47,6 +49,7 @@ class MessageCommandServiceImplTest {
     @BeforeEach
     void setUp() {
         imMessageMapper = mock(ImMessageMapper.class);
+        imMessagePinMapper = mock(ImMessagePinMapper.class);
         imConversationMapper = mock(ImConversationMapper.class);
         imConversationUserMapper = mock(ImConversationUserMapper.class);
         imSingleChatService = mock(ImSingleChatService.class);
@@ -58,7 +61,7 @@ class MessageCommandServiceImplTest {
         systemConfigService = mock(SystemConfigService.class);
         auditLogService = mock(AuditLogService.class);
         service = new MessageCommandServiceImpl(
-                imMessageMapper, imMessageReactionMapper, imConversationMapper, imConversationUserMapper,
+                imMessageMapper, imMessagePinMapper, imMessageReactionMapper, imConversationMapper, imConversationUserMapper,
                 imSingleChatService, imGroupChatService, imWsPushService,
                 fileService,
                 messageViewService, systemConfigService, auditLogService, new ObjectMapper()

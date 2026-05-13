@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireAdmin;
 import com.echoim.server.common.PageResponse;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
@@ -17,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RequireLogin
+@RequireAdmin
 @RestController
 @RequestMapping("/api/admin/bans")
 public class AdminBanController {

@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireAdmin;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.service.admin.DashboardService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RequireLogin
+@RequireAdmin
 @RestController
 @RequestMapping("/api/admin/dashboard")
 public class AdminDashboardController {

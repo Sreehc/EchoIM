@@ -169,6 +169,23 @@ export interface ApiImInfo {
   path: string
 }
 
+export interface ApiUserNoticeItem {
+  noticeId: number
+  title: string
+  content: string
+  noticeType: number
+  publishedAt: string
+  read: boolean
+}
+
+export interface ApiNoticePageResult {
+  list: ApiUserNoticeItem[]
+  pageNo: number
+  pageSize: number
+  total: number
+  unreadCount: number
+}
+
 export type WsMessageType =
   | 'AUTH'
   | 'PING'
@@ -189,6 +206,7 @@ export type WsMessageType =
   | 'CALL_ICE_CANDIDATE'
   | 'CALL_STATE'
   | 'NOTICE'
+  | 'SYSTEM_NOTICE'
   | 'CONVERSATION_CHANGE'
   | 'FORCE_OFFLINE'
   | 'OFFLINE_SYNC'
@@ -216,6 +234,14 @@ export interface WsAuthPayload {
 export interface WsNoticePayload {
   code: number
   message: string
+}
+
+export interface WsSystemNoticePayload {
+  noticeId: number
+  title: string
+  noticeType: number
+  publishedAt: string
+  requiresDetail: boolean
 }
 
 export interface WsPongPayload {

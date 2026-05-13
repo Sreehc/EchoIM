@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireAdmin;
 import com.echoim.server.common.annotation.RequireLogin;
 import com.echoim.server.common.auth.LoginUserContext;
 import com.echoim.server.service.sensitive.SensitiveWordService;
@@ -12,6 +13,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/sensitive-words")
 @RequireLogin
+@RequireAdmin
 public class AdminSensitiveWordController {
 
     private final SensitiveWordService sensitiveWordService;

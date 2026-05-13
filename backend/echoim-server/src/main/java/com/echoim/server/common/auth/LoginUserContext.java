@@ -26,6 +26,17 @@ public final class LoginUserContext {
         return loginUser.getUserId();
     }
 
+    public static LoginUser requireAdmin() {
+        LoginUser loginUser = HOLDER.get();
+        if (loginUser == null || loginUser.getUserId() == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED, "未登录");
+        }
+        if (!"admin".equalsIgnoreCase(loginUser.getTokenType())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "需要管理员身份");
+        }
+        return loginUser;
+    }
+
     public static void clear() {
         HOLDER.remove();
     }

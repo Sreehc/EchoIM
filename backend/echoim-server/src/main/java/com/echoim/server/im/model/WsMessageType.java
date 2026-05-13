@@ -20,6 +20,7 @@ public enum WsMessageType {
     CALL_ICE_CANDIDATE,
     CALL_STATE,
     NOTICE,
+    SYSTEM_NOTICE,
     CONVERSATION_CHANGE,
     FORCE_OFFLINE,
     OFFLINE_SYNC,

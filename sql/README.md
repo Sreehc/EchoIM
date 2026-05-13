@@ -107,6 +107,7 @@ docker exec -i echoim-mysql sh -lc 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --defa
 |------|------|
 | `im_report` | 举报记录 |
 | `im_system_notice` | 系统公告 |
+| `im_system_notice_read` | 系统公告已读记录 |
 | `im_user_ban` | 用户封禁记录 |
 | `sys_admin_user` | 管理员账号 |
 | `sys_config` | 系统配置 |

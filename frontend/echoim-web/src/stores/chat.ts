@@ -27,6 +27,7 @@ import { editMessage as editMessageRequest, reactMessage as reactMessageRequest,
 import { EchoWsClient } from '@/services/ws'
 import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
+import { useNoticeStore } from '@/stores/notices'
 import { useUiStore } from '@/stores/ui'
 import { fetchUserPublicProfile } from '@/services/user'
 import { showIncomingMessageNotification } from '@/utils/browserNotifications'
@@ -44,6 +45,7 @@ import type {
   WsConversationChangePayload,
   WsEnvelope,
   WsNoticePayload,
+  WsSystemNoticePayload,
   WsReadPayload,
 } from '@/types/api'
 import type {
@@ -75,6 +77,7 @@ const DEFAULT_PAGE_SIZE = 50
 export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore()
   const callStore = useCallStore()
+  const noticeStore = useNoticeStore()
   const uiStore = useUiStore()
 
   const conversations = ref<ConversationSummary[]>([])
@@ -803,6 +806,11 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
+    if (envelope.type === 'SYSTEM_NOTICE') {
+      noticeStore.handleSystemNotice(envelope.data as WsSystemNoticePayload)
+      return
+    }
+
     if (envelope.type === 'FORCE_OFFLINE') {
       const offlineData = envelope.data as { code?: number; message?: string } | undefined
       const TOKEN_EXPIRED_CODE = 40102
@@ -819,6 +827,7 @@ export const useChatStore = defineStore('chat', () => {
 
       authStore.clearSession()
       resetState()
+      noticeStore.resetState()
       window.location.assign('/login')
       return
     }

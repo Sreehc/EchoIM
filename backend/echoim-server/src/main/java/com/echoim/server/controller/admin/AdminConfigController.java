@@ -1,6 +1,7 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
+import com.echoim.server.common.annotation.RequireAdmin;
 import com.echoim.server.common.annotation.RequireLogin;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @RequireLogin
+@RequireAdmin
 @RestController
 @RequestMapping({"/api/admin/configs", "/admin/configs"})
 public class AdminConfigController {

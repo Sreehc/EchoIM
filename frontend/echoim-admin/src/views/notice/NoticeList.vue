@@ -66,6 +66,14 @@
             <el-radio :value="2">指定用户</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item v-if="createForm.noticeType === 2" label="目标用户">
+          <el-input
+            v-model="createForm.targetUserIds"
+            type="textarea"
+            :rows="3"
+            placeholder="输入用户 ID，支持逗号或换行分隔"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="createDialogVisible = false">取消</el-button>
@@ -89,12 +97,13 @@ const total = ref(0)
 
 const createDialogVisible = ref(false)
 const creating = ref(false)
-const createForm = reactive({ title: '', content: '', noticeType: 1 })
+const createForm = reactive({ title: '', content: '', noticeType: 1, targetUserIds: '' })
 
 function openCreateDialog() {
   createForm.title = ''
   createForm.content = ''
   createForm.noticeType = 1
+  createForm.targetUserIds = ''
   createDialogVisible.value = true
 }
 
@@ -116,9 +125,18 @@ async function handleCreate() {
     ElMessage.warning('请填写标题和内容')
     return
   }
+  if (createForm.noticeType === 2 && !createForm.targetUserIds.trim()) {
+    ElMessage.warning('请填写目标用户 ID')
+    return
+  }
   creating.value = true
   try {
-    await createNotice(createForm)
+    await createNotice({
+      title: createForm.title,
+      content: createForm.content,
+      noticeType: createForm.noticeType,
+      targetUserIds: createForm.noticeType === 2 ? createForm.targetUserIds : undefined,
+    })
     ElMessage.success('公告已发布')
     createDialogVisible.value = false
     loadData()

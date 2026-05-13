@@ -18,6 +18,8 @@ class MessageViewServiceImplTest {
         MessageViewServiceImpl service = new MessageViewServiceImpl(
                 mock(com.echoim.server.mapper.ImMessageReceiptMapper.class),
                 mock(com.echoim.server.mapper.ImMessageReactionMapper.class),
+                mock(com.echoim.server.mapper.ImMessageMapper.class),
+                mock(com.echoim.server.mapper.ImGroupMemberMapper.class),
                 new ObjectMapper()
         );
         MessageItemVo message = new MessageItemVo();

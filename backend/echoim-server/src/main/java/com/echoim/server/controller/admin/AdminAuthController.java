@@ -1,45 +1,36 @@
 package com.echoim.server.controller.admin;
 
 import com.echoim.server.common.ApiResponse;
-import com.echoim.server.common.auth.LoginUser;
-import com.echoim.server.service.token.TokenService;
+import com.echoim.server.common.annotation.RequireAdmin;
+import com.echoim.server.common.auth.LoginUserContext;
+import com.echoim.server.service.admin.AdminAuthService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping({"/api/admin/auth", "/admin/auth"})
 public class AdminAuthController {
 
-    private final TokenService tokenService;
+    private final AdminAuthService adminAuthService;
 
-    public AdminAuthController(TokenService tokenService) {
-        this.tokenService = tokenService;
+    public AdminAuthController(AdminAuthService adminAuthService) {
+        this.adminAuthService = adminAuthService;
     }
 
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@Valid @RequestBody AdminLoginRequest request) {
-        // TODO: replace stub with real admin credential verification
-        LoginUser adminUser = new LoginUser();
-        adminUser.setUserId(0L);
-        adminUser.setUsername(request.username());
-        adminUser.setTokenType("admin");
+        return ApiResponse.success(adminAuthService.login(request.username(), request.password()));
+    }
 
-        String token = tokenService.generateToken(adminUser);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("token", token);
-        result.put("tokenType", "Bearer");
-        result.put("adminInfo", Map.of(
-                "adminUserId", 0L,
-                "username", request.username(),
-                "nickname", "系统管理员",
-                "roleCode", "super_admin"
-        ));
-        return ApiResponse.success(result);
+    @PostMapping("/logout")
+    @RequireAdmin
+    public ApiResponse<Void> logout() {
+        var admin = LoginUserContext.requireAdmin();
+        adminAuthService.logout(admin.getUserId(), admin.getUsername());
+        return ApiResponse.success();
     }
 
     public record AdminLoginRequest(

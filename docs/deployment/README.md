@@ -33,6 +33,7 @@ cp .env.example .env
 - `ECHOIM_JWT_SECRET`：JWT 签名密钥
 - `MYSQL_*`：数据库连接
 - `REDIS_*`：Redis 连接
+- `ECHOIM_ADMIN_SUPER_USERNAME` / `ECHOIM_ADMIN_SUPER_PASSWORD`：可选的部署期超级管理员引导账号
 - `SPRING_MAIL_*`：邮件服务（注册/登录验证码）
 - `ALIYUN_OSS_*` 或使用本地存储（设置 `ECHOIM_FILE_STORAGE_TYPE=local`）
 
@@ -180,6 +181,9 @@ WebSocket 生产环境使用 `wss://` 协议。
 | `SPRING_MAIL_USERNAME` | SMTP 账号 | **必填** |
 | `SPRING_MAIL_PASSWORD` | SMTP 密码 | **必填** |
 | `SPRING_MAIL_FROM` | 发件人 | `EchoIM <mailer@example.com>` |
+| `ECHOIM_ADMIN_SUPER_USERNAME` | 部署期超级管理员账号 | 空 |
+| `ECHOIM_ADMIN_SUPER_PASSWORD` | 部署期超级管理员密码 | 空 |
+| `ECHOIM_ADMIN_SUPER_NICKNAME` | 部署期超级管理员昵称 | `系统管理员` |
 | `ECHOIM_FILE_STORAGE_TYPE` | 存储类型 | `oss` |
 | `ECHOIM_FILE_MAX_SIZE` | 最大文件大小 | `104857600`（100MB） |
 | `ALIYUN_OSS_BUCKET` | OSS Bucket | - |
@@ -227,3 +231,14 @@ ECHOIM_CALL_ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]},{"urls":["tur
 ```
 
 推荐使用 [coturn](https://github.com/coturn/coturn) 自建或接入 Twilio 等第三方服务。
+
+## 9. Beta 发布检查单
+
+Beta 发布前请至少完成以下检查：
+
+- 超级管理员账号可正常登录，普通用户 token 不能访问任意 `/api/admin/*` 接口
+- 用户端登录后能拉取系统公告，在线用户能收到新公告提示
+- 系统公告可进入详情并标记已读，刷新后未读数状态保持一致
+- 后端 `mvn test`、用户端与管理后台 `typecheck` 和 `build` 全部通过
+- `.env` 中 JWT、数据库、Redis、邮件、文件存储和管理员引导账号配置已核验
+- 已记录本次发布版本、回归结果和已知问题

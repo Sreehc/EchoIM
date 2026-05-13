@@ -121,8 +121,8 @@ const isCollapsed = ref(false)
 const activeMenu = computed(() => route.path)
 const currentTitle = computed(() => (route.meta.title as string) || '管理后台')
 
-function handleLogout() {
-  authStore.logout()
+async function handleLogout() {
+  await authStore.logout()
   router.push('/login')
 }
 </script>

@@ -13,6 +13,10 @@ echoim:
     secret: ${ECHOIM_JWT_SECRET:your-jwt-secret}
   auth:
     refresh-token-expire-days: 30
+  admin:
+    super-username: ${ECHOIM_ADMIN_SUPER_USERNAME:admin}
+    super-password: ${ECHOIM_ADMIN_SUPER_PASSWORD:EchoIM@Admin2026!}
+    super-nickname: ${ECHOIM_ADMIN_SUPER_NICKNAME:系统管理员}
   file:
     storage-type: oss
     access-sign-secret: echoim-local-file-access-secret

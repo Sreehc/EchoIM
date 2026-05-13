@@ -47,6 +47,7 @@ public class TokenServiceImpl implements TokenService {
                 .claim("userId", loginUser.getUserId())
                 .claim("username", loginUser.getUsername())
                 .claim("tokenType", loginUser.getTokenType())
+                .claim("roleCode", loginUser.getRoleCode())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expireAt))
                 .signWith(secretKey)
@@ -67,6 +68,7 @@ public class TokenServiceImpl implements TokenService {
             loginUser.setUserId(userId == null ? null : userId.longValue());
             loginUser.setUsername(claims.get("username", String.class));
             loginUser.setTokenType(claims.get("tokenType", String.class));
+            loginUser.setRoleCode(claims.get("roleCode", String.class));
             Date expiration = claims.getExpiration();
             loginUser.setExpireAtMillis(expiration == null ? null : expiration.getTime());
             return loginUser;
